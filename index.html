@@ -242,12 +242,15 @@
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
   input[type=file]{display:none}
   #printRoot{display:none}
-  @media print{@page{size:landscape;margin:12mm}.app,.scrim,#home{display:none!important}
-    #printRoot{display:block;color:#111;font-family:var(--sans)}#printRoot img{width:100%;border:1px solid #ccc;border-radius:6px}
-    #printRoot h1{font-size:20px;margin:0 0 2px}#printRoot .pmeta{color:#555;font-size:12px;margin-bottom:10px}
-    #printRoot table{width:100%;border-collapse:collapse;font-size:10px;margin-top:10px}
-    #printRoot th,#printRoot td{border:1px solid #ccc;padding:3px 5px;text-align:left}#printRoot th{background:#f0f0f0}
-    #printRoot .pcols{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}#printRoot .pstat{font-size:12px;line-height:1.7}}
+  @media print{@page{size:landscape;margin:11mm}.app,.scrim,#home{display:none!important}
+    #printRoot{display:block;color:#111;font-family:var(--sans)}
+    #printRoot h1{font-size:20px;margin:0 0 2px}#printRoot .pmeta{color:#555;font-size:12px;margin-bottom:8px}
+    #printRoot .pmap{display:block;width:100%;max-height:126mm;object-fit:contain;border:1px solid #ccc;border-radius:6px;margin-bottom:8px}
+    #printRoot .pstat{font-size:12px;margin-bottom:8px}
+    #printRoot .ptables{display:flex;gap:10px;align-items:flex-start}
+    #printRoot table{width:100%;border-collapse:collapse;font-size:9px}
+    #printRoot th,#printRoot td{border:1px solid #ccc;padding:2px 4px;text-align:left}#printRoot th{background:#f0f0f0}
+    #printRoot td strong{font-weight:700}}
 </style>
 
 <!-- ===================== HOME ===================== -->
@@ -293,7 +296,7 @@
   <header class="bar">
     <button class="iconbtn" id="homeBtn" title="Home" aria-label="Home">≡</button>
     <div class="brand-mini"><b id="wsName">Sheet</b><span class="sub" id="wsFac"></span></div>
-    <div class="count-pill"><b id="countNum">0</b> / 33 logged</div>
+    <div class="count-pill"><b id="countNum">0</b> / <span id="countTot">33</span> logged</div>
     <div class="seg" role="group" aria-label="View">
       <button id="viewMap" aria-pressed="true">Map</button>
       <button id="viewTrend" aria-pressed="false">Trend</button>
@@ -305,6 +308,8 @@
 
   <div class="subbar">
     <span class="field">Round <select id="sessSel"></select></span>
+    <span class="field">Detail <select id="modeSel">
+      <option value="detailed">Detailed · 39</option><option value="moderate">Moderate · 33</option><option value="quick">Quick · 19</option></select></span>
     <button class="mini" id="newRound">+ New round</button>
     <span class="sub-spacer"></span>
     <span class="field" id="cmpWrap">Compare to <select id="cmpSel"></select></span>
@@ -327,6 +332,11 @@
             <label class="cl ccheck"><input type="checkbox" id="contourOn" checked> Contours</label><span class="cl dim">fewer</span>
             <input type="range" id="contourSlider" min="0" max="5" step="1" value="2" aria-label="Contour density">
             <span class="cl dim">more</span><span class="cl ct" id="contourCount"></span>
+          </div>
+          <div class="contour-bar" id="smoothBar">
+            <span class="cl">Smoothing</span><span class="cl dim">soft</span>
+            <input type="range" id="smoothSlider" min="0" max="5" step="1" value="2" aria-label="Interpolation smoothing">
+            <span class="cl dim">sharp</span><span class="cl ct" id="smoothCount"></span>
           </div>
           <div id="threeWrap"><canvas id="surf" width="1100" height="620"></canvas>
             <div class="surf-hint">drag to rotate · pinch or ↑/↓ to scale height</div></div>
@@ -442,6 +452,8 @@
     <h2>New round</h2>
     <div class="lead">Pick the date this round was measured. Backdate it to log past measurements that were missed.</div>
     <div class="row"><label for="roundDate">Date measured</label><input type="date" id="roundDate"></div>
+    <div class="row"><label for="roundMode">Detail level</label><select id="roundMode">
+      <option value="detailed">Detailed — 39 spots</option><option value="moderate">Moderate — 33 spots</option><option value="quick">Quick — 19 spots</option></select></div>
     <div class="row"><label for="roundLabel">Label (optional)</label><input type="text" id="roundLabel" placeholder="e.g. morning flood, post-event"></div>
     <div class="modal-foot"><button class="btn ghost" id="roundCancel">Cancel</button><button class="btn primary" id="roundCreate">Create round</button></div>
   </div>
@@ -470,24 +482,33 @@ const RINK_SIZES=[
   {id:"studio",name:"Studio — 185 × 85 ft",   L:185, W:85,  corner:25}
 ];
 const NHL_SIZE=()=>({...RINK_SIZES[0]});
+const MODES={detailed:{label:"Detailed",n:39},moderate:{label:"Moderate",n:33},quick:{label:"Quick",n:19}};
 let L=200,W=85,CORNER=28;
-let GOAL1,GOAL2,FO_L,FO_R,BLUE1,BLUE2,CX,FO_T,FO_B,CY;
+let GOAL1,GOAL2,FO_L,FO_R,BLUE1,BLUE2,CX,FO_T,FO_B,CY,LG_FO,L_FO_BL,R_BL_FO,R_FO_G,BC_L,BC_R;
 let XS=[],YS=[],POINTS=[],idxByKey=new Map(),guidedOrder=[],xName=new Map(),yName=new Map();
 const keyOf=p=>p.x+","+p.y;
 const zoneOf=p=>`${xName.get(p.x)} · ${yName.get(p.y)}`;
 const thirdOf=x=>x<BLUE1?0:x>BLUE2?2:1;
-function applyGeometry(size){
-  size=size||NHL_SIZE();const sx=size.L/200, sy=size.W/85;
+function pointsForMode(mode){const rows=[FO_B,CY,FO_T],out=[];
+  if(mode==="quick"){for(const x of [GOAL1,BLUE1,CX,BLUE2,GOAL2])for(const y of rows)out.push({x,y});
+    for(const x of [FO_L,FO_R])for(const y of [FO_B,FO_T])out.push({x,y});}
+  else{const cols=mode==="detailed"?[GOAL1,LG_FO,FO_L,L_FO_BL,BLUE1,BC_L,CX,BC_R,BLUE2,R_BL_FO,FO_R,R_FO_G,GOAL2]
+    :[GOAL1,LG_FO,FO_L,L_FO_BL,BLUE1,CX,BLUE2,R_BL_FO,FO_R,R_FO_G,GOAL2];
+    for(const x of cols)for(const y of rows)out.push({x,y});}
+  return out;}
+function applyGeometry(size,mode){
+  size=size||NHL_SIZE();mode=mode||"moderate";const sx=size.L/200, sy=size.W/85;
   L=size.L; W=size.W; CORNER=size.corner;
   GOAL1=11*sx; GOAL2=size.L-11*sx; BLUE1=75*sx; BLUE2=size.L-75*sx; CX=size.L/2;
   FO_L=40*sx; FO_R=size.L-40*sx; FO_B=22*sy; FO_T=size.W-22*sy; CY=size.W/2;
-  const LG_FO=(GOAL1+FO_L)/2,L_FO_BL=(FO_L+BLUE1)/2,R_BL_FO=(BLUE2+FO_R)/2,R_FO_G=(FO_R+GOAL2)/2;
+  LG_FO=(GOAL1+FO_L)/2;L_FO_BL=(FO_L+BLUE1)/2;R_BL_FO=(BLUE2+FO_R)/2;R_FO_G=(FO_R+GOAL2)/2;BC_L=(BLUE1+CX)/2;BC_R=(CX+BLUE2)/2;
   XS=[GOAL1,LG_FO,FO_L,L_FO_BL,BLUE1,CX,BLUE2,R_BL_FO,FO_R,R_FO_G,GOAL2];YS=[FO_B,CY,FO_T];
-  POINTS=[];for(const x of XS)for(const y of YS)POINTS.push({x,y});
+  POINTS=pointsForMode(mode);
   idxByKey=new Map(POINTS.map((p,i)=>[keyOf(p),i]));
-  xName=new Map([[GOAL1,"L goal line"],[LG_FO,"L goal–FO"],[FO_L,"L faceoff"],[L_FO_BL,"L FO–blue"],[BLUE1,"L blue line"],[CX,"Center"],[BLUE2,"R blue line"],[R_BL_FO,"R blue–FO"],[FO_R,"R faceoff"],[R_FO_G,"R FO–goal"],[GOAL2,"R goal line"]]);
+  xName=new Map([[GOAL1,"L goal line"],[LG_FO,"L goal–FO"],[FO_L,"L faceoff"],[L_FO_BL,"L FO–blue"],[BLUE1,"L blue line"],[BC_L,"L blue–center"],[CX,"Center"],[BC_R,"center–R blue"],[BLUE2,"R blue line"],[R_BL_FO,"R blue–FO"],[FO_R,"R faceoff"],[R_FO_G,"R FO–goal"],[GOAL2,"R goal line"]]);
   yName=new Map([[FO_B,"bottom"],[CY,"mid"],[FO_T,"top"]]);
-  guidedOrder=[];XS.forEach((x,ci)=>{(ci%2===0?YS:[...YS].reverse()).forEach(y=>guidedOrder.push(idxByKey.get(x+","+y)));});
+  guidedOrder=[];const cols=[...new Set(POINTS.map(p=>p.x))].sort((a,b)=>a-b);
+  cols.forEach((x,ci)=>{const ids=POINTS.map((p,i)=>({p,i})).filter(o=>o.p.x===x).sort((a,b)=>a.p.y-b.p.y).map(o=>o.i);if(ci%2===1)ids.reverse();ids.forEach(i=>guidedOrder.push(i));});
 }
 applyGeometry();
 
@@ -517,11 +538,11 @@ function buildBands(){const e=S().edges,lts=[e[0],e[1],e[2],e[3],Infinity];
 const bandOf=v=>{for(const b of BANDS)if(v<b.lt)return b;return BANDS[BANDS.length-1];};
 
 const uid=()=>Math.random().toString(36).slice(2,9);
-const newSession=()=>({id:uid(),date:new Date().toISOString(),label:"",data:{},notes:{}});
+const newSession=()=>({id:uid(),date:new Date().toISOString(),label:"",mode:"moderate",data:{},notes:{}});
 const newSheet=(n,size)=>({id:uid(),name:n||"Main sheet",size:size||NHL_SIZE(),sessions:[newSession()]});
 const defaultSettings=()=>({target:1.5,edges:[...DEFAULT_EDGES],tieAttention:true,floodBelow:1.25,shaveAbove:1.5625});
 const newFacility=n=>{const sh=newSheet();return{id:uid(),name:n||"Main facility",settings:defaultSettings(),sheets:[sh]};};
-function freshState(){const f=newFacility();return{theme:"dark",contourIdx:2,contoursOn:true,overdueDays:7,facilities:[f],activeFacility:f.id,activeSheet:f.sheets[0].id,activeSession:f.sheets[0].sessions[0].id};}
+function freshState(){const f=newFacility();return{theme:"dark",contourIdx:2,contoursOn:true,smoothIdx:2,overdueDays:7,facilities:[f],activeFacility:f.id,activeSheet:f.sheets[0].id,activeSession:f.sheets[0].sessions[0].id};}
 
 const facility=()=>state.facilities.find(f=>f.id===state.activeFacility)||state.facilities[0];
 const S=()=>facility().settings;
@@ -543,11 +564,11 @@ function doUndo(){if(!undoStack.length)return;const s=session(),p=JSON.parse(und
 const clearUndo=()=>{undoStack=[];const u=$("undoBtn");if(u)u.disabled=true;};
 
 /* ---------- interpolation ---------- */
-const NX=150,NY=64,POWER=2.4;let field=null,deltaField=null;
+const NX=150,NY=64;const SMOOTH_STEPS=[1.6,2.0,2.4,3.0,3.8,5.0],SMOOTH_LABELS=["very soft","soft","balanced","crisp","sharp","hard edges"];const POW=()=>SMOOTH_STEPS[(state&&state.smoothIdx!=null)?state.smoothIdx:2];let field=null,deltaField=null;
 function anchors(v){const a=[],s=8;for(let x=0;x<=L;x+=s){a.push({x,y:0,v});a.push({x,y:W,v});}for(let y=s;y<W;y+=s){a.push({x:0,y,v});a.push({x:L,y,v});}return a;}
-function idw(samples,fallback){const out=new Float32Array(NX*NY);
+function idw(samples,fallback){const out=new Float32Array(NX*NY),pw=POW();
   for(let j=0;j<NY;j++){const fy=(j+0.5)/NY*W;for(let i=0;i<NX;i++){const fx=(i+0.5)/NX*L;let num=0,den=0,hit=null;
-    for(let p=0;p<samples.length;p++){const dx=fx-samples[p].x,dy=fy-samples[p].y,d2=dx*dx+dy*dy;if(d2<0.25){hit=samples[p].v;break;}const w=1/Math.pow(d2,POWER/2);num+=w*samples[p].v;den+=w;}
+    for(let p=0;p<samples.length;p++){const dx=fx-samples[p].x,dy=fy-samples[p].y,d2=dx*dx+dy*dy;if(d2<0.25){hit=samples[p].v;break;}const w=1/Math.pow(d2,pw/2);num+=w*samples[p].v;den+=w;}
     out[i+j*NX]=hit!=null?hit:(den?num/den:fallback);}}return out;}
 function computeField(){const pts=[],d=data();for(const k in d){const[x,y]=k.split(",").map(Number);pts.push({x,y,v:decOf.get(d[k])});}field=idw(pts.concat(anchors(S().target)),S().target);}
 function computeDelta(){const base=baselineSession();if(!base){deltaField=null;return;}const cur=data(),bd=base.data,pts=[];
@@ -623,17 +644,17 @@ function buildSessSel(){const sh=sheet(),es=$("sessSel");es.innerHTML="";[...sh.
   const a=document.createElement("option");a.value="";a.textContent="previous round";cs.appendChild(a);
   others.forEach(s=>{const o=document.createElement("option");o.value=s.id;o.textContent=fmtDate(s.date)+(s.label?` · ${s.label}`:"");if(s.id===compareId)o.selected=true;cs.appendChild(o);});
   $("cmpWrap").classList.toggle("on",viewMode==="trend");
-  $("wsName").textContent=sheet().name;$("wsFac").textContent=facility().name;}
+  $("wsName").textContent=sheet().name;$("wsFac").textContent=facility().name;$("modeSel").value=session().mode||"moderate";}
 const fmtDate=iso=>{const d=new Date(iso);return d.toLocaleDateString(undefined,{month:"short",day:"numeric"})+" "+d.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"});};
 const fmtDay=iso=>new Date(iso).toLocaleDateString(undefined,{month:"short",day:"numeric"});
 
 /* ---------- refresh ---------- */
-function refresh(){drawLive();const p=POINTS[selIdx],lab=data()[keyOf(p)];
+function refresh(){if(selIdx>=POINTS.length)selIdx=0;if(guidedPos>=guidedOrder.length)guidedPos=0;drawLive();const p=POINTS[selIdx],lab=data()[keyOf(p)];
   $("selZone").textContent=zoneOf(p);$("selVal").textContent=lab?frClean(lab):"not set";$("noteInput").value=notes()[keyOf(p)]||"";
-  const cnt=Object.keys(data()).length;$("countNum").textContent=cnt;$("hint").style.display=cnt?"none":"grid";
+  const cnt=Object.keys(data()).length,tot=POINTS.length;$("countNum").textContent=cnt;$("countTot").textContent=tot;$("hint").style.display=cnt?"none":"grid";
   document.querySelectorAll(".chip[data-opt]").forEach(c=>c.classList.toggle("is-set",c.dataset.opt===lab));
   const gp=$("gprog");gp.classList.toggle("on",entryMode==="guided");
-  if(entryMode==="guided"){$("gposLab").textContent=`Point ${guidedPos+1} of 33 · ${zoneOf(POINTS[guidedOrder[guidedPos]])}`;$("gleftLab").textContent=`${cnt}/33 done`;$("gfill").style.width=(cnt/33*100)+"%";}
+  if(entryMode==="guided"){$("gposLab").textContent=`Point ${guidedPos+1} of ${tot} · ${zoneOf(POINTS[guidedOrder[guidedPos]])}`;$("gleftLab").textContent=`${cnt}/${tot} done`;$("gfill").style.width=(cnt/tot*100)+"%";}
   renderStats();if(viewMode==="3d")drawSurf();updateContourReadout();}
 function renderStats(){const d=data(),rows=[];for(const k in d){const[x,y]=k.split(",").map(Number);rows.push({x,y,zone:zoneOf({x,y}),lab:d[k],v:decOf.get(d[k])});}
   $("targetNote").textContent="target "+fr(S().target);
@@ -668,17 +689,25 @@ $("noteInput").addEventListener("input",e=>setNote(e.target.value));
 
 /* ---------- views ---------- */
 function setView(v){viewMode=v;$("viewMap").setAttribute("aria-pressed",String(v==="map"));$("viewTrend").setAttribute("aria-pressed",String(v==="trend"));$("view3d").setAttribute("aria-pressed",String(v==="3d"));
-  $("live2d").classList.toggle("off",v==="3d");$("threeWrap").classList.toggle("on",v==="3d");$("contourBar").style.display=v==="map"?"flex":"none";buildLegend();buildSessSel();
-  if(v==="3d"){sizeSurf();drawSurf();}else drawLive();renderStats();updateContourReadout();}
+  $("live2d").classList.toggle("off",v==="3d");$("threeWrap").classList.toggle("on",v==="3d");$("contourBar").style.display=v==="map"?"flex":"none";$("smoothBar").style.display=v==="map"?"flex":"none";buildLegend();buildSessSel();
+  if(v==="3d"){sizeSurf();drawSurf();}else drawLive();renderStats();updateContourReadout();updateSmoothReadout();}
 $("viewMap").addEventListener("click",()=>setView("map"));$("viewTrend").addEventListener("click",()=>{computeDelta();setView("trend");});$("view3d").addEventListener("click",()=>setView("3d"));
 function updateContourReadout(){const on=state.contoursOn??true;if(!on){$("contourCount").textContent="off";return;}const step=CONTOUR_STEPS[state.contourIdx??2],n=contourLevels().length;$("contourCount").textContent="every "+fr(step)+(n?` · ${n} lines`:" · flat");}
 $("contourSlider").addEventListener("input",e=>{state.contourIdx=+e.target.value;persist();if(viewMode==="map")drawLive();updateContourReadout();});
 $("contourOn").addEventListener("change",e=>{state.contoursOn=e.target.checked;$("contourBar").classList.toggle("off",!e.target.checked);$("contourSlider").disabled=!e.target.checked;persist();if(viewMode==="map")drawLive();updateContourReadout();});
+function updateSmoothReadout(){$("smoothCount").textContent=SMOOTH_LABELS[(state.smoothIdx!=null)?state.smoothIdx:2];}
+$("smoothSlider").addEventListener("input",e=>{state.smoothIdx=+e.target.value;persist();computeField();computeDelta();if(viewMode==="3d")drawSurf();else drawLive();updateSmoothReadout();updateContourReadout();});
 
 /* ---------- round controls ---------- */
-$("sessSel").addEventListener("change",e=>{state.activeSession=e.target.value;compareId=null;clearUndo();selIdx=0;computeField();computeDelta();buildSessSel();refresh();persist();});
+$("sessSel").addEventListener("change",e=>{state.activeSession=e.target.value;compareId=null;clearUndo();selIdx=0;applyGeometry(sheet().size,session().mode);computeField();computeDelta();buildSessSel();refresh();persist();});
+function changeMode(mode){const s=session();if(mode===(s.mode||"moderate"))return;
+  const valid=new Set(pointsForMode(mode).map(keyOf)),cur=s.data,orphan=Object.keys(cur).filter(k=>!valid.has(k));
+  if(orphan.length&&!confirm(`Switch to ${MODES[mode].label} (${MODES[mode].n} spots)? ${orphan.length} existing reading(s) fall outside that grid and will be removed.`)){$("modeSel").value=s.mode||"moderate";return;}
+  if(orphan.length){pushUndo();orphan.forEach(k=>{delete cur[k];delete s.notes[k];});}
+  s.mode=mode;selIdx=0;guidedPos=0;applyGeometry(sheet().size,mode);computeField();computeDelta();buildSessSel();refresh();persist();flashNote(MODES[mode].label+" · "+MODES[mode].n+" spots");}
+$("modeSel").addEventListener("change",e=>changeMode(e.target.value));
 $("cmpSel").addEventListener("change",e=>{compareId=e.target.value||null;computeDelta();drawLive();renderStats();persist();});
-$("newRound").addEventListener("click",()=>openNewRound(s=>{compareId=null;clearUndo();selIdx=0;guidedPos=0;computeField();computeDelta();buildSessSel();refresh();persist();flashNote("round added "+fmtDay(s.date));}));
+$("newRound").addEventListener("click",()=>openNewRound(s=>{compareId=null;clearUndo();selIdx=0;guidedPos=0;applyGeometry(sheet().size,s.mode);computeField();computeDelta();buildSessSel();refresh();persist();flashNote("round added "+fmtDay(s.date));}));
 
 /* ---------- CSV / files ---------- */
 $("expCsv").addEventListener("click",()=>{const d=data(),nt=notes();let csv="x_ft,y_ft,thickness,zone,note\n";for(const k in d){const[x,y]=k.split(",");csv+=`${x},${y},${decOf.get(d[k])},"${zoneOf({x:+x,y:+y})}","${(nt[k]||"").replace(/"/g,'""')}"\n`;}download(csv,"text/csv",fileStem()+".csv");});
@@ -697,19 +726,25 @@ const renderToImage=W2=>{const c=document.createElement("canvas");c.width=W2;c.h
 $("expPng").addEventListener("click",()=>{const Wd=1760,Hd=980,pad=56,c=document.createElement("canvas");c.width=Wd;c.height=Hd;const x=c.getContext("2d");
   x.fillStyle="#0d1620";x.fillRect(0,0,Wd,Hd);x.fillStyle="#eaf3f8";x.font="800 30px system-ui,sans-serif";x.textAlign="left";x.textBaseline="alphabetic";
   x.fillText(facility().name+" — "+sheet().name+(viewMode==="trend"?" · TREND":""),pad,pad+18);x.fillStyle="#90a8b8";x.font="14px ui-monospace,Menlo,monospace";x.fillText(fmtDate(session().date),pad,pad+42);
-  x.fillStyle="#6fd6ec";x.textAlign="right";x.fillText(Object.keys(data()).length+" / 33 · target "+fr(S().target),Wd-pad,pad+42);x.textAlign="left";
+  x.fillStyle="#6fd6ec";x.textAlign="right";x.fillText(Object.keys(data()).length+" / "+POINTS.length+" · target "+fr(S().target),Wd-pad,pad+42);x.textAlign="left";
   const rw=Wd-pad*2,ry=pad+78;renderScene(x,pad,ry,rw,{labels:true,sel:false,contours:true,trend:viewMode==="trend"});const rh=W*(rw/L);let lx=pad,ly=ry+rh+44;x.font="600 14px ui-monospace,Menlo,monospace";x.textBaseline="middle";
   if(viewMode==="trend"){x.fillStyle="#eaf3f8";x.fillText("Change vs "+(baselineSession()?fmtDate(baselineSession().date):"previous"),pad,ly);}else for(const b of BANDS){x.fillStyle=b.color;x.fillRect(lx,ly-9,18,18);x.strokeStyle="#ffffff22";x.strokeRect(lx,ly-9,18,18);x.fillStyle="#eaf3f8";x.fillText(b.label,lx+26,ly-1);x.fillStyle="#90a8b8";x.fillText(b.rng,lx+26,ly+15);lx+=Math.max(180,x.measureText(b.label).width+96);}
   const a=document.createElement("a");a.href=c.toDataURL("image/png");a.download=fileStem()+".png";document.body.appendChild(a);a.click();a.remove();flashNote("image saved");});
 
 /* ---------- print ---------- */
-$("expPdf").addEventListener("click",()=>{const img=renderToImage(1400).toDataURL("image/png"),d=data(),nt=notes(),rows=[];for(const k in d){const[x,y]=k.split(",").map(Number);rows.push({x,y,v:decOf.get(d[k]),lab:d[k]});}
+$("expPdf").addEventListener("click",()=>{const img=renderToImage(2000).toDataURL("image/png"),d=data(),nt=notes(),rows=[];for(const k in d){const[x,y]=k.split(",").map(Number);rows.push({x,y,v:decOf.get(d[k])});}
   const avg=rows.length?(rows.reduce((s,r)=>s+r.v,0)/rows.length).toFixed(2):"—",fb=attFlood(),sa=attShave(),flood=rows.filter(r=>r.v<fb).length,shave=rows.filter(r=>r.v>=sa).length;
   const za=[[],[],[]];rows.forEach(r=>za[thirdOf(r.x)].push(r.v));const zt=a=>a.length?(a.reduce((x,y)=>x+y,0)/a.length).toFixed(2)+'″':'—';
-  let tb="";guidedOrder.forEach(gi=>{const p=POINTS[gi],k=keyOf(p);tb+=`<tr><td>${zoneOf(p)}</td><td>${d[k]?frClean(d[k]):"—"}</td><td>${nt[k]||""}</td></tr>`;});
-  $("printRoot").innerHTML=`<h1>${facility().name} — Ice Thickness Report</h1><div class="pmeta">${sheet().name} · ${fmtDate(session().date)} · target ${fr(S().target)} · ${rows.length}/33 logged</div>
-    <div class="pcols"><img src="${img}" alt="thickness map"><div class="pstat"><div><strong>Average:</strong> ${avg}″</div><div><strong>Zone avg:</strong> Left ${zt(za[0])} · Neutral ${zt(za[1])} · Right ${zt(za[2])}</div><div><strong>Flood:</strong> ${flood} below ${fr(fb)}</div><div><strong>Shave:</strong> ${shave} at/above ${fr(sa)}</div>
-    <table><thead><tr><th>Location</th><th>Reading</th><th>Note</th></tr></thead><tbody>${tb}</tbody></table></div></div>`;
+  const pts=guidedOrder.map(gi=>{const p=POINTS[gi],k=keyOf(p),lab=d[k],v=lab!=null?decOf.get(lab):null,b=v!=null?bandOf(v):null,bold=!!b&&(b.key==="thin"||b.key==="thick");return{loc:zoneOf(p),reading:lab?frClean(lab):"—",note:(nt[k]||""),bold};});
+  const ncol=pts.length>26?3:2,per=Math.ceil(pts.length/ncol),tables=[];
+  for(let c=0;c<ncol;c++){const chunk=pts.slice(c*per,(c+1)*per);if(!chunk.length)continue;
+    tables.push(`<table><thead><tr><th>Location</th><th>Reading</th><th>Note</th></tr></thead><tbody>`+
+      chunk.map(r=>`<tr><td>${r.loc}</td><td>${r.bold?`<strong>${r.reading}</strong>`:r.reading}</td><td>${r.note}</td></tr>`).join("")+`</tbody></table>`);}
+  $("printRoot").innerHTML=`<h1>${facility().name} — Ice Thickness Report</h1>`+
+    `<div class="pmeta">${sheet().name} · ${fmtDate(session().date)} · target ${fr(S().target)} · ${rows.length}/${POINTS.length} logged</div>`+
+    `<img src="${img}" class="pmap" alt="thickness map">`+
+    `<div class="pstat"><strong>Average</strong> ${avg}″ &nbsp;·&nbsp; <strong>Zones</strong> L ${zt(za[0])} / N ${zt(za[1])} / R ${zt(za[2])} &nbsp;·&nbsp; <strong>Flood</strong> ${flood} below ${fr(fb)} &nbsp;·&nbsp; <strong>Shave</strong> ${shave} at/above ${fr(sa)}</div>`+
+    `<div class="ptables">${tables.join("")}</div>`;
   setTimeout(()=>window.print(),60);});
 
 /* ---------- theme ---------- */
@@ -723,7 +758,7 @@ $("themeBtn").addEventListener("click",()=>setTheme(state.theme==="dark"?"light"
 
 /* ---------- screens ---------- */
 const appEl=$("app");
-function enterWork(view){state.screen="work";compareId=null;clearUndo();applyGeometry(sheet().size);buildBands();buildChips();computeField();computeDelta();
+function enterWork(view){state.screen="work";compareId=null;clearUndo();applyGeometry(sheet().size,session().mode);buildBands();buildChips();computeField();computeDelta();
   $("home").style.display="none";appEl.classList.add("live");buildSessSel();sizeLive();setView(view||"map");refresh();persist();}
 function goHome(){state.screen="home";appEl.classList.remove("live");$("home").style.display="block";buildHome();persist();}
 $("homeBtn").addEventListener("click",goHome);
@@ -844,20 +879,20 @@ $("backupFile").addEventListener("change",e=>{const f=e.target.files[0];if(!f)re
   try{const obj=JSON.parse(rd.result);if(!obj||!Array.isArray(obj.facilities)||!obj.facilities.length)throw 0;
     if(confirm("Replace ALL current data with this backup? This can't be undone.")){state=obj;
       if(state.contourIdx==null)state.contourIdx=2;if(state.contoursOn==null)state.contoursOn=true;if(!state.theme)state.theme="dark";if(state.overdueDays==null)state.overdueDays=7;
-      state.facilities.forEach(fa=>{if(!fa.settings)fa.settings=defaultSettings();if(!fa.settings.edges)fa.settings.edges=[...DEFAULT_EDGES];(fa.sheets||[]).forEach(sh=>{if(!sh.size)sh.size=NHL_SIZE();});});
+      state.facilities.forEach(fa=>{if(!fa.settings)fa.settings=defaultSettings();if(!fa.settings.edges)fa.settings.edges=[...DEFAULT_EDGES];(fa.sheets||[]).forEach(sh=>{if(!sh.size)sh.size=NHL_SIZE();(sh.sessions||[]).forEach(se=>{if(!se.mode)se.mode="moderate";});});});
       if(!facility())state.activeFacility=state.facilities[0].id;if(!sheet())state.activeSheet=facility().sheets[0].id;if(!session())state.activeSession=sheet().sessions[0].id;
       compareId=null;clearUndo();$("contourSlider").value=state.contourIdx;$("contourOn").checked=state.contoursOn;$("contourSlider").disabled=!state.contoursOn;$("contourBar").classList.toggle("off",!state.contoursOn);
-      applyGeometry(sheet().size);applyTheme();buildBands();buildChips();persist();closeSettings();goHome();flashNote("backup restored");}
+      applyGeometry(sheet().size,session().mode);applyTheme();buildBands();buildChips();persist();closeSettings();goHome();flashNote("backup restored");}
   }catch(err){alert("That doesn't look like a valid Ice Sheet backup file.");}
   $("backupFile").value="";};rd.readAsText(f);});
 function applySettings(){buildBands();buildChips();buildLegend();computeField();if(state.screen==="work"){drawLive();renderStats();}else buildHome();persist();}
 function buildFacManage(){const el=$("facManage");el.innerHTML="";state.facilities.forEach(f=>{const row=document.createElement("div");row.className="mrow";
   const inp=document.createElement("input");inp.value=f.name;inp.addEventListener("input",()=>{f.name=inp.value||"Facility";persist();if(state.screen!=="work")buildHome();else buildSessSel();});
-  const del=document.createElement("button");del.className="del";del.textContent="✕";del.title="Delete facility";del.addEventListener("click",()=>{if(state.facilities.length<=1){flashNote("keep at least one facility");return;}if(confirm(`Delete "${f.name}" and all its sheets?`)){state.facilities=state.facilities.filter(x=>x.id!==f.id);if(state.activeFacility===f.id){state.activeFacility=state.facilities[0].id;state.activeSheet=facility().sheets[0].id;state.activeSession=facility().sheets[0].sessions[0].id;}buildBands();buildSettings();persist();if(state.screen==="work"){applyGeometry(sheet().size);computeField();computeDelta();buildSessSel();refresh();}else buildHome();}});
+  const del=document.createElement("button");del.className="del";del.textContent="✕";del.title="Delete facility";del.addEventListener("click",()=>{if(state.facilities.length<=1){flashNote("keep at least one facility");return;}if(confirm(`Delete "${f.name}" and all its sheets?`)){state.facilities=state.facilities.filter(x=>x.id!==f.id);if(state.activeFacility===f.id){state.activeFacility=state.facilities[0].id;state.activeSheet=facility().sheets[0].id;state.activeSession=facility().sheets[0].sessions[0].id;}buildBands();buildSettings();persist();if(state.screen==="work"){applyGeometry(sheet().size,session().mode);computeField();computeDelta();buildSessSel();refresh();}else buildHome();}});
   row.appendChild(inp);row.appendChild(del);el.appendChild(row);});}
 function buildSheetManage(){const el=$("sheetManage");el.innerHTML="";facility().sheets.forEach(sh=>{const row=document.createElement("div");row.className="mrow";
   const inp=document.createElement("input");inp.value=sh.name;inp.addEventListener("input",()=>{sh.name=inp.value||"Sheet";persist();if(state.screen!=="work")buildHome();else buildSessSel();});
-  const del=document.createElement("button");del.className="del";del.textContent="✕";del.title="Delete sheet";del.addEventListener("click",()=>{if(facility().sheets.length<=1){flashNote("keep at least one sheet");return;}if(confirm(`Delete "${sh.name}"?`)){facility().sheets=facility().sheets.filter(x=>x.id!==sh.id);if(state.activeSheet===sh.id){state.activeSheet=facility().sheets[0].id;state.activeSession=facility().sheets[0].sessions[0].id;}buildSettings();persist();if(state.screen==="work"){applyGeometry(sheet().size);computeField();computeDelta();buildSessSel();refresh();}else buildHome();}});
+  const del=document.createElement("button");del.className="del";del.textContent="✕";del.title="Delete sheet";del.addEventListener("click",()=>{if(facility().sheets.length<=1){flashNote("keep at least one sheet");return;}if(confirm(`Delete "${sh.name}"?`)){facility().sheets=facility().sheets.filter(x=>x.id!==sh.id);if(state.activeSheet===sh.id){state.activeSheet=facility().sheets[0].id;state.activeSession=facility().sheets[0].sessions[0].id;}buildSettings();persist();if(state.screen==="work"){applyGeometry(sheet().size,session().mode);computeField();computeDelta();buildSessSel();refresh();}else buildHome();}});
   row.appendChild(inp);row.appendChild(del);el.appendChild(row);});}
 $("addFacBtn").addEventListener("click",()=>{addFacility();buildSettings();});
 $("addSheetBtn").addEventListener("click",()=>openAddSheet(()=>buildSettings()));
@@ -867,11 +902,11 @@ let roundAfter=null;
 function todayISO(){const d=new Date(),p=n=>String(n).padStart(2,'0');return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate());}
 function isoFromInput(v){return v?new Date(v+"T12:00:00").toISOString():new Date().toISOString();}
 function inputFromIso(iso){const d=new Date(iso),p=n=>String(n).padStart(2,'0');return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate());}
-function openNewRound(after){roundAfter=after||null;$("roundDate").value=todayISO();$("roundLabel").value="";$("roundScrim").classList.add("on");}
+function openNewRound(after){roundAfter=after||null;$("roundDate").value=todayISO();$("roundLabel").value="";$("roundMode").value=session().mode||"moderate";$("roundScrim").classList.add("on");}
 const closeNewRound=()=>$("roundScrim").classList.remove("on");
 $("roundCancel").addEventListener("click",closeNewRound);
 $("roundScrim").addEventListener("click",e=>{if(e.target===$("roundScrim"))closeNewRound();});
-$("roundCreate").addEventListener("click",()=>{const sh=sheet(),s=newSession();s.date=isoFromInput($("roundDate").value);s.label=$("roundLabel").value.trim();sh.sessions.push(s);state.activeSession=s.id;closeNewRound();persist();const cb=roundAfter;roundAfter=null;if(cb)cb(s);});
+$("roundCreate").addEventListener("click",()=>{const sh=sheet(),s=newSession();s.date=isoFromInput($("roundDate").value);s.label=$("roundLabel").value.trim();s.mode=$("roundMode").value;sh.sessions.push(s);state.activeSession=s.id;closeNewRound();persist();const cb=roundAfter;roundAfter=null;if(cb)cb(s);});
 
 /* ---------- delete a round ---------- */
 function deleteRound(sh,sid){if(sh.sessions.length<=1){flashNote("keep at least one round");return false;}
@@ -923,10 +958,11 @@ async function boot(){let raw=await Store.get(KEY);if(raw){try{state=JSON.parse(
   if(!facility())state.activeFacility=state.facilities[0].id;
   if(!sheet())state.activeSheet=facility().sheets[0].id;
   if(!session())state.activeSession=sheet().sessions[0].id;
-  state.facilities.forEach(f=>{if(!f.settings)f.settings=defaultSettings();if(!f.settings.edges)f.settings.edges=[...DEFAULT_EDGES];f.sheets.forEach(sh=>{if(!sh.size)sh.size=NHL_SIZE();});});
+  state.facilities.forEach(f=>{if(!f.settings)f.settings=defaultSettings();if(!f.settings.edges)f.settings.edges=[...DEFAULT_EDGES];f.sheets.forEach(sh=>{if(!sh.size)sh.size=NHL_SIZE();(sh.sessions||[]).forEach(se=>{if(!se.mode)se.mode="moderate";});});});
   if(state.overdueDays==null)state.overdueDays=7;
   if(state.contourIdx==null)state.contourIdx=2;$("contourSlider").value=state.contourIdx;
   if(state.contoursOn==null)state.contoursOn=true;$("contourOn").checked=state.contoursOn;$("contourSlider").disabled=!state.contoursOn;$("contourBar").classList.toggle("off",!state.contoursOn);
-  applyGeometry(sheet().size);applyTheme();buildBands();buildChips();bindDrag();goHome();}
+  if(state.smoothIdx==null)state.smoothIdx=2;$("smoothSlider").value=state.smoothIdx;
+  applyGeometry(sheet().size,session().mode);applyTheme();buildBands();buildChips();bindDrag();goHome();}
 boot();
 </script>
