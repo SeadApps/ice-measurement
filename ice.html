@@ -650,7 +650,7 @@ const Store={async get(k){try{if(window.storage&&window.storage.get){const r=awa
 const K={fac:"ice_v4_facilities",sh:"ice_v4_sheets",se:"ice_v4_sessions",prefs:"ice_v4_prefs",legacy:"ice_sheet_v3"};
 const nowISO=()=>new Date().toISOString();
 const PREF_KEYS=["theme","unit","lastBackup","contourIdx","contoursOn","smoothIdx","overdueDays",
-                 "activeFacility","activeSheet","activeSession"];
+                 "activeFacility","activeSheet","activeSession","screen","lastView"];
 let SNAP={fac:{},sh:{},se:{}};   // what we last wrote, so we only re-stamp what actually changed
 
 function decompose(st){
@@ -913,7 +913,7 @@ function setEntry(m){entryMode=m;$("modeFree").setAttribute("aria-pressed",Strin
 $("noteInput").addEventListener("input",e=>setNote(e.target.value));
 
 /* ---------- views ---------- */
-function setView(v){viewMode=v;$("viewMap").setAttribute("aria-pressed",String(v==="map"));$("viewTrend").setAttribute("aria-pressed",String(v==="trend"));$("view3d").setAttribute("aria-pressed",String(v==="3d"));
+function setView(v){viewMode=v;if(state){state.lastView=v;persist();}$("viewMap").setAttribute("aria-pressed",String(v==="map"));$("viewTrend").setAttribute("aria-pressed",String(v==="trend"));$("view3d").setAttribute("aria-pressed",String(v==="3d"));
   $("live2d").classList.toggle("off",v==="3d");$("threeWrap").classList.toggle("on",v==="3d");$("contourBar").style.display=v==="map"?"flex":"none";$("smoothBar").style.display=v==="map"?"flex":"none";buildLegend();buildSessSel();
   if(v==="3d"){sizeSurf();drawSurf();}else drawLive();renderStats();updateContourReadout();updateSmoothReadout();}
 $("viewMap").addEventListener("click",()=>setView("map"));$("viewTrend").addEventListener("click",()=>{computeDelta();setView("trend");});$("view3d").addEventListener("click",()=>setView("3d"));
@@ -1247,7 +1247,10 @@ async function boot(){state=await Repo.load();
   if(state.contourIdx==null)state.contourIdx=2;$("contourSlider").value=state.contourIdx;
   if(state.contoursOn==null)state.contoursOn=true;$("contourOn").checked=state.contoursOn;$("contourSlider").disabled=!state.contoursOn;$("contourBar").classList.toggle("off",!state.contoursOn);
   if(state.smoothIdx==null)state.smoothIdx=2;$("smoothSlider").value=state.smoothIdx;
-  applyGeometry(sheet().size,session().mode);applyTheme();applyUnitButtons();buildBands();buildChips();bindDrag();goHome();}
+  applyGeometry(sheet().size,session().mode);applyTheme();applyUnitButtons();buildBands();buildChips();bindDrag();
+  /* Pick up where this device left off — coming back from another app in the suite
+     lands on the sheet you were working, not the front screen. ≡ still goes home. */
+  if(state.screen==="work"&&facility()&&sheet()&&session())enterWork(state.lastView);else goHome();}
 boot();
 
 /* ---------- PWA: install this file + its assets so the app opens and works offline ---------- */
