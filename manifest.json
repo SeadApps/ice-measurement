@@ -1,0 +1,21 @@
+{
+  "name": "Rink Apps — arena operations tools",
+  "short_name": "Rink Apps",
+  "description": "Ice thickness measurement and rink glass management for multi-facility arenas.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0d1620",
+  "theme_color": "#0d1620",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ],
+  "shortcuts": [
+    { "name": "Ice Manager",   "short_name": "Ice",   "url": "./ice.html",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "Glass Manager", "short_name": "Glass", "url": "./glass.html",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192", "type": "image/png" }] }
+  ]
+}
