@@ -529,11 +529,15 @@ async function restore(){
   let saved = null;
   try{ saved = JSON.parse(await Store.get(KEY) || 'null'); }catch(e){}
   state = (saved && saved.panels) ? saved.panels : JSON.parse(JSON.stringify(DATA.cond || {}));
+  for(const id in state){ if(state[id] && !state[id].updatedAt) state[id].updatedAt = state[id].at || '1970-01-01'; }
   who = (saved && saved.who) || '';
   document.getElementById('who').value = who;
 }
+const nowISO = () => new Date().toISOString();
+const stampOf = r => (r && (r.updatedAt || r.at)) || '';   // full timestamp, else the older date-only field
 function set(id, patch, quiet){
-  state[id] = Object.assign({status:'ok',note:''}, state[id], patch, {by: who || '', at: stamp()});
+  state[id] = Object.assign({status:'ok',note:''}, state[id], patch,
+                            {by: who || '', at: stamp(), updatedAt: nowISO()});
   store(); rail(); table(); paint();
   if(!quiet) detail();          // keep focus in the note box while typing
 }
@@ -577,7 +581,7 @@ document.getElementById('file').addEventListener('change', e=>{
       const cur = state[id];
       if(!cur){ state[id] = v; added++; }
       else if(cur.status !== v.status || (cur.note||'') !== (v.note||'')){
-        if((v.at||'') >= (cur.at||'')){ state[id] = v; changed++; }
+        if(stampOf(v) > stampOf(cur)){ state[id] = v; changed++; }   // newer edit wins; a tie keeps ours
       }
     }
     store(); rail(); table(); detail(); paint();
@@ -609,14 +613,6 @@ th.dark.addEventListener('click',  ()=>setTheme('dark'));
   await restore();
   buildPlan(); rail(); totals(); table(); detail(); paint();
 })();
-</script>
-
-
-<script>
-/* PWA: install this page and its siblings so the suite opens and works offline. */
-if("serviceWorker" in navigator){
-  window.addEventListener("load",()=>{navigator.serviceWorker.register("sw.js").catch(()=>{/* file:// or unsupported host — the page still works, just not offline-installable */});});
-}
 </script>
 
 </body>

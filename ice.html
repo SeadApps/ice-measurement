@@ -14,6 +14,7 @@
     --ink:#eaf3f8; --ink-dim:#90a8b8; --ink-faint:#5d7384;
     --red:#e5343a; --blue:#2f86c5; --frost:#6fd6ec;
     --b-thin:#d6453f; --b-low:#e8b54a; --b-ideal:#eef4f6; --b-high:#6aa9d6; --b-thick:#2c6aa3;
+    --ctl:34px;   /* one height for every control in a bar */
     --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
     --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   }
@@ -99,7 +100,9 @@
   .btn.ghost{background:transparent;color:var(--ink-dim)}
   .btn.primary{background:var(--frost);color:#06222b;border-color:var(--frost)}
   .btn.danger:hover{border-color:var(--red);color:#ff6b70}
-  .iconbtn{appearance:none;background:var(--panel);border:1px solid var(--line);color:var(--ink);width:36px;height:34px;border-radius:9px;cursor:pointer;font-size:15px;line-height:1}
+  .iconbtn{appearance:none;background:var(--panel);border:1px solid var(--line);color:var(--ink);width:36px;
+    height:var(--ctl);border-radius:9px;cursor:pointer;font-size:15px;line-height:1;
+    display:inline-flex;align-items:center;justify-content:center;flex:none}
   .iconbtn:hover{border-color:#3a5b72}
   .iconbtn.unit{font-family:var(--mono);font-size:11.5px;font-weight:700}
   .backup-warn{display:none;align-items:center;gap:12px;flex-wrap:wrap;background:#2a2110;border:1px solid #7a5230;border-radius:10px;padding:10px 13px;margin:12px 0 0;font-size:12.5px;color:#f0c98a}
@@ -111,16 +114,21 @@
   /* ---------- WORKSPACE ---------- */
   .app{display:none;grid-template-rows:auto auto 1fr auto;max-width:1500px;margin:0 auto;padding:12px clamp(10px,2.5vw,24px) 0}
   .app.live{display:grid}
-  header.bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-bottom:10px}
-  .brand-mini{display:flex;align-items:baseline;gap:8px;margin-right:auto}
-  .brand-mini b{font-size:15px}.brand-mini .sub{font-size:11px;color:var(--ink-dim);font-family:var(--mono)}
-  .count-pill{font-family:var(--mono);font-size:13px;background:var(--panel);border:1px solid var(--line);padding:6px 11px;border-radius:999px;white-space:nowrap}
+  header.bar{display:flex;align-items:center;gap:12px;row-gap:8px;flex-wrap:wrap;padding-bottom:10px}
+  /* Below a wide desktop the workspace bar is full; the app switcher stays on the home screen. */
+  @media (max-width:1180px){.app .appsw{display:none}}
+  .brand-mini{display:flex;align-items:baseline;gap:8px;margin-right:auto;min-width:0;flex:1 1 auto;overflow:hidden}
+  .brand-mini b{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+  .brand-mini .sub{font-size:11px;color:var(--ink-dim);font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+  .count-pill{font-family:var(--mono);font-size:13px;background:var(--panel);border:1px solid var(--line);
+    height:var(--ctl);padding:0 12px;border-radius:999px;white-space:nowrap;display:inline-flex;align-items:center;gap:4px;flex:none}
   .count-pill b{color:var(--frost)}
   .count-pill.done{border-color:#2f5e44}
   .count-pill.done b{color:#7fcf9a}
   .count-pill.done::before{content:"✓ ";color:#7fcf9a;font-weight:700}
-  .seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--panel)}
-  .seg button{appearance:none;border:0;background:transparent;color:var(--ink-dim);font:inherit;font-size:12.5px;font-weight:600;padding:8px 13px;cursor:pointer}
+  .seg{display:inline-flex;height:var(--ctl);border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--panel);flex:none}
+  .seg button{appearance:none;border:0;background:transparent;color:var(--ink-dim);font:inherit;font-size:12.5px;
+    font-weight:600;padding:0 13px;cursor:pointer;display:inline-flex;align-items:center}
   .seg button[aria-pressed="true"]{background:var(--panel-2);color:var(--ink)}
   .seg button+button{border-left:1px solid var(--line)}
   .seg button:focus-visible{outline:2px solid var(--frost);outline-offset:-2px}
@@ -252,15 +260,16 @@
   .check{display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-size:12.5px;color:var(--ink-dim)}
   .check input{width:16px;height:16px;accent-color:var(--frost)}
   #manualAtt{display:none}#manualAtt.on{display:block}
-  .themeseg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
-  .themeseg button{appearance:none;border:0;background:var(--panel-2);color:var(--ink-dim);font:inherit;font-size:12.5px;font-weight:600;padding:8px 16px;cursor:pointer}
+  .themeseg{display:inline-flex;height:var(--ctl);border:1px solid var(--line);border-radius:9px;overflow:hidden;flex:none}
+  .themeseg button{appearance:none;border:0;background:var(--panel-2);color:var(--ink-dim);font:inherit;font-size:12.5px;
+    font-weight:600;padding:0 16px;cursor:pointer;display:inline-flex;align-items:center}
   .themeseg button[aria-pressed="true"]{background:var(--frost);color:#06222b}
   .themeseg button+button{border-left:1px solid var(--line)}
 
   /* ---------- app switcher (shared with glass.html) ---------- */
-  .appsw{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--panel)}
+  .appsw{display:inline-flex;height:var(--ctl);border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--panel);flex:none}
   .appsw a{display:flex;align-items:center;text-decoration:none;color:var(--ink-dim);font:inherit;font-size:12.5px;
-    font-weight:600;padding:8px 14px;white-space:nowrap}
+    font-weight:600;padding:0 14px;white-space:nowrap}
   .appsw a+a{border-left:1px solid var(--line)}
   .appsw a:hover{color:var(--ink);background:var(--panel-2)}
   .appsw a[aria-current="page"]{background:var(--panel-2);color:var(--ink)}
@@ -629,7 +638,108 @@ function baselineSession(){const sh=sheet();if(compareId){const s=sh.sessions.fi
 /* ---------- persistence ---------- */
 const Store={async get(k){try{if(window.storage&&window.storage.get){const r=await window.storage.get(k);return r?r.value:null;}}catch(e){}try{return localStorage.getItem(k);}catch(e){return null;}},
   async set(k,v){try{if(window.storage&&window.storage.set){await window.storage.set(k,v);return;}}catch(e){}try{localStorage.setItem(k,v);}catch(e){}}};
-let saveTimer=null;const persist=()=>{clearTimeout(saveTimer);saveTimer=setTimeout(()=>Store.set(KEY,JSON.stringify(state)),180);};
+
+/* ---------- record store (v4) ----------------------------------------------
+   Everything used to live under one key, so every save rewrote the entire app.
+   That is fine for one device and fatal for two: whoever saved last silently
+   replaced the other's work. State is now split into per-record maps, each
+   record carrying its own updatedAt, so two copies can be merged record by
+   record. The in-memory `state` shape is unchanged — only how it reaches disk.
+   Device preferences (theme, units, which sheet you were last looking at) stay
+   out of the shared set so one device can't move another's view. */
+const K={fac:"ice_v4_facilities",sh:"ice_v4_sheets",se:"ice_v4_sessions",prefs:"ice_v4_prefs",legacy:"ice_sheet_v3"};
+const nowISO=()=>new Date().toISOString();
+const PREF_KEYS=["theme","unit","lastBackup","contourIdx","contoursOn","smoothIdx","overdueDays",
+                 "activeFacility","activeSheet","activeSession"];
+let SNAP={fac:{},sh:{},se:{}};   // what we last wrote, so we only re-stamp what actually changed
+
+function decompose(st){
+  const fac={},sh={},se={};
+  (st.facilities||[]).forEach((f,fi)=>{
+    fac[f.id]={id:f.id,name:f.name,settings:f.settings,ord:fi};
+    (f.sheets||[]).forEach((x,si)=>{
+      sh[x.id]={id:x.id,facilityId:f.id,name:x.name,size:x.size,ord:si};
+      (x.sessions||[]).forEach((z,zi)=>{ se[z.id]=Object.assign({},z,{sheetId:x.id,ord:zi}); });
+    });
+  });
+  return {fac,sh,se};
+}
+const bodyOf=r=>{const c=Object.assign({},r);delete c.updatedAt;delete c.deleted;return JSON.stringify(c);};
+
+/* Stamp only what changed, and leave a tombstone for anything removed, so a
+   delete on one device isn't undone by a merge from another. */
+function stampChanges(next,prev){
+  const out={},t=nowISO();
+  for(const id in next){
+    const p=prev[id];
+    out[id]=(p&&!p.deleted&&bodyOf(p)===bodyOf(next[id]))
+      ? Object.assign({},next[id],{updatedAt:p.updatedAt||t})
+      : Object.assign({},next[id],{updatedAt:t});
+  }
+  for(const id in prev){ if(!(id in next)) out[id]=prev[id].deleted?prev[id]:{id,deleted:true,updatedAt:t}; }
+  return out;
+}
+function reassemble(fac,sh,se){
+  const live=o=>Object.values(o).filter(r=>r&&!r.deleted);
+  const byOrd=(a,b)=>(a.ord||0)-(b.ord||0)||String(a.id).localeCompare(String(b.id));
+  return live(fac).sort(byOrd).map(f=>Object.assign({},f,{
+    sheets:live(sh).filter(x=>x.facilityId===f.id).sort(byOrd).map(x=>Object.assign({},x,{
+      sessions:live(se).filter(z=>z.sheetId===x.id).sort(byOrd)
+    }))
+  }));
+}
+const Repo={
+  async save(st){
+    const d=decompose(st);
+    SNAP={fac:stampChanges(d.fac,SNAP.fac),sh:stampChanges(d.sh,SNAP.sh),se:stampChanges(d.se,SNAP.se)};
+    const prefs={};PREF_KEYS.forEach(k=>prefs[k]=st[k]);
+    await Promise.all([Store.set(K.fac,JSON.stringify(SNAP.fac)),Store.set(K.sh,JSON.stringify(SNAP.sh)),
+                       Store.set(K.se,JSON.stringify(SNAP.se)),Store.set(K.prefs,JSON.stringify(prefs))]);
+  },
+  async load(){
+    const rd=async k=>{try{return JSON.parse(await Store.get(k)||"null");}catch(e){return null;}};
+    let [fac,sh,se,prefs]=await Promise.all([rd(K.fac),rd(K.sh),rd(K.se),rd(K.prefs)]);
+    if(fac&&sh&&se){
+      SNAP={fac,sh,se};
+      const st=Object.assign({},prefs||{},{facilities:reassemble(fac,sh,se)});
+      if(st.facilities.length)return st;
+    }
+    const legacy=await rd(K.legacy);          // one-time move off the single blob
+    if(legacy&&Array.isArray(legacy.facilities)&&legacy.facilities.length){
+      await this.save(legacy);                // the old key is left untouched as a fallback
+      return legacy;
+    }
+    return null;
+  },
+  /* Fold another copy in, newest wins per record. Readings inside a round are
+     merged point by point, so two people logging different spots in the same
+     round both keep their work. */
+  merge(inc){
+    let taken=0;
+    const fold=(dst,src,isSession)=>{
+      for(const id in src){
+        const a=dst[id],b=src[id];
+        if(!a){dst[id]=b;taken++;continue;}
+        const newer=(b.updatedAt||"")>(a.updatedAt||"");
+        if(isSession&&!a.deleted&&!b.deleted){
+          const merged=Object.assign({},newer?b:a);
+          merged.data =Object.assign({},newer?a.data :b.data ,newer?b.data :a.data );
+          merged.notes=Object.assign({},newer?a.notes:b.notes,newer?b.notes:a.notes);
+          merged.updatedAt=newer?b.updatedAt:a.updatedAt;
+          if(JSON.stringify(merged)!==JSON.stringify(a)){dst[id]=merged;taken++;}
+        }else if(newer){dst[id]=b;taken++;}
+      }
+    };
+    fold(SNAP.fac,inc.facilities||{},false);
+    fold(SNAP.sh ,inc.sheets    ||{},false);
+    fold(SNAP.se ,inc.sessions  ||{},true);
+    return {taken,facilities:reassemble(SNAP.fac,SNAP.sh,SNAP.se)};
+  },
+  snapshot(){return {format:"rink-ice-v4",exportedAt:nowISO(),
+    facilities:SNAP.fac,sheets:SNAP.sh,sessions:SNAP.se};}
+};
+
+let saveTimer=null;const persist=()=>{clearTimeout(saveTimer);saveTimer=setTimeout(()=>Repo.save(state),180);};
 
 /* ---------- undo ---------- */
 let undoStack=[];const snap=()=>JSON.stringify({data:data(),notes:notes()});
@@ -1027,19 +1137,32 @@ $("floodIn").addEventListener("input",e=>{let v=parseFloat(e.target.value);if(is
 $("shaveIn").addEventListener("input",e=>{let v=parseFloat(e.target.value);if(isNaN(v))return;S().shaveAbove=v;$("shaveFrac").textContent=fmtSet(v);applySettings();});
 $("resetBands").addEventListener("click",()=>{S().edges=[...DEFAULT_EDGES];applySettings();buildSettings();});
 $("overdueIn").addEventListener("input",e=>{let v=parseInt(e.target.value,10);if(isNaN(v))return;state.overdueDays=Math.max(1,Math.min(90,v));persist();});
-async function doBackupExport(){const res=await exportFile(JSON.stringify(state),"application/json","ice_sheet_backup_"+todayISO()+".json");
-  if(res!=="cancelled"){state.lastBackup=new Date().toISOString();persist();updateBackupStatus();}}
+async function doBackupExport(){await Repo.save(state);
+  const res=await exportFile(JSON.stringify(Repo.snapshot()),"application/json","ice_sheet_backup_"+todayISO()+".json");
+  if(res!=="cancelled"){state.lastBackup=new Date().toISOString();persist();updateBackupStatus();updateBackupBanner();}}
 $("backupExport").addEventListener("click",doBackupExport);
 $("backupImport").addEventListener("click",()=>$("backupFile").click());
 $("backupFile").addEventListener("change",e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{
-  try{const obj=JSON.parse(rd.result);if(!obj||!Array.isArray(obj.facilities)||!obj.facilities.length)throw 0;
-    if(confirm("Replace ALL current data with this backup? This can't be undone.")){state=obj;
-      if(state.contourIdx==null)state.contourIdx=2;if(state.contoursOn==null)state.contoursOn=true;if(!state.theme)state.theme="dark";if(state.overdueDays==null)state.overdueDays=7;
-      if(!state.unit)state.unit="in";if(state.lastBackup===undefined)state.lastBackup=null;
-      state.facilities.forEach(fa=>{if(!fa.settings)fa.settings=defaultSettings();if(!fa.settings.edges)fa.settings.edges=[...DEFAULT_EDGES];(fa.sheets||[]).forEach(sh=>{if(!sh.size)sh.size=NHL_SIZE();(sh.sessions||[]).forEach(se=>{if(!se.mode)se.mode="moderate";});});});
-      if(!facility())state.activeFacility=state.facilities[0].id;if(!sheet())state.activeSheet=facility().sheets[0].id;if(!session())state.activeSession=sheet().sessions[0].id;
-      compareId=null;clearUndo();$("contourSlider").value=state.contourIdx;$("contourOn").checked=state.contoursOn;$("contourSlider").disabled=!state.contoursOn;$("contourBar").classList.toggle("off",!state.contoursOn);
-      applyGeometry(sheet().size,session().mode);applyTheme();buildBands();buildChips();persist();closeSettings();goHome();flashNote("backup restored");}
+  try{
+    const obj=JSON.parse(rd.result);
+    let inc=null;
+    if(obj&&obj.format==="rink-ice-v4"&&obj.sessions){                 // a record backup
+      inc={facilities:obj.facilities||{},sheets:obj.sheets||{},sessions:obj.sessions||{}};
+    }else if(obj&&Array.isArray(obj.facilities)&&obj.facilities.length){ // an older whole-state backup
+      const d=decompose(obj),t=obj.exportedAt||nowISO(),stamp=o=>{const r={};for(const k in o)r[k]=Object.assign({},o[k],{updatedAt:t});return r;};
+      inc={facilities:stamp(d.fac),sheets:stamp(d.sh),sessions:stamp(d.se)};
+    }else throw 0;
+    const count=Object.keys(inc.sessions).length;
+    if(!confirm("Merge this backup into your data?\n\n"+count+" round"+(count===1?"":"s")+" in the file. Nothing is deleted — where both copies changed the same round, the newer edit wins and readings from each are kept.")){$("backupFile").value="";return;}
+    const res=Repo.merge(inc);
+    state.facilities=res.facilities;
+    state.facilities.forEach(fa=>{if(!fa.settings)fa.settings=defaultSettings();if(!fa.settings.edges)fa.settings.edges=[...DEFAULT_EDGES];(fa.sheets||[]).forEach(sh=>{if(!sh.size)sh.size=NHL_SIZE();(sh.sessions||[]).forEach(se=>{if(!se.mode)se.mode="moderate";});});});
+    if(!facility())state.activeFacility=state.facilities[0].id;
+    if(!sheet())state.activeSheet=facility().sheets[0].id;
+    if(!session())state.activeSession=sheet().sessions[0].id;
+    compareId=null;clearUndo();
+    applyGeometry(sheet().size,session().mode);buildBands();buildChips();persist();closeSettings();goHome();
+    flashNote(res.taken?("merged "+res.taken+" change"+(res.taken===1?"":"s")):"already up to date");
   }catch(err){alert("That doesn't look like a valid Ice Sheet backup file.");}
   $("backupFile").value="";};rd.readAsText(f);});
 function applySettings(){buildBands();buildChips();buildLegend();computeField();if(state.screen==="work"){drawLive();renderStats();}else buildHome();persist();}
@@ -1106,7 +1229,7 @@ let resizeT=null;window.addEventListener("resize",()=>{clearTimeout(resizeT);res
 function migrateV2(o){const f={id:uid(),name:o.facility||"Main facility",settings:o.settings||defaultSettings(),sheets:o.sheets&&o.sheets.length?o.sheets:[newSheet()]};if(!f.settings.edges)f.settings.edges=[...DEFAULT_EDGES];
   return{theme:"dark",facilities:[f],activeFacility:f.id,activeSheet:o.activeSheet||f.sheets[0].id,activeSession:o.activeSession||f.sheets[0].sessions[0].id};}
 function migrateV1(o){const st=freshState();st.facilities[0].sheets[0].sessions[0].data=o;return st;}
-async function boot(){let raw=await Store.get(KEY);if(raw){try{state=JSON.parse(raw);}catch(e){state=null;}}
+async function boot(){state=await Repo.load();
   if(!state){const v2=await Store.get(V2);if(v2){try{state=migrateV2(JSON.parse(v2));}catch(e){}}}
   if(!state){const v1=await Store.get(V1);if(v1){try{state=migrateV1(JSON.parse(v1));}catch(e){}}}
   if(!state)state=freshState();
