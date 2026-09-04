@@ -57,6 +57,9 @@
      writes is deleted at the end, and the code you type is never stored.</p>
 
   <div class="card">
+    <label for="email">Account email &mdash; exactly as it appears under Authentication &rarr; Users</label>
+    <input id="email" type="text" autocomplete="off" autocapitalize="none" spellcheck="false"
+           value="operations@conwayarena.local" style="margin-bottom:14px">
     <label for="code">Access code</label>
     <input id="code" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="the crew code">
     <div class="row">
@@ -133,10 +136,16 @@ async function main(){
   li=row('The access code works');
   try{
     const r=await fetch(URL_+"/auth/v1/token?grant_type=password",{method:'POST',headers:H(),
-      body:JSON.stringify({email:"crew@conwayarena.local",password:code})});
+      body:JSON.stringify({email:document.getElementById('email').value.trim(),password:code})});
     const j=await r.json();
     if(j.access_token){ token=j.access_token; mark(li,'pass','signed in as the crew account'); }
-    else { mark(li,'fail',(j.error_description||j.msg||j.error||'sign-in refused')); hardFail=true; }
+    else {
+      const raw=String(j.error_description||j.msg||j.error||'sign-in refused');
+      const hint = /not confirmed/i.test(raw) ? ' — the account exists but is unconfirmed: edit the user and confirm it'
+                 : /invalid login/i.test(raw) ? ' — email or code does not match the account'
+                 : '';
+      mark(li,'fail',raw+hint); hardFail=true;
+    }
   }catch(e){ mark(li,'fail',String(e.message||e)); hardFail=true; }
 
   // 5 — signed in, can write
