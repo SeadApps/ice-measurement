@@ -1,0 +1,9 @@
+# Normalise line endings in the repository and check out LF everywhere.
+# Git for Windows ships with core.autocrlf=true, which rewrites files on
+# checkout. Without this file that conversion is machine-dependent, and a clone
+# on one OS can turn the next commit into a whole-file diff that hides the
+# actual edit. Pinning it here keeps history readable wherever it is cloned.
+* text=auto eol=lf
+
+# Icons are binary — never transform them.
+*.png binary

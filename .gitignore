@@ -1,0 +1,5 @@
+# A hand-run diagnostic page for checking Supabase auth and RLS. It was removed
+# from the repository deliberately (commit f18aaec): GitHub Pages serves
+# everything here, so committing it publishes a live probe of the project's
+# auth setup. Kept locally only. Delete this line if it should ship after all.
+supabase-check.html
