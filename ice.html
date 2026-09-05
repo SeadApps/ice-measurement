@@ -1275,7 +1275,8 @@ boot().then(()=>{
     }
   });
   const bar=document.querySelector("#home .home-bar");
-  if(bar) bar.insertBefore(SYNC.statusEl(), bar.querySelector(".themeseg"));
+  if(bar){ bar.insertBefore(SYNC.statusEl(), bar.querySelector(".themeseg"));
+           bar.insertBefore(SYNC.signOutEl(), bar.querySelector(".themeseg")); }
   SYNC.start({title:"Arena Management System"});
 });
 
