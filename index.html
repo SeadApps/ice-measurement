@@ -6,8 +6,8 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Rink Apps">
-<title>Rink Apps</title>
+<meta name="apple-mobile-web-app-title" content="Arena Management">
+<title>Arena Management System</title>
 <style>
   /* Palette and type are the Ice app's, so every tool in the suite matches. */
   :root{
@@ -106,6 +106,7 @@ document.documentElement.setAttribute("data-theme",_t==="light"?"light":"dark");
   </footer>
 </div>
 
+<script src="sync.js"></script>
 <script>
 /* Same storage wrapper both apps use: a host-provided store if one exists, else this browser. */
 const Store={
@@ -126,44 +127,78 @@ th.light.addEventListener('click', ()=>{applyTheme('light'); Store.set('rink_the
 th.dark .addEventListener('click', ()=>{applyTheme('dark');  Store.set('rink_theme','dark');});
 applyTheme(document.documentElement.getAttribute('data-theme')==='light'?'light':'dark');
 
-/* ---------- a live line on each card ---------- */
+/* ---------- a live line on each card ----------
+   These read what the apps have already stored on this device. The launcher
+   never pulls: sync.js keeps one sent-map per device, and a pull from here —
+   with no records of its own to apply — would still advance the cursor, so the
+   apps would never see the rows it skipped. Local read only, no writes. */
 function ago(d){
   const days = Math.floor((Date.now() - new Date(d)) / 86400000);
   if(!isFinite(days)) return null;
   return days <= 0 ? 'today' : days === 1 ? 'yesterday' : days + ' days ago';
 }
-(async function cardStats(){
-  // Ice — read the same record the Ice app writes.
-  try{
-    const raw = await Store.get('ice_sheet_v3');
-    const st = raw ? JSON.parse(raw) : null;
-    const el = document.getElementById('statIce');
-    if(st && st.facilities && st.facilities.length){
-      let sheets = 0, latest = null;
-      st.facilities.forEach(f => (f.sheets||[]).forEach(sh => {
-        sheets++;
-        (sh.sessions||[]).forEach(se => { if(se.date && (!latest || new Date(se.date) > new Date(latest))) latest = se.date; });
-      }));
-      const facs = st.facilities.length;
-      const when = latest ? ago(latest) : null;
-      el.innerHTML = '<b>' + sheets + '</b> sheet' + (sheets===1?'':'s') +
-                     ' &middot; ' + facs + ' facilit' + (facs===1?'y':'ies') +
-                     (when ? ' &middot; last round ' + when : ' &middot; no rounds yet');
-    } else { el.textContent = 'Not set up yet'; }
-  }catch(e){ document.getElementById('statIce').textContent = ''; }
+const readJSON = async k => { try{ return JSON.parse(await Store.get(k) || 'null'); }catch(e){ return null; } };
+const liveRecords = o => Object.values(o || {}).filter(r => r && !r.deleted);
 
-  // Glass — read the same record the Glass app writes.
-  try{
-    const raw = await Store.get('glass_record_v1');
-    const rec = raw ? JSON.parse(raw) : null;
-    const el = document.getElementById('statGlass');
-    const p = (rec && rec.panels) || {};
-    const rep = Object.values(p).filter(v => v && v.status === 'replace').length;
-    const plx = Object.values(p).filter(v => v && v.status === 'plexi').length;
-    el.innerHTML = '<b>127</b> panels &middot; ' +
-                   (rep ? '<b class="warn">' + rep + '</b> to replace' : 'none flagged') +
-                   (plx ? ' &middot; <b class="warn">' + plx + '</b> on plexi' : '');
-  }catch(e){ document.getElementById('statGlass').textContent = ''; }
+async function iceStat(){
+  /* The v4 record store, which is what the Ice app actually writes. This used
+     to read ice_sheet_v3 — the single blob v4 replaced — so it reported a
+     frozen pre-migration number, or nothing at all on a device that started
+     on v4 and never had that key. */
+  const [fac, sh, se] = await Promise.all(
+    ['ice_v4_facilities','ice_v4_sheets','ice_v4_sessions'].map(readJSON));
+
+  if(fac || sh || se){
+    const facs = liveRecords(fac).length, sheets = liveRecords(sh).length;
+    if(!facs && !sheets) return 'Nothing recorded on this device';
+    const latest = liveRecords(se).reduce((a, s) =>
+      (s.date && (!a || new Date(s.date) > new Date(a))) ? s.date : a, null);
+    const when = latest ? ago(latest) : null;
+    return '<b>' + sheets + '</b> sheet' + (sheets===1?'':'s') +
+           ' &middot; ' + facs + ' facilit' + (facs===1?'y':'ies') +
+           (when ? ' &middot; last round ' + when : ' &middot; no rounds yet');
+  }
+
+  const legacy = await readJSON('ice_sheet_v3');   // never opened since the move to v4
+  if(legacy && legacy.facilities && legacy.facilities.length){
+    let sheets = 0;
+    legacy.facilities.forEach(f => sheets += (f.sheets||[]).length);
+    return '<b>' + sheets + '</b> sheet' + (sheets===1?'':'s') +
+           ' &middot; ' + legacy.facilities.length + ' facilit' +
+           (legacy.facilities.length===1?'y':'ies');
+  }
+  return 'Open Ice Manager to load this device';
+}
+
+async function glassStat(){
+  const rec = await readJSON('glass_record_v1');
+  if(!rec || !rec.panels) return 'Open Glass Manager to load this device';
+  const p = Object.values(rec.panels).filter(Boolean);
+  const rep = p.filter(v => v.status === 'replace').length;
+  const plx = p.filter(v => v.status === 'plexi').length;
+  return '<b>127</b> panels &middot; ' +
+         (rep ? '<b class="warn">' + rep + '</b> to replace' : 'none flagged') +
+         (plx ? ' &middot; <b class="warn">' + plx + '</b> on plexi' : '');
+}
+
+async function cardStats(){
+  try{ document.getElementById('statIce').innerHTML = await iceStat(); }
+  catch(e){ document.getElementById('statIce').textContent = ''; }
+  try{ document.getElementById('statGlass').innerHTML = await glassStat(); }
+  catch(e){ document.getElementById('statGlass').textContent = ''; }
+}
+
+/* ---------- the gate ----------
+   Nothing about the rinks is shown before a successful sign-in. That was
+   already true in practice, but only because a new device happens to have no
+   local data to show — nothing actually checked. Now it is checked. */
+(async function boot(){
+  if(typeof Sync === 'undefined'){ await cardStats(); return; }  // sync.js failed to load
+  await Sync.start({title:'Arena Management System'});
+  await Sync.verify();          // catches a rotated code; re-gates without syncing
+  const bar = document.querySelector('.home-bar');
+  if(bar) bar.insertBefore(Sync.signOutEl(), bar.querySelector('.themeseg'));
+  await cardStats();
 })();
 </script>
 
