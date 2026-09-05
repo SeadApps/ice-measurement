@@ -4,7 +4,7 @@ Static site on GitHub Pages: `seadapps.github.io/ice-measurement/`.
 No build step, no framework, no dependencies. Edit a file, push, done.
 
 ```
-index.html    launcher — cards for each app, live status read from each app's store
+index.html    launcher — gated; cards read this device's records, never the network
 ice.html      Ice Manager  — thickness rounds, contour map, trends (multi-facility)
 glass.html    Glass Manager — 127 rink glass panels, condition record
 sync.js       shared: Supabase auth, pull/push, the access gate, the status pill
@@ -92,6 +92,13 @@ own clock, so a tablet with the wrong date can't win every conflict forever.
 **Records pulled down are marked as sent.** Otherwise the next push echoes them
 straight back and bumps their timestamps.
 
+**A page that shows records must not pull unless it also applies them.** The
+launcher displays counts but owns no records, so it reads local storage and
+calls `Sync.verify()` — which checks the token and nothing else. Giving it the
+full loop would be worse than useless: a pull whose `apply()` has nothing to
+apply still advances the cursor, so the apps would never see the rows it
+skipped. Silent, and indistinguishable from the round never being logged.
+
 ---
 
 ## Supabase
@@ -111,8 +118,29 @@ RLS on. Signed-in users read/insert/update; no delete policy. A trigger stamps
 server-side, not a JavaScript check. The code never appears in the repo. The
 anon key does, and that is fine: on its own it grants nothing.
 
-Rotating the code = changing that account's password, which signs every device
-out once.
+Rotating the code = changing that account's password, which invalidates every
+device's stored refresh token.
+
+**What a rotated code does, precisely.** The next time a device syncs, its
+refresh is rejected, `sync.js` drops the session and puts the gate back up — on
+all three pages, launcher included. Two things make that reliable:
+
+- *A rejection is not the same as being offline.* Both fail to produce a token,
+  and they need opposite responses: offline keeps the session and retries,
+  rejected clears it. Only an explicit 400 or 401 counts as rejected; a paused
+  project or a 5xx stays offline, because a false positive throws a code prompt
+  at somebody halfway through a round.
+- *A 401 on a data call expires the token locally.* Otherwise a device whose
+  token was invalidated server-side sits on "can't reach the server" until its
+  own clock says the token expired — up to an hour.
+
+What a rotated code **cannot** do is erase records already on a device. Those
+stay in local storage and reappear when someone signs in again. Wiping them
+would make a false positive destroy unsynced work, against the rule that local
+storage is the primary copy. A lost tablet is a device-level problem.
+
+There is also a sign-out control on every page, so re-entering the code is
+possible on purpose rather than only by clearing site data.
 
 **Free tier pauses after ~7 days of no requests.** `keepalive.yml` pings every
 three days. GitHub disables scheduled workflows after 60 days of no commits —
@@ -148,6 +176,7 @@ node dev/fake-supabase.js &
 node dev/synctest.js       # 20 checks: sign-in, two devices, offline, paused
 node dev/conflicttest.js   # 10 checks: no churn, contested edits, retries
 node dev/e2e.js            # 14 checks: legacy migration, backup merge
+node dev/homecheck.js      # 23 checks: the gate, card figures, a rotated code
 ```
 
 Tests point `window.__SYNC_CONFIG__` at the fake via `addInitScript`; the real
@@ -161,8 +190,6 @@ pages never read it.
   drawn dashed and flagged in the schedule. Never confirmed on site. Either a
   missed panel or the Zamboni doorway is wider than its two 57½″ leaves.
 - **Glass Manager on a phone** has not been looked at. Desktop and tablet are fine.
-- **`index.html` `<title>` and `manifest.json`** still say "Rink Apps" while the
-  visible name is "Arena Management System".
 - **Ice app has no "marked by" field.** Glass does. Worth adding for parity —
   attribution without individual logins.
 - **No realtime.** Sync happens on open and on focus. Supabase realtime would

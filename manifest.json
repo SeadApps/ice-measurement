@@ -1,6 +1,6 @@
 {
-  "name": "Rink Apps — arena operations tools",
-  "short_name": "Rink Apps",
+  "name": "Arena Management System",
+  "short_name": "Arena",
   "description": "Ice thickness measurement and rink glass management for multi-facility arenas.",
   "start_url": "./",
   "scope": "./",

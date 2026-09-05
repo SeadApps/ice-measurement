@@ -639,7 +639,8 @@ th.dark.addEventListener('click',  ()=>setTheme('dark'));
     }
   });
   const hdr=document.querySelector('header');
-  if(hdr) hdr.insertBefore(SYNC.statusEl(), hdr.querySelector('.themeseg'));
+  if(hdr){ hdr.insertBefore(SYNC.statusEl(), hdr.querySelector('.themeseg'));
+           hdr.insertBefore(SYNC.signOutEl(), hdr.querySelector('.themeseg')); }
   SYNC.start({title:'Arena Management System'});
 })();
 </script>

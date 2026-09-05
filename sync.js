@@ -42,6 +42,9 @@
 
   var session = null, hooks = null, statusCbs = [], state = "offline", detail = "";
   var pushTimer = null, syncing = false;
+  var gateTitle = "Arena Management System";  // remembered so a re-gate looks like the first one
+  var gatePromise = null;                     // one gate at a time, however many syncs race
+  var resyncPending = false;
 
   function setStatus(s, d) {
     if (s === state && d === detail) return;
@@ -78,35 +81,64 @@
     });
   }
 
+  /* Three outcomes, not two. Being offline and having the token rejected both
+     fail to produce an access token, but they call for opposite responses:
+     offline keeps the session and retries later, rejected clears it and asks
+     for the code. Collapsing them into `false` is why rotating the access code
+     used to leave every device showing its local copy for good — the pill said
+     "enter the code again" and then nothing ever offered anywhere to enter it. */
   function refresh() {
-    if (!session || !session.refresh_token) return Promise.resolve(false);
+    if (!session || !session.refresh_token) return Promise.resolve("revoked");
     return fetch(CFG.url + "/auth/v1/token?grant_type=refresh_token", {
       method: "POST", headers: headers(false),
       body: JSON.stringify({ refresh_token: session.refresh_token })
-    }).then(function (r) { return r.json(); }).then(function (j) {
-      if (j.access_token) return saveSession(j).then(function () { return true; });
-      return false;
-    }).catch(function () { return false; });   // offline: keep the session, try later
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) {
+        if (j.access_token) return saveSession(j).then(function () { return "ok"; });
+        /* Only an outright rejection counts as revoked. A paused project, a
+           gateway error or a 5xx must not sign anyone out — err toward keeping
+           the session, because a false positive throws a code prompt at
+           somebody halfway through a round. */
+        return (r.status === 400 || r.status === 401) ? "revoked" : "offline";
+      });
+    }).catch(function () { return "offline"; });   // no network: keep the session, try later
   }
 
   function ensureToken() {
-    if (!session) return Promise.resolve(false);
-    if (Date.now() < session.expires_at) return Promise.resolve(true);
+    if (!session) return Promise.resolve("revoked");
+    if (Date.now() < session.expires_at) return Promise.resolve("ok");
     return refresh();
   }
 
+  /* Only the session is dropped. The cursor and the sent-map describe the local
+     records, and those survive a sign-out — clearing them would make the next
+     push treat every record as never-sent, restamp the whole set server-side,
+     and leave this device looking newest on everything. That is exactly the
+     clobber the record store exists to prevent. */
   function signOut() {
     session = null;
-    return Promise.all([writeJSON(K_SESSION, null), writeJSON(K_CURSOR, null), writeJSON(K_SENT, {})]);
+    return writeJSON(K_SESSION, null);
   }
 
   /* --- transport ---------------------------------------------------------- */
+
+  /* A 401 on a data call means the token is no longer accepted even though our
+     own clock still thinks it is good — which is what a rotated code looks like
+     until the access token would have expired anyway. Expiring it locally makes
+     the next pass refresh, get rejected, and put the gate up. Without this a
+     revoked device sits on "can't reach the server" for up to an hour first. */
+  function noteAuth(r) {
+    if (r && r.status === 401 && session) session.expires_at = 0;
+    return r;
+  }
+
   function pull() {
     return readJSON(K_CURSOR, null).then(function (cursor) {
       var q = CFG.url + "/rest/v1/records?select=*&order=updated_at.asc&limit=1000";
       if (hooks && hooks.kinds) q += "&kind=in.(" + hooks.kinds.join(",") + ")";
       if (cursor) q += "&updated_at=gt." + encodeURIComponent(cursor);
       return fetch(q, { headers: headers(true) }).then(function (r) {
+        noteAuth(r);
         if (!r.ok) throw new Error("HTTP " + r.status);
         return r.json();
       }).then(function (rows) {
@@ -145,7 +177,7 @@
           method: "POST",
           headers: Object.assign(headers(true), { "Prefer": "resolution=merge-duplicates,return=minimal" }),
           body: JSON.stringify(batch)
-        }).then(function (r) { return r.ok; }).catch(function () { return false; });
+        }).then(function (r) { return noteAuth(r).ok; }).catch(function () { return false; });
       });
     }, Promise.resolve(true));
   }
@@ -197,8 +229,9 @@
       });
     }
     syncing = true; setStatus("syncing", reason || "");
-    return ensureToken().then(function (ok) {
-      if (!ok) { setStatus("offline", "signed out — enter the code again"); return; }
+    return ensureToken().then(function (res) {
+      if (res === "revoked") return revoked().then(function () { resyncPending = true; });
+      if (res !== "ok") { setStatus("offline", "can't reach the server"); return; }
       return push().then(function (pushed) {
         return pull().then(function (applied) {
           if (pushed) { setStatus("synced", applied ? "brought in " + applied + " change" + (applied === 1 ? "" : "s") : "up to date"); return; }
@@ -209,7 +242,23 @@
       });
     }).catch(function (e) {
       setStatus("offline", "can't reach the server");
-    }).then(function () { syncing = false; });
+    }).then(function () {
+      syncing = false;
+      /* Signing back in has to wait for the guard above to clear, or the
+         follow-up sync returns at the first line and the device sits there
+         signed in but never pulling. */
+      if (resyncPending) { resyncPending = false; return sync("signed in"); }
+    });
+  }
+
+  /* The code was rotated, or this device's session was invalidated. Put the
+     gate back up and leave every local record alone: signing in again restores
+     the app exactly as it was, and a false positive here can't destroy work
+     that hasn't synced yet. Hiding the data is what a rotated code can do; it
+     cannot reach back and erase what a device already holds. */
+  function revoked() {
+    setStatus("local", "signed out");
+    return signOut().then(function () { return showGate(gateTitle); });
   }
 
   function nudge() {                      // called by the apps after any edit
@@ -219,14 +268,15 @@
 
   /* --- the access gate ---------------------------------------------------- */
   var GATE_CSS = ''
+    + '.sync-gate,.sync-gate *{position:static}'
     + '.sync-gate{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;'
     + 'padding:24px;background:radial-gradient(1200px 600px at 50% -10%,var(--glow,#16283a) 0%,transparent 60%),var(--bg,#0d1620)}'
-    + '.sync-gate .box{width:100%;max-width:360px;display:flex;flex-direction:column;gap:20px}'
-    + '.sync-gate .bd{display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center}'
-    + '.sync-gate .bd h2{margin:0;font-size:23px;font-weight:800;display:flex;align-items:baseline;gap:9px;'
+    + '.sync-gate .sync-box{width:100%;max-width:360px;display:flex;flex-direction:column;gap:20px}'
+    + '.sync-gate .sync-bd{display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center}'
+    + '.sync-gate .sync-bd h2{margin:0;font-size:23px;font-weight:800;display:flex;align-items:baseline;gap:9px;'
     + 'color:var(--ink,#eaf3f8)}'
-    + '.sync-gate .bd h2 i{font-style:normal;font-family:var(--mono,monospace);color:var(--frost,#6fd6ec);font-size:17px}'
-    + '.sync-gate .bd p{margin:0;font-size:12.5px;color:var(--ink-dim,#90a8b8)}'
+    + '.sync-gate .sync-bd h2 i{font-style:normal;font-family:var(--mono,monospace);color:var(--frost,#6fd6ec);font-size:17px}'
+    + '.sync-gate .sync-bd p{margin:0;font-size:12.5px;color:var(--ink-dim,#90a8b8)}'
     + '.sync-gate form{background:var(--panel,#152433);border:1px solid var(--line,#273d4f);border-radius:14px;'
     + 'padding:22px 20px;display:flex;flex-direction:column;gap:12px}'
     + '.sync-gate label{font-family:var(--mono,monospace);font-size:10px;letter-spacing:.14em;text-transform:uppercase;'
@@ -237,14 +287,19 @@
     + '.sync-gate button{appearance:none;font:inherit;font-size:15px;font-weight:700;height:44px;border:0;'
     + 'border-radius:10px;background:var(--frost,#6fd6ec);color:#06222b;cursor:pointer}'
     + '.sync-gate button:disabled{opacity:.55;cursor:default}'
-    + '.sync-gate .err{min-height:16px;font-size:12.5px;color:#e5645d}'
-    + '.sync-gate .hint{font-size:12px;color:var(--ink-faint,#5d7384);text-align:center;line-height:1.55}'
+    + '.sync-gate .sync-err{min-height:16px;font-size:12.5px;color:#e5645d}'
+    + '.sync-gate .sync-hint{font-size:12px;color:var(--ink-faint,#5d7384);text-align:center;line-height:1.55}'
     + '.sync-pill{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono,monospace);font-size:11px;'
     + 'color:var(--ink-dim,#90a8b8);background:var(--panel,#152433);border:1px solid var(--line,#273d4f);'
     + 'border-radius:999px;padding:5px 11px;white-space:nowrap}'
     + '.sync-pill i{width:7px;height:7px;border-radius:50%;background:var(--ink-faint,#5d7384);flex:none}'
     + '.sync-pill.synced i{background:#7fcf9a}.sync-pill.syncing i{background:var(--frost,#6fd6ec)}'
-    + '.sync-pill.offline i{background:#e8b54a}.sync-pill.local i{background:var(--ink-faint,#5d7384)}';
+    + '.sync-pill.offline i{background:#e8b54a}.sync-pill.local i{background:var(--ink-faint,#5d7384)}'
+    + '.sync-signout{appearance:none;font:inherit;font-family:var(--mono,monospace);font-size:11px;'
+    + 'color:var(--ink-dim,#90a8b8);background:var(--panel,#152433);border:1px solid var(--line,#273d4f);'
+    + 'border-radius:999px;padding:5px 11px;cursor:pointer;white-space:nowrap}'
+    + '.sync-signout:hover{color:var(--ink,#eaf3f8);border-color:var(--ink-faint,#5d7384)}'
+    + '.sync-signout:focus-visible{outline:2px solid var(--frost,#6fd6ec);outline-offset:2px}';
 
   function injectCSS() {
     if (document.getElementById("sync-css")) return;
@@ -253,20 +308,29 @@
   }
 
   function showGate(title) {
+    /* start() and a revoked token can both ask for the gate, and a focus event
+       can arrive while one is already up. Hand back the gate that is already
+       open rather than stacking a second one over it. */
+    if (gatePromise) return gatePromise;
+    gatePromise = buildGate(title).then(function (v) { gatePromise = null; return v; });
+    return gatePromise;
+  }
+
+  function buildGate(title) {
     return new Promise(function (resolve) {
       injectCSS();
       var el = document.createElement("div");
       el.className = "sync-gate";
       el.innerHTML =
-        '<div class="box"><div class="bd"><h2><i>[ ◊ ]</i> ' + (title || "Arena Management System") + '</h2>'
+        '<div class="sync-box"><div class="sync-bd"><h2><i>[ ◊ ]</i> ' + (title || "Arena Management System") + '</h2>'
         + '<p>Conway Arena &middot; Nashua, NH</p></div>'
         + '<form autocomplete="off"><label for="sg-code">Access code</label>'
         + '<input id="sg-code" type="password" inputmode="text" autocapitalize="none" autocorrect="off" spellcheck="false">'
-        + '<button type="submit">Continue</button><div class="err"></div></form>'
-        + '<p class="hint">Ask Pete for the code.<br>You only need this once on each phone or tablet.</p></div>';
+        + '<button type="submit">Continue</button><div class="sync-err"></div></form>'
+        + '<p class="sync-hint">Ask Pete for the code.<br>You only need this once on each phone or tablet.</p></div>';
       document.body.appendChild(el);
       var form = el.querySelector("form"), input = el.querySelector("input"),
-          btn = el.querySelector("button"), err = el.querySelector(".err");
+          btn = el.querySelector("button"), err = el.querySelector(".sync-err");
       setTimeout(function () { input.focus(); }, 50);
       form.addEventListener("submit", function (e) {
         e.preventDefault();
@@ -289,10 +353,11 @@
     start: function (opts) {
       opts = opts || {};
       injectCSS();
+      if (opts.title) gateTitle = opts.title;
       return readJSON(K_SESSION, null).then(function (s) {
         session = s;
         if (session) { setStatus("local", "checking…"); return true; }
-        return showGate(opts.title);
+        return showGate(gateTitle);
       }).then(function () {
         window.addEventListener("online",  function () { sync("back online"); });
         window.addEventListener("offline", function () { setStatus("offline", "saved on this device"); });
@@ -301,6 +366,20 @@
       });
     },
     attach: function (h) { hooks = h; },
+    /* Check the stored session is still good, without syncing anything.
+       For a page that shows a local summary and never reads or writes records
+       — the launcher — running the full loop would be wrong: a pull whose
+       apply() does nothing still advances the cursor, and the apps would then
+       never see the rows it skipped. This validates the token, re-gates if it
+       has been revoked, and leaves the cursor and the sent-map untouched. */
+    verify: function () {
+      if (!session) return Promise.resolve(false);
+      if (!navigator.onLine) return Promise.resolve(true);   // can't tell; assume good
+      return ensureToken().then(function (res) {
+        if (res === "revoked") return revoked().then(function () { return !!session; });
+        return true;    // "offline" is not a reason to lock anyone out
+      });
+    },
     nudge: nudge,
     sync: sync,
     signOut: function () { return signOut().then(function () { location.reload(); }); },
@@ -324,6 +403,22 @@
         : s === "syncing" ? "syncing…"
         : s === "offline" ? (d || "saved on this device")
         : (d || "on this device only");
+      });
+      return el;
+    },
+    /* A sign-out button the pages can sit next to the pill. Confirms first —
+       it lives in a header next to a theme toggle, and signing out by mistake
+       means hunting down the code again. */
+    signOutEl: function (label) {
+      injectCSS();
+      var el = document.createElement("button");
+      el.type = "button";
+      el.className = "sync-signout";
+      el.textContent = label || "Sign out";
+      el.addEventListener("click", function () {
+        if (!window.confirm("Sign out of this device?\n\nYou'll need the access code to get back in. "
+                          + "Anything saved on this device stays where it is.")) return;
+        Sync.signOut();
       });
       return el;
     },
