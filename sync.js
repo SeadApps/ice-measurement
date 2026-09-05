@@ -268,14 +268,15 @@
 
   /* --- the access gate ---------------------------------------------------- */
   var GATE_CSS = ''
+    + '.sync-gate,.sync-gate *{position:static}'
     + '.sync-gate{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;'
     + 'padding:24px;background:radial-gradient(1200px 600px at 50% -10%,var(--glow,#16283a) 0%,transparent 60%),var(--bg,#0d1620)}'
-    + '.sync-gate .box{width:100%;max-width:360px;display:flex;flex-direction:column;gap:20px}'
-    + '.sync-gate .bd{display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center}'
-    + '.sync-gate .bd h2{margin:0;font-size:23px;font-weight:800;display:flex;align-items:baseline;gap:9px;'
+    + '.sync-gate .sync-box{width:100%;max-width:360px;display:flex;flex-direction:column;gap:20px}'
+    + '.sync-gate .sync-bd{display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center}'
+    + '.sync-gate .sync-bd h2{margin:0;font-size:23px;font-weight:800;display:flex;align-items:baseline;gap:9px;'
     + 'color:var(--ink,#eaf3f8)}'
-    + '.sync-gate .bd h2 i{font-style:normal;font-family:var(--mono,monospace);color:var(--frost,#6fd6ec);font-size:17px}'
-    + '.sync-gate .bd p{margin:0;font-size:12.5px;color:var(--ink-dim,#90a8b8)}'
+    + '.sync-gate .sync-bd h2 i{font-style:normal;font-family:var(--mono,monospace);color:var(--frost,#6fd6ec);font-size:17px}'
+    + '.sync-gate .sync-bd p{margin:0;font-size:12.5px;color:var(--ink-dim,#90a8b8)}'
     + '.sync-gate form{background:var(--panel,#152433);border:1px solid var(--line,#273d4f);border-radius:14px;'
     + 'padding:22px 20px;display:flex;flex-direction:column;gap:12px}'
     + '.sync-gate label{font-family:var(--mono,monospace);font-size:10px;letter-spacing:.14em;text-transform:uppercase;'
@@ -286,8 +287,8 @@
     + '.sync-gate button{appearance:none;font:inherit;font-size:15px;font-weight:700;height:44px;border:0;'
     + 'border-radius:10px;background:var(--frost,#6fd6ec);color:#06222b;cursor:pointer}'
     + '.sync-gate button:disabled{opacity:.55;cursor:default}'
-    + '.sync-gate .err{min-height:16px;font-size:12.5px;color:#e5645d}'
-    + '.sync-gate .hint{font-size:12px;color:var(--ink-faint,#5d7384);text-align:center;line-height:1.55}'
+    + '.sync-gate .sync-err{min-height:16px;font-size:12.5px;color:#e5645d}'
+    + '.sync-gate .sync-hint{font-size:12px;color:var(--ink-faint,#5d7384);text-align:center;line-height:1.55}'
     + '.sync-pill{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono,monospace);font-size:11px;'
     + 'color:var(--ink-dim,#90a8b8);background:var(--panel,#152433);border:1px solid var(--line,#273d4f);'
     + 'border-radius:999px;padding:5px 11px;white-space:nowrap}'
@@ -321,15 +322,15 @@
       var el = document.createElement("div");
       el.className = "sync-gate";
       el.innerHTML =
-        '<div class="box"><div class="bd"><h2><i>[ ◊ ]</i> ' + (title || "Arena Management System") + '</h2>'
+        '<div class="sync-box"><div class="sync-bd"><h2><i>[ ◊ ]</i> ' + (title || "Arena Management System") + '</h2>'
         + '<p>Conway Arena &middot; Nashua, NH</p></div>'
         + '<form autocomplete="off"><label for="sg-code">Access code</label>'
         + '<input id="sg-code" type="password" inputmode="text" autocapitalize="none" autocorrect="off" spellcheck="false">'
-        + '<button type="submit">Continue</button><div class="err"></div></form>'
-        + '<p class="hint">Ask Pete for the code.<br>You only need this once on each phone or tablet.</p></div>';
+        + '<button type="submit">Continue</button><div class="sync-err"></div></form>'
+        + '<p class="sync-hint">Ask Pete for the code.<br>You only need this once on each phone or tablet.</p></div>';
       document.body.appendChild(el);
       var form = el.querySelector("form"), input = el.querySelector("input"),
-          btn = el.querySelector("button"), err = el.querySelector(".err");
+          btn = el.querySelector("button"), err = el.querySelector(".sync-err");
       setTimeout(function () { input.focus(); }, 50);
       form.addEventListener("submit", function (e) {
         e.preventDefault();
