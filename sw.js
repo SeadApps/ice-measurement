@@ -1,6 +1,6 @@
 // Bump CACHE_VERSION whenever you change any file listed below — there's no build
 // step, so this string is the only thing that retires the previous cache.
-const CACHE_VERSION = "rink-apps-v5";
+const CACHE_VERSION = "arena-v6";
 const PRECACHE_URLS = [
   "./", "index.html", "ice.html", "glass.html", "sync.js",
   "manifest.json", "icon-192.png", "icon-512.png"
