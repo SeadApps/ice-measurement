@@ -539,6 +539,7 @@
 
 <div id="printRoot"></div>
 
+<script src="sync.js"></script>
 <script>
 "use strict";
 /* ---------- geometry (per-sheet rink size) ---------- */
@@ -739,7 +740,9 @@ const Repo={
     facilities:SNAP.fac,sheets:SNAP.sh,sessions:SNAP.se};}
 };
 
-let saveTimer=null;const persist=()=>{clearTimeout(saveTimer);saveTimer=setTimeout(()=>Repo.save(state),180);};
+const SYNC=(typeof Sync!=="undefined")?Sync:null;   // absent if sync.js failed to load; the app still works locally
+let saveTimer=null;const persist=()=>{clearTimeout(saveTimer);
+  saveTimer=setTimeout(()=>{Repo.save(state);if(SYNC)SYNC.nudge();},180);};
 
 /* ---------- undo ---------- */
 let undoStack=[];const snap=()=>JSON.stringify({data:data(),notes:notes()});
@@ -1251,7 +1254,30 @@ async function boot(){state=await Repo.load();
   /* Pick up where this device left off — coming back from another app in the suite
      lands on the sheet you were working, not the front screen. ≡ still goes home. */
   if(state.screen==="work"&&facility()&&sheet()&&session())enterWork(state.lastView);else goHome();}
-boot();
+boot().then(()=>{
+  if(!SYNC) return;
+  SYNC.attach({
+    kinds:["facility","sheet","session"],
+    collect:()=>({facility:SNAP.fac, sheet:SNAP.sh, session:SNAP.se}),
+    apply:(incoming)=>{
+      const res=Repo.merge({facilities:incoming.facility||{}, sheets:incoming.sheet||{}, sessions:incoming.session||{}});
+      if(!res.taken) return 0;
+      state.facilities=res.facilities;
+      state.facilities.forEach(fa=>{if(!fa.settings)fa.settings=defaultSettings();if(!fa.settings.edges)fa.settings.edges=[...DEFAULT_EDGES];
+        (fa.sheets||[]).forEach(sh=>{if(!sh.size)sh.size=NHL_SIZE();(sh.sessions||[]).forEach(se=>{if(!se.mode)se.mode="moderate";});});});
+      if(!facility())state.activeFacility=state.facilities[0].id;
+      if(!sheet())state.activeSheet=facility().sheets[0].id;
+      if(!session())state.activeSession=sheet().sessions[0].id;
+      Repo.save(state);
+      if(state.screen==="work"){applyGeometry(sheet().size,session().mode);computeField();computeDelta();buildSessSel();refresh();}
+      else buildHome();
+      return res.taken;
+    }
+  });
+  const bar=document.querySelector("#home .home-bar");
+  if(bar) bar.insertBefore(SYNC.statusEl(), bar.querySelector(".themeseg"));
+  SYNC.start({title:"Arena Management System"});
+});
 
 /* ---------- PWA: install this file + its assets so the app opens and works offline ---------- */
 if("serviceWorker" in navigator){

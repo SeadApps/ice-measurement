@@ -1,8 +1,8 @@
 // Bump CACHE_VERSION whenever you change any file listed below — there's no build
 // step, so this string is the only thing that retires the previous cache.
-const CACHE_VERSION = "rink-apps-v3";
+const CACHE_VERSION = "rink-apps-v5";
 const PRECACHE_URLS = [
-  "./", "index.html", "ice.html", "glass.html",
+  "./", "index.html", "ice.html", "glass.html", "sync.js",
   "manifest.json", "icon-192.png", "icon-512.png"
 ];
 
@@ -33,7 +33,10 @@ self.addEventListener("fetch", e => {
   // for the cache to be invalidated. Falls back to the cached copy when offline.
   if (e.request.mode === "navigate" || e.request.destination === "document") {
     e.respondWith(
-      fetch(e.request)
+      // cache:"no-store" steps over the browser's own HTTP cache as well. Without
+      // it, GitHub Pages' 10-minute max-age can keep serving yesterday's page even
+      // though the service worker asked the network for it.
+      fetch(e.request.url, { cache: "no-store", credentials: "same-origin" })
         .then(res => {
           if (res && res.ok) { const copy = res.clone(); caches.open(CACHE_VERSION).then(c => c.put(e.request, copy)); }
           return res;
