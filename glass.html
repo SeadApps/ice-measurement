@@ -17,8 +17,12 @@
   --line:#273d4f; --line-2:#3a5b72;
   --ink:#eaf3f8; --ink-2:#90a8b8; --ink-3:#5d7384;
   --accent:#6fd6ec; --accent-soft:#13323f;
-  --rink-blue:#4f8fd0; --rink-red:#d6453f; --ice:#101d28;
-  --ok:#6f8ea0; --ok-soft:#1a2c3a;
+  --rink-blue:#4f8fd0; --rink-red:#d6453f; --ice:#feffff;
+  --ok:#6f8ea0; --ok-soft:#d0d0d0;
+  /* Text sitting on a glass panel, not on the page. Panels are light in
+     both themes, so this stays dark in both and is deliberately not
+     redefined under [data-theme="light"]. */
+  --panel-ink:#13222e;
   --replace:#e5645d; --replace-soft:#3a1f1e;
   --plexi:#e8b54a; --plexi-soft:#33280f;
   --warn:#e8b54a;
@@ -125,7 +129,7 @@ svg.rink{display:block;width:100%;min-width:760px;height:auto}
 .pnl.sel{stroke:var(--ink);stroke-width:.55}
 .pnl.dim{opacity:.22}
 .pnum{font-family:var(--mono);font-size:1.62px;fill:var(--ink-3);text-anchor:middle;dominant-baseline:middle;pointer-events:none;user-select:none}
-.pnum.on{fill:var(--ink);font-weight:600}
+.pnum.on{fill:var(--panel-ink);font-weight:600}
 .seclbl{font-family:var(--display);font-size:3.4px;font-weight:600;letter-spacing:.24em;fill:var(--ink-3);text-anchor:middle;text-transform:uppercase}
 .opnlbl{font-family:var(--display);font-size:1.95px;font-weight:600;letter-spacing:.04em;fill:var(--ink-2);text-anchor:middle;dominant-baseline:middle;text-transform:uppercase}
 .opnlbl.warn{fill:var(--warn)}
