@@ -247,7 +247,7 @@ document.documentElement.setAttribute("data-theme",_t==="light"?"light":"dark");
 </header>
 
 <div class="specstrip">
-  <p class="lede">Conway Arena, Nashua NH &middot; all 127 pieces in running order from the Zamboni doors, counter&#8209;clockwise. Click any panel on the plan or in the schedule to record its condition.</p>
+  <p class="lede"><span id="facName">Conway Arena</span>, Nashua NH &middot; all 127 pieces in running order from the Zamboni doors, counter&#8209;clockwise. Click any panel on the plan or in the schedule to record its condition.</p>
   <div class="specs">
     <div class="spec"><b>200&prime; &times; 85&prime;</b><span>Ice sheet</span></div>
     <div class="spec"><b>27&prime; 2&Prime;</b><span>Corner radius</span></div>
@@ -335,7 +335,7 @@ const STATUS = {
   replace: {label:'Needs replacement',   short:'Replace',cls:'replace'},
   plexi:   {label:'Temporary plexi in',  short:'Plexi', cls:'plexi'}
 };
-let state = {};          // id -> {status, note}
+let state = {};          // the active facility's panels: id -> {status, note}
 let sel = null;          // selected panel id
 let filter = null;       // status filter
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -524,19 +524,81 @@ const Store={
                 try{ return localStorage.getItem(k); }catch(e){ return null; } },
   async set(k,v){ try{ if(window.storage&&window.storage.set){ await window.storage.set(k,v); return; } }catch(e){}
                   try{ localStorage.setItem(k,v); }catch(e){} }};
-const KEY = 'glass_record_v1';
+/* Panels belong to a facility now.
+
+   The original 127 live in a bucket called "legacy" and keep bare record ids
+   on the wire - "045", not "<facility>:045". Nothing already on the server is
+   re-keyed, so a device still running the old code stays consistent and there
+   is no one-shot migration to get right. Facilities added later get scoped
+   ids, "<facilityId>:<panelId>".
+
+   The bucket key is the fixed string "legacy" rather than a facility id,
+   because facility records arrive from sync - asynchronously, and possibly
+   never on a device that has only ever run Glass. Which named facility the
+   bucket belongs to is a separate fact that syncs on its own (glass_binding),
+   and only affects what the page is labelled. */
+const KEY = 'glass_record_v2', KEY_V1 = 'glass_record_v1';
+const LEGACY = 'legacy';
 function say(msg){ const n = document.getElementById('savenote'); if(n) n.textContent = msg; }
 function stamp(){ return new Date().toISOString().slice(0,10); }
 let who = '';
+let records = {};             // bucket -> panelId -> {status,note,by,at,updatedAt}
+let facilities = {};          // facilityId -> {id,name,ord} - the Ice app owns these
+let boundFacilityId = null;   // which facility record names the legacy bucket
+let bindingAt = '';           // its updatedAt, so the binding merges newest-wins
+let activeBucket = LEGACY;
+
+const bucketOf = b => (records[b] = records[b] || {});
+const recId = (bucket, pid) => bucket === LEGACY ? pid : bucket + ':' + pid;
+function splitId(rid){
+  const i = String(rid).indexOf(':');
+  return i < 0 ? { bucket: LEGACY, pid: String(rid) }
+               : { bucket: rid.slice(0, i), pid: rid.slice(i + 1) };
+}
+function facilityName(bucket){
+  const f = facilities[bucket === LEGACY ? boundFacilityId : bucket];
+  return (f && f.name) || (bucket === LEGACY ? 'Conway Arena' : 'Unnamed facility');
+}
+function paintFacility(){
+  const el = document.getElementById('facName');
+  if(el) el.textContent = facilityName(activeBucket);
+}
+
+/* Nothing names the legacy bucket until the Ice app's facilities arrive. Bind
+   it to the first of them once, and let that decision sync so every device
+   agrees; never move it afterwards. */
+function ensureBinding(){
+  if(boundFacilityId) return false;
+  const list = Object.keys(facilities).map(k=>facilities[k]).filter(Boolean)
+    .sort((a,b)=>(a.ord||0)-(b.ord||0) || String(a.id).localeCompare(String(b.id)));
+  if(!list.length) return false;
+  boundFacilityId = list[0].id; bindingAt = new Date().toISOString();
+  return true;
+}
 
 const SYNC=(typeof Sync!=="undefined")?Sync:null;   // absent if sync.js failed to load; the page still works locally
-function store(){ Store.set(KEY, JSON.stringify({panels:state, who})); say('Saved'); if(SYNC) SYNC.nudge(); }
+const snapshot = () => JSON.stringify({records, who, boundFacilityId, bindingAt, activeBucket});
+function store(){ Store.set(KEY, snapshot()); say('Saved'); if(SYNC) SYNC.nudge(); }
+
 async function restore(){
   let saved = null;
   try{ saved = JSON.parse(await Store.get(KEY) || 'null'); }catch(e){}
-  state = (saved && saved.panels) ? saved.panels : JSON.parse(JSON.stringify(DATA.cond || {}));
-  for(const id in state){ if(state[id] && !state[id].updatedAt) state[id].updatedAt = state[id].at || '1970-01-01'; }
-  who = (saved && saved.who) || '';
+  if(saved && saved.records){
+    records = saved.records; who = saved.who || '';
+    boundFacilityId = saved.boundFacilityId || null; bindingAt = saved.bindingAt || '';
+    activeBucket = saved.activeBucket || LEGACY;
+  } else {
+    let v1 = null;
+    try{ v1 = JSON.parse(await Store.get(KEY_V1) || 'null'); }catch(e){}
+    records = {}; records[LEGACY] = (v1 && v1.panels) ? v1.panels
+                                  : JSON.parse(JSON.stringify(DATA.cond || {}));
+    who = (v1 && v1.who) || '';
+    /* v1 is left untouched as a fallback, the same way the Ice app leaves
+       ice_sheet_v3 alone after moving to records. */
+  }
+  const legacy = bucketOf(LEGACY);
+  for(const id in legacy){ if(legacy[id] && !legacy[id].updatedAt) legacy[id].updatedAt = legacy[id].at || '1970-01-01'; }
+  state = bucketOf(activeBucket);
   document.getElementById('who').value = who;
 }
 const nowISO = () => new Date().toISOString();
@@ -569,7 +631,7 @@ document.getElementById('csv').addEventListener('click', ()=>{
 });
 document.getElementById('save').addEventListener('click', ()=>{
   grab(`conway-glass-record-${stamp()}.json`,
-       JSON.stringify({rink:'Conway Arena', saved:stamp(), by:who, panels:state}, null, 2),
+       JSON.stringify({rink:facilityName(activeBucket), saved:stamp(), by:who, panels:state}, null, 2),
        'application/json');
   say('Record file saved — send it on to whoever keeps the master.');
 });
@@ -617,28 +679,61 @@ th.dark.addEventListener('click',  ()=>setTheme('dark'));
 (async function boot(){
   applyTheme(document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark');
   await restore();
-  buildPlan(); rail(); totals(); table(); detail(); paint();
+  buildPlan(); rail(); totals(); table(); detail(); paint(); paintFacility();
 
   if(!SYNC) return;
   SYNC.attach({
-    kinds:['glass_panel'],
+    /* facility is pulled, never pushed - the Ice app owns those records, and
+       collect() deliberately omits them so nothing here can restamp one. */
+    kinds:['facility','glass_panel','glass_binding'],
     collect:()=>{
-      const out={};
-      for(const id in state) out[id]=Object.assign({}, state[id], {id});
-      return {glass_panel:out};
+      const panels={};
+      for(const bucket in records){
+        const m=records[bucket];
+        for(const pid in m){ const rid=recId(bucket,pid); panels[rid]=Object.assign({}, m[pid], {id:rid}); }
+      }
+      const binding={};
+      if(boundFacilityId) binding[LEGACY]={id:LEGACY, facilityId:boundFacilityId, updatedAt:bindingAt};
+      return {glass_panel:panels, glass_binding:binding};
     },
     apply:(incoming)=>{
-      const inc=incoming.glass_panel||{}; let taken=0;
-      for(const id in inc){
-        const v=inc[id], cur=state[id];
+      let taken=0;
+
+      const facs=incoming.facility||{};
+      for(const id in facs){
+        const f=facs[id];
+        if(f.deleted){ if(facilities[id]){ delete facilities[id]; taken++; } continue; }
+        facilities[id]={id:id, name:f.name, ord:f.ord}; taken++;
+      }
+
+      const binds=incoming.glass_binding||{};
+      const b=binds[LEGACY];
+      if(b && !b.deleted && (b.updatedAt||'')>bindingAt){
+        boundFacilityId=b.facilityId||null; bindingAt=b.updatedAt||''; taken++;
+      }
+
+      const inc=incoming.glass_panel||{};
+      for(const rid in inc){
+        const v=inc[rid];
         if(v.deleted) continue;                       // panels are never removed, only re-marked
-        if(!GLASS.some(p=>p.id===id)) continue;       // ignore anything not on this rink
+        const at=splitId(rid);
+        /* Only the legacy bucket is this rink. A scoped id belongs to a
+           facility whose layout Glass cannot draw yet, so keep the record but
+           do not try to match it against Conway's panel list. */
+        if(at.bucket===LEGACY && !GLASS.some(p=>p.id===at.pid)) continue;
+        const m=bucketOf(at.bucket), cur=m[at.pid];
         if(!cur || stampOf(v) > stampOf(cur)){
-          state[id]={status:v.status||'ok', note:v.note||'', by:v.by||'', at:v.at||'', updatedAt:v.updatedAt};
+          m[at.pid]={status:v.status||'ok', note:v.note||'', by:v.by||'', at:v.at||'', updatedAt:v.updatedAt};
           taken++;
         }
       }
-      if(taken){ Store.set(KEY, JSON.stringify({panels:state, who})); rail(); table(); detail(); paint(); }
+
+      if(ensureBinding()) taken++;
+      if(taken){
+        state=bucketOf(activeBucket);
+        Store.set(KEY, snapshot());
+        paintFacility(); rail(); table(); detail(); paint();
+      }
       return taken;
     }
   });
