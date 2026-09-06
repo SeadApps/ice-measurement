@@ -1,11 +1,21 @@
 const {chromium}=require('playwright');
 
-async function seedSignedIn(ctx){            // a device that signed in earlier, so no gate
-  await ctx.addInitScript(()=>{
+/* A device that signed in earlier, so no gate. The token must be one the fake
+   server actually issued: a made-up one now takes a 401 on the first data call,
+   which expires it locally and re-gates the device. That is correct behaviour —
+   it is what makes a rotated access code bite — but it buries the rest of the
+   test under a modal, so sign in properly and keep what comes back. */
+async function seedSignedIn(ctx){
+  const r = await fetch('http://localhost:8200/auth/v1/token?grant_type=password', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({email:'operations@conwayarena.local', password:'test-access-code'})});
+  const tok = await r.json();
+  await ctx.addInitScript(t=>{
     try{ localStorage.setItem('rink_session', JSON.stringify(
-      {access_token:'test', refresh_token:'test', expires_at: Date.now()+3600000})); }catch(e){}
+      {access_token:t.access_token, refresh_token:t.refresh_token,
+       expires_at: Date.now()+3600000})); }catch(e){}
     window.__SYNC_CONFIG__={url:'http://localhost:8200', anon:'test', email:'operations@conwayarena.local'};
-  });
+  }, tok);
 }
 const ok=(n,c)=>console.log((c?'  PASS  ':'  FAIL  ')+n);
 (async()=>{const b=await chromium.launch();

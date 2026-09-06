@@ -7,12 +7,22 @@ const LEGACY={theme:"dark",unit:"in",lastBackup:null,contourIdx:2,contoursOn:tru
       {id:"seA2",date:"2026-09-02T12:00:00.000Z",mode:"moderate",data:{"c":5},notes:{}}]}]}],
   activeFacility:"fA",activeSheet:"shA",activeSession:"seA2"};
 
-async function seedSignedIn(ctx){            // a device that signed in earlier, so no gate
-  await ctx.addInitScript(()=>{
+/* A device that signed in earlier, so no gate. The token must be one the fake
+   server actually issued: a made-up one now takes a 401 on the first data call,
+   which expires it locally and re-gates the device. That is correct behaviour —
+   it is what makes a rotated access code bite — but it buries the rest of the
+   test under a modal, so sign in properly and keep what comes back. */
+async function seedSignedIn(ctx){
+  const r = await fetch('http://localhost:8200/auth/v1/token?grant_type=password', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({email:'operations@conwayarena.local', password:'test-access-code'})});
+  const tok = await r.json();
+  await ctx.addInitScript(t=>{
     try{ localStorage.setItem('rink_session', JSON.stringify(
-      {access_token:'test', refresh_token:'test', expires_at: Date.now()+3600000})); }catch(e){}
+      {access_token:t.access_token, refresh_token:t.refresh_token,
+       expires_at: Date.now()+3600000})); }catch(e){}
     window.__SYNC_CONFIG__={url:'http://localhost:8200', anon:'test', email:'operations@conwayarena.local'};
-  });
+  }, tok);
 }
 const ok=(n,c)=>console.log((c?'  PASS  ':'  FAIL  ')+n);
 
@@ -51,8 +61,22 @@ const snap=JSON.parse(fs.readFileSync(file,'utf8'));
 ok('export is the record format',     snap.format==='rink-ice-v4' && Object.keys(snap.sessions).length===2);
 ok('export carries no device prefs',  !('theme' in snap) && !('activeSheet' in snap));
 
+/* Device B is a different machine with its own separate work, and the backup
+   file is the only channel between it and A. Point it at a port nothing is
+   listening on: it keeps a session, so no gate blocks the test, but it can
+   never pull A's records and the merge being tested is genuinely a file merge.
+   Signing it in properly would have it sync A's data down before the import
+   and quietly test nothing. */
+async function seedIsolated(ctx){
+  await ctx.addInitScript(()=>{
+    try{ localStorage.setItem('rink_session', JSON.stringify(
+      {access_token:'isolated', refresh_token:'isolated', expires_at: Date.now()+3600000})); }catch(e){}
+    window.__SYNC_CONFIG__={url:'http://localhost:8299', anon:'test', email:'operations@conwayarena.local'};
+  });
+}
+
 // ---------- device B: a different machine with its own separate work ----------
-const Bx = await b.newContext({viewport:{width:1280,height:900}}); await seedSignedIn(Bx);
+const Bx = await b.newContext({viewport:{width:1280,height:900}}); await seedIsolated(Bx);
 const pb=await Bx.newPage();
 pb.on('pageerror',e=>errs.push('B: '+String(e).split('\n')[0]));
 pb.on('dialog',d=>d.accept());

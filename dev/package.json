@@ -1,0 +1,18 @@
+{
+  "name": "arena-dev-tests",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Playwright harness for the Arena Management System. Development only - none of this is part of the published site.",
+  "scripts": {
+    "server": "node fake-supabase.js",
+    "sync": "node synctest.js",
+    "conflict": "node conflicttest.js",
+    "e2e": "node e2e.js",
+    "home": "node homecheck.js",
+    "reg": "node reg.js",
+    "resume": "node resume.js"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.0"
+  }
+}
