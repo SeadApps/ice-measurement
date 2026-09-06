@@ -132,12 +132,35 @@
     return r;
   }
 
+  /* One cursor per app, not one per device.
+
+     The pull is filtered to this app's kinds, but the cursor was a single
+     shared key — so whichever app synced last carried it forward past rows the
+     other had never seen, and because a cursor only ever moves forward those
+     rows were skipped for good. A desktop used for ice rounds for weeks has a
+     cursor at roughly now; the first time somebody opens Glass Manager on it,
+     every panel mark older than that is silently missed. No error, no retry —
+     the record just never arrives.
+
+     Keying by the kind set keeps the two independent. Devices upgrading have
+     no value under the new key, so they pull their kinds from the beginning
+     once, which also repairs anything the old shared cursor had skipped. */
+  function cursorKey() {
+    var ks = (hooks && hooks.kinds && hooks.kinds.length)
+           ? hooks.kinds.slice().sort().join(",") : "all";
+    return K_CURSOR + ":" + ks;
+  }
+
   function pull() {
-    return readJSON(K_CURSOR, null).then(function (cursor) {
+    return readJSON(cursorKey(), null).then(function (cursor) {
       var q = CFG.url + "/rest/v1/records?select=*&order=updated_at.asc&limit=1000";
       if (hooks && hooks.kinds) q += "&kind=in.(" + hooks.kinds.join(",") + ")";
       if (cursor) q += "&updated_at=gt." + encodeURIComponent(cursor);
-      return fetch(q, { headers: headers(true) }).then(function (r) {
+      /* cache:"no-store" is belt-and-braces rather than a fix for anything
+         observed: whenever the cursor has not moved, two pulls build the very
+         same URL, and nothing in the response forbids the browser answering
+         the second from cache. sw.js already takes this precaution for pages. */
+      return fetch(q, { headers: headers(true), cache: "no-store" }).then(function (r) {
         noteAuth(r);
         if (!r.ok) throw new Error("HTTP " + r.status);
         return r.json();
@@ -160,7 +183,7 @@
             if (mine && mine.updatedAt === row.updated_at) sent[row.kind + " " + row.id] = row.updated_at;
           });
           return writeJSON(K_SENT, sent);
-        }).then(function () { return writeJSON(K_CURSOR, newest); }).then(function () { return applied; });
+        }).then(function () { return writeJSON(cursorKey(), newest); }).then(function () { return applied; });
       });
     });
   }
