@@ -41,7 +41,11 @@ async function signIn(p) {
   await sleep(4000);
 }
 const panelStatus = p => p.evaluate(() =>
-  ((JSON.parse(localStorage.getItem('glass_record_v1') || '{}').panels || {})['045'] || {}).status || 'ok');
+  (((() => {
+  const v2 = JSON.parse(localStorage.getItem('glass_record_v2') || 'null');
+  if (v2 && v2.records) return v2.records.legacy || {};
+  return JSON.parse(localStorage.getItem('glass_record_v1') || '{}').panels || {};
+})())['045'] || {}).status || 'ok');
 
 (async () => {
 await fetch(B + '/__reset');
@@ -68,9 +72,15 @@ ok('it arrives on a device with no cursor', (await panelStatus(D.p)) === 'replac
    be a device that has already pulled the panel once and is right not to ask
    again — which is the opposite of the case under test. */
 await D.p.evaluate(() => {
+  localStorage.removeItem('glass_record_v2');
   localStorage.removeItem('glass_record_v1');
   localStorage.removeItem('rink_sync_sent');
-  localStorage.removeItem('rink_sync_cursor:glass_panel');
+  /* Every cursor, by prefix. Naming Glass's key literally would rot the moment
+     its kind set changes — which it did in G1, when facility and glass_binding
+     joined glass_panel and the key became a different string. */
+  Object.keys(localStorage)
+    .filter(k => k.indexOf('rink_sync_cursor') === 0)
+    .forEach(k => localStorage.removeItem(k));
 });
 const past = new Date(Date.parse(panel.updated_at) + 60000).toISOString();
 
@@ -86,9 +96,12 @@ await sleep(5000);
 ok('and still arrives when the Ice app has moved on', (await panelStatus(D.p)) === 'replace',
    'panel 045 reads "' + (await panelStatus(D.p)) + '" — the Ice cursor hid it');
 
-const glassCursor = await D.p.evaluate(() =>
-  localStorage.getItem('rink_sync_cursor:glass_panel'));
-ok('Glass keeps a cursor of its own', !!glassCursor, String(glassCursor));
+/* Asserted by prefix for the same reason: what matters is that Glass keeps a
+   cursor covering its own kinds, not what the key happens to be called. */
+const glassCursor = await D.p.evaluate(() => Object.keys(localStorage)
+  .filter(k => k.indexOf('rink_sync_cursor') === 0 && k.indexOf('glass_panel') >= 0));
+ok('Glass keeps a cursor of its own', glassCursor.length === 1, JSON.stringify(glassCursor));
+ok("and it is not the Ice app's", glassCursor[0] !== 'rink_sync_cursor:facility,session,sheet');
 
 /* ---- and Glass's own cursor still does its job: no needless re-pulling ---- */
 await D.p.evaluate(() => { window.__gets = 0;

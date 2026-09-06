@@ -93,11 +93,19 @@ const G1=await device(b,'G1'), G2=await device(b,'G2');
 await G1.p.goto(B+'/glass.html'); await sleep(1000); await signIn(G1.p,'test-access-code'); await sleep(2500);
 await G1.p.click('#pnl-045'); await G1.p.click('.sbtn[data-s="replace"]'); await sleep(3000);
 await G2.p.goto(B+'/glass.html'); await sleep(1000); await signIn(G2.p,'test-access-code'); await sleep(3000);
-const g2=await G2.p.evaluate(()=>JSON.parse(localStorage.getItem('glass_record_v1')||'{}').panels||{});
+const g2=await G2.p.evaluate(()=>(() => {
+  const v2 = JSON.parse(localStorage.getItem('glass_record_v2') || 'null');
+  if (v2 && v2.records) return v2.records.legacy || {};
+  return JSON.parse(localStorage.getItem('glass_record_v1') || '{}').panels || {};
+})());
 ok('glass mark crossed devices', g2['045'] && g2['045'].status==='replace');
 await G2.p.click('#pnl-020'); await G2.p.click('.sbtn[data-s="plexi"]'); await sleep(3000);
 await G1.p.evaluate(()=>window.Sync.sync('test')); await sleep(2500);
-const g1=await G1.p.evaluate(()=>JSON.parse(localStorage.getItem('glass_record_v1')||'{}').panels||{});
+const g1=await G1.p.evaluate(()=>(() => {
+  const v2 = JSON.parse(localStorage.getItem('glass_record_v2') || 'null');
+  if (v2 && v2.records) return v2.records.legacy || {};
+  return JSON.parse(localStorage.getItem('glass_record_v1') || '{}').panels || {};
+})());
 ok('and back the other way', g1['020'] && g1['020'].status==='plexi');
 ok('neither device lost its own mark', g1['045'] && g1['045'].status==='replace' && g2['045']);
 
