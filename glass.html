@@ -223,6 +223,67 @@ footer{font-size:12.5px;color:var(--ink-3);text-align:center;font-family:var(--m
   .notes{break-inside:avoid}
   header{border-bottom-width:1.5px}
 }
+
+  /* ---- the rink builder ---- */
+  .bld{position:fixed;inset:0;z-index:900;background:var(--ground);overflow:auto;padding:0}
+  .bld[hidden]{display:none!important}
+  .bld-box{max-width:820px;margin:0 auto;padding:20px 16px 40px;display:flex;flex-direction:column;gap:16px}
+  .bld-head{display:flex;align-items:baseline;gap:12px}
+  .bld-head h2{margin:0;font-size:20px;font-weight:800;letter-spacing:-.01em}
+  .bld-head .sub{font-size:12.5px;color:var(--ink-2)}
+  .bld-x{margin-left:auto;appearance:none;font:inherit;font-size:13px;background:var(--surface);
+    color:var(--ink-2);border:1px solid var(--line);border-radius:8px;padding:8px 14px;cursor:pointer}
+  .bld-steps{display:flex;gap:6px;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;
+    text-transform:uppercase}
+  .bld-steps span{flex:1;padding:7px 8px;text-align:center;border-radius:7px;background:var(--surface);
+    color:var(--ink-3);border:1px solid var(--line)}
+  .bld-steps span.on{background:var(--accent);color:var(--ground);border-color:var(--accent);font-weight:700}
+  .bld-steps span.done{color:var(--ok)}
+  .bld-body{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px}
+  .bld-body h3{margin:0 0 4px;font-size:16px;font-weight:700}
+  .bld-body p.note{margin:0 0 16px;font-size:13px;color:var(--ink-2);line-height:1.55;max-width:62ch}
+  .bld-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+  .bld-f{display:flex;flex-direction:column;gap:5px}
+  .bld-f label{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+  .bld-f input,.bld-f select{font:inherit;font-size:16px;height:46px;padding:0 12px;border-radius:9px;
+    border:1px solid var(--line);background:var(--surface-2);color:var(--ink);width:100%}
+  .bld-f input:focus,.bld-f select:focus{outline:2px solid var(--accent);outline-offset:-1px}
+  .bld-f .hint{font-size:11.5px;color:var(--ink-3)}
+  .bld-check{display:flex;align-items:flex-start;gap:10px;margin-top:14px;font-size:14px;line-height:1.5}
+  .bld-check input{width:22px;height:22px;margin-top:1px;flex:none;accent-color:var(--accent)}
+  .bld-readout{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin:16px 0}
+  .bld-readout div{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:10px 12px}
+  .bld-readout b{display:block;font-family:var(--mono);font-size:17px;font-variant-numeric:tabular-nums}
+  .bld-readout span{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
+  .bld-readout div.warn{border-color:var(--plexi)} .bld-readout div.warn b{color:var(--plexi)}
+  .bld-readout div.bad{border-color:var(--replace)} .bld-readout div.bad b{color:var(--replace)}
+  .bld-list{display:flex;flex-wrap:wrap;gap:6px;margin:14px 0;min-height:30px}
+  .bld-chip{display:inline-flex;align-items:center;gap:7px;background:var(--surface-2);
+    border:1px solid var(--line);border-radius:999px;padding:6px 6px 6px 12px;font-family:var(--mono);font-size:12px}
+  .bld-chip.door{border-color:var(--accent)} .bld-chip.gate{border-color:var(--accent)}
+  .bld-chip.open{border-color:var(--ink-3);border-style:dashed}
+  .bld-chip button{appearance:none;border:0;background:transparent;color:var(--ink-3);cursor:pointer;
+    font-size:15px;line-height:1;padding:2px 5px;border-radius:50%}
+  .bld-chip button:hover{color:var(--replace)}
+  .bld-add{display:grid;grid-template-columns:1.1fr .9fr 1.4fr auto;gap:8px;align-items:end}
+  @media (max-width:640px){ .bld-add{grid-template-columns:1fr 1fr} .bld-add .wide{grid-column:1/-1} }
+  .bld-foot{display:flex;align-items:center;gap:12px}
+  .bld-foot button{appearance:none;font:inherit;font-size:15px;font-weight:600;height:46px;padding:0 22px;
+    border-radius:9px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+  .bld-foot button.primary{background:var(--accent);color:var(--ground);border-color:var(--accent);font-weight:700}
+  .bld-foot button:disabled{opacity:.45;cursor:default}
+  .bld-foot .bld-msg{flex:1;font-size:13px;color:var(--ink-2)}
+  .bld-foot .bld-msg.bad{color:var(--replace)}
+  .bld-secs{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+  .bld-secs th{text-align:left;font-family:var(--mono);font-size:9.5px;letter-spacing:.11em;
+    text-transform:uppercase;color:var(--ink-3);padding:0 10px 7px 0;border-bottom:1px solid var(--line-2)}
+  .bld-secs td{padding:9px 10px 9px 0;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+  .bld-secs td.n{font-family:var(--mono)}
+  .bld-secs tr.warn td.n{color:var(--plexi)} .bld-secs tr.bad td.n{color:var(--replace)}
+  #bldPlan{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:10px;overflow-x:auto}
+  .bld-addbtn{height:46px;padding:0 22px;border-radius:9px;border:1px solid var(--accent);
+    background:var(--accent);color:var(--ground);font:inherit;font-size:15px;font-weight:700;cursor:pointer}
+  #bldPlan svg{width:100%;height:auto;display:block}
 </style>
 </head>
 <body>
@@ -241,6 +302,7 @@ document.documentElement.setAttribute("data-theme",_t==="light"?"light":"dark");
     <a href="ice.html">Ice</a>
     <a href="glass.html" aria-current="page">Glass</a>
   </nav>
+  <button type="button" class="bld-x" id="addRink">+ Add a rink</button>
   <div class="themeseg" role="group" aria-label="Theme">
     <button type="button" id="thLight">Light</button><button type="button" id="thDark">Dark</button>
   </div>
@@ -324,6 +386,26 @@ document.documentElement.setAttribute("data-theme",_t==="light"?"light":"dark");
 </div>
 
 <script src="sync.js"></script>
+<div class="bld" id="builder" hidden role="dialog" aria-modal="true" aria-labelledby="bldTitle">
+  <div class="bld-box">
+    <div class="bld-head">
+      <h2 id="bldTitle">Add a rink</h2>
+      <span class="sub">measure once, walk the boards, check the drawing</span>
+      <button type="button" class="bld-x" id="bldClose">Close</button>
+    </div>
+    <div class="bld-steps" id="bldSteps">
+      <span data-s="1">1 &middot; Sheet</span><span data-s="2">2 &middot; Glass</span>
+      <span data-s="3">3 &middot; Walk</span><span data-s="4">4 &middot; Check</span>
+    </div>
+    <div class="bld-body" id="bldBody"></div>
+    <div class="bld-foot">
+      <button type="button" id="bldBack">Back</button>
+      <span class="bld-msg" id="bldMsg"></span>
+      <button type="button" class="primary" id="bldNext">Next</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const DATA = {"rink": {"L": 200.0, "W": 85.0, "R": 27.166666666666668, "perimeter_ft": 523.3599}, "panels": [{"id": "001", "kind": "glass", "tag": null, "label": null, "section": "Zamboni End (right of doors)", "sectionKey": "ZAM_A", "thickness": "5/8\"", "width_in": 33, "s0": 0.0, "s1": 2.75, "d": "M -102.900,4.792 L -102.900,5.479 L -102.900,6.167 L -102.900,6.854 L -102.900,7.542 L -100.000,7.542 L -100.000,6.854 L -100.000,6.167 L -100.000,5.479 L -100.000,4.792 Z", "cx": -101.45, "cy": 6.167, "lx": -104.9, "ly": 6.167, "ix": -97.4, "iy": 6.167, "rot": 270.0, "ftin": "2' 9\"", "len_ft": 2.75}, {"id": "002", "kind": "glass", "tag": null, "label": null, "section": "Zamboni End (right of doors)", "sectionKey": "ZAM_A", "thickness": "5/8\"", "width_in": 43, "s0": 2.77544, "s1": 6.35878, "d": "M -102.900,7.567 L -102.900,8.463 L -102.900,9.359 L -102.900,10.255 L -102.900,11.150 L -100.000,11.150 L -100.000,10.255 L -100.000,9.359 L -100.000,8.463 L -100.000,7.567 Z", "cx": -101.45, "cy": 9.359, "lx": -104.9, "ly": 9.359, "ix": -97.4, "iy": 9.359, "rot": 270.0, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "003", "kind": "glass", "tag": "door", "label": "Door", "section": "Zamboni End (right of doors)", "sectionKey": "ZAM_A", "thickness": "5/8\"", "width_in": 33, "s0": 6.38422, "s1": 9.13422, "d": "M -102.900,11.176 L -102.900,11.863 L -102.900,12.551 L -102.900,13.238 L -102.900,13.926 L -100.000,13.926 L -100.000,13.238 L -100.000,12.551 L -100.000,11.863 L -100.000,11.176 Z", "cx": -101.45, "cy": 12.551, "lx": -104.9, "ly": 12.551, "ix": -97.4, "iy": 12.551, "rot": 270.0, "ftin": "2' 9\"", "len_ft": 2.75}, {"id": "004", "kind": "glass", "tag": null, "label": null, "section": "Zamboni End (right of doors)", "sectionKey": "ZAM_A", "thickness": "5/8\"", "width_in": 11, "s0": 9.15966, "s1": 10.07633, "d": "M -102.900,13.951 L -102.900,14.410 L -102.900,14.868 L -100.000,14.868 L -100.000,14.410 L -100.000,13.951 Z", "cx": -101.45, "cy": 14.41, "lx": -104.9, "ly": 14.41, "ix": -97.4, "iy": 14.41, "rot": 270.0, "ftin": "0' 11\"", "len_ft": 0.917}, {"id": "005", "kind": "glass", "tag": null, "label": null, "section": "Zamboni End (right of doors)", "sectionKey": "ZAM_A", "thickness": "5/8\"", "width_in": 43, "s0": 10.10177, "s1": 13.6851, "d": "M -102.900,14.893 L -102.896,15.838 L -102.863,16.829 L -102.797,17.818 L -102.699,18.805 L -99.818,18.470 L -99.907,17.578 L -99.966,16.685 L -99.996,15.789 L -100.000,14.893 Z", "cx": -101.415, "cy": 16.757, "lx": -104.86, "ly": 16.928, "ix": -97.37, "iy": 16.555, "rot": 87.15, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "006", "kind": "glass", "tag": null, "label": null, "section": "Zamboni End (right of doors)", "sectionKey": "ZAM_A", "thickness": "5/8\"", "width_in": 43, "s0": 13.71054, "s1": 17.29388, "d": "M -102.696,18.833 L -102.564,19.815 L -102.400,20.793 L -102.204,21.765 L -101.976,22.730 L -99.165,22.016 L -99.371,21.144 L -99.548,20.266 L -99.696,19.383 L -99.815,18.495 Z", "cx": -100.974, "cy": 20.53, "lx": -104.367, "ly": 21.156, "ix": -96.992, "iy": 19.794, "rot": 79.54, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "007", "kind": "glass", "tag": null, "label": null, "section": "Zamboni End (right of doors)", "sectionKey": "ZAM_A", "thickness": "5/8\"", "width_in": 43, "s0": 17.31932, "s1": 20.90265, "d": "M -101.969,22.757 L -101.709,23.713 L -101.417,24.661 L -101.093,25.598 L -100.740,26.524 L -98.048,25.445 L -98.368,24.608 L -98.660,23.761 L -98.923,22.905 L -99.159,22.041 Z", "cx": -100.038, "cy": 24.211, "lx": -103.318, "ly": 25.281, "ix": -96.188, "iy": 22.955, "rot": 71.93, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "008", "kind": "glass", "tag": null, "label": null, "section": "Zamboni End (right of doors)", "sectionKey": "ZAM_A", "thickness": "5/8\"", "width_in": 43, "s0": 20.9281, "s1": 24.51143, "d": "M -100.729,26.550 L -100.344,27.464 L -99.929,28.365 L -99.485,29.251 L -99.012,30.122 L -96.487,28.696 L -96.914,27.908 L -97.316,27.108 L -97.691,26.294 L -98.039,25.469 Z", "cx": -98.623, "cy": 27.736, "lx": -101.732, "ly": 29.231, "ix": -94.973, "iy": 25.981, "rot": 64.32, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "009", "kind": "glass", "tag": null, "label": null, "section": "Zamboni End (right of doors)", "sectionKey": "ZAM_A", "thickness": "5/8\"", "width_in": 43, "s0": 24.53687, "s1": 28.1202, "d": "M -98.998,30.146 L -98.495,31.001 L -97.965,31.839 L -97.407,32.658 L -96.822,33.459 L -94.508,31.711 L -95.037,30.987 L -95.541,30.247 L -96.020,29.490 L -96.474,28.718 Z", "cx": -96.753, "cy": 31.043, "lx": -99.636, "ly": 32.936, "ix": -93.367, "iy": 28.819, "rot": 56.7, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "010", "kind": "glass", "tag": null, "label": null, "section": "Zamboni End (right of doors)", "sectionKey": "ZAM_A", "thickness": "5/8\"", "width_in": 43, "s0": 28.14565, "s1": 31.72898, "d": "M -96.805,33.481 L -96.194,34.262 L -95.557,35.022 L -94.896,35.760 L -94.210,36.476 L -92.148,34.437 L -92.768,33.790 L -93.365,33.123 L -93.941,32.436 L -94.493,31.731 Z", "cx": -94.461, "cy": 34.072, "lx": -97.069, "ly": 36.331, "ix": -91.4, "iy": 31.42, "rot": 49.09, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "011", "kind": "glass", "tag": null, "label": null, "section": "Zamboni End (right of doors)", "sectionKey": "ZAM_A", "thickness": "5/8\"", "width_in": 43, "s0": 31.75442, "s1": 35.33776, "d": "M -94.190,36.496 L -93.481,37.189 L -92.749,37.858 L -91.996,38.502 L -91.222,39.122 L -89.448,36.827 L -90.148,36.268 L -90.828,35.685 L -91.490,35.081 L -92.130,34.455 Z", "cx": -91.789, "cy": 36.772, "lx": -94.074, "ly": 39.356, "ix": -89.106, "iy": 33.738, "rot": 41.48, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "012", "kind": "glass", "tag": null, "label": null, "section": "Zamboni End (right of doors)", "sectionKey": "ZAM_A", "thickness": "5/8\"", "width_in": 43, "s0": 35.3632, "s1": 38.94653, "d": "M -91.199,39.139 L -90.404,39.731 L -89.590,40.297 L -88.758,40.836 L -87.909,41.347 L -86.455,38.838 L -87.222,38.376 L -87.974,37.890 L -88.710,37.378 L -89.428,36.843 Z", "cx": -88.782, "cy": 39.093, "lx": -90.705, "ly": 41.958, "ix": -86.525, "iy": 35.731, "rot": 33.87, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "013", "kind": "glass", "tag": null, "label": null, "section": "Zamboni End (right of doors)", "sectionKey": "ZAM_A", "thickness": "5/8\"", "width_in": 43, "s0": 38.97197, "s1": 42.55531, "d": "M -87.884,41.362 L -87.018,41.844 L -86.136,42.297 L -85.240,42.721 L -84.330,43.115 L -83.222,40.435 L -84.044,40.079 L -84.853,39.696 L -85.650,39.287 L -86.433,38.851 Z", "cx": -85.495, "cy": 40.997, "lx": -87.021, "ly": 44.09, "ix": -83.703, "iy": 37.365, "rot": 26.26, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "014", "kind": "glass", "tag": null, "label": null, "section": "Zamboni End (right of doors)", "sectionKey": "ZAM_A", "thickness": "5/8\"", "width_in": 43, "s0": 42.58075, "s1": 46.16408, "d": "M -84.304,43.126 L -83.382,43.489 L -82.448,43.821 L -81.503,44.123 L -80.550,44.393 L -79.805,41.590 L -80.667,41.346 L -81.521,41.074 L -82.364,40.773 L -83.198,40.445 Z", "cx": -81.984, "cy": 42.447, "lx": -83.087, "ly": 45.716, "ix": -80.689, "iy": 38.61, "rot": 18.65, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "015", "kind": "glass", "tag": null, "label": null, "section": "Zamboni End (right of doors)", "sectionKey": "ZAM_A", "thickness": "5/8\"", "width_in": 42, "s0": 46.18952, "s1": 49.68952, "d": "M -80.522,44.400 L -79.582,44.633 L -78.635,44.835 L -77.682,45.006 L -76.724,45.147 L -76.349,42.272 L -77.215,42.144 L -78.076,41.989 L -78.931,41.807 L -79.781,41.597 Z", "cx": -78.355, "cy": 43.412, "lx": -79.021, "ly": 46.797, "ix": -77.574, "iy": 39.438, "rot": 11.13, "ftin": "3' 6\"", "len_ft": 3.5}, {"id": "016", "kind": "glass", "tag": null, "label": null, "section": "Zamboni End (right of doors)", "sectionKey": "ZAM_A", "thickness": "5/8\"", "width_in": 42, "s0": 49.71497, "s1": 53.21497, "d": "M -76.696,45.151 L -75.734,45.260 L -74.769,45.338 L -73.802,45.384 L -72.833,45.400 L -72.833,42.500 L -73.708,42.486 L -74.582,42.444 L -75.454,42.373 L -76.324,42.275 Z", "cx": -74.675, "cy": 43.891, "lx": -74.898, "ly": 47.333, "ix": -74.415, "iy": 39.849, "rot": 3.69, "ftin": "3' 6\"", "len_ft": 3.5}, {"id": "017", "kind": "glass", "tag": null, "label": null, "section": "Bleacher Side", "sectionKey": "BLEACHER", "thickness": "1/2\"", "width_in": 48, "s0": 53.21497, "s1": 57.21497, "d": "M -72.833,45.400 L -72.033,45.400 L -71.233,45.400 L -70.433,45.400 L -69.633,45.400 L -68.833,45.400 L -68.833,42.500 L -69.633,42.500 L -70.433,42.500 L -71.233,42.500 L -72.033,42.500 L -72.833,42.500 Z", "cx": -70.833, "cy": 43.95, "lx": -70.833, "ly": 47.4, "ix": -70.833, "iy": 39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "018", "kind": "glass", "tag": null, "label": null, "section": "Bleacher Side", "sectionKey": "BLEACHER", "thickness": "1/2\"", "width_in": 48, "s0": 57.28673, "s1": 61.28673, "d": "M -68.762,45.400 L -67.962,45.400 L -67.162,45.400 L -66.362,45.400 L -65.562,45.400 L -64.762,45.400 L -64.762,42.500 L -65.562,42.500 L -66.362,42.500 L -67.162,42.500 L -67.962,42.500 L -68.762,42.500 Z", "cx": -66.762, "cy": 43.95, "lx": -66.762, "ly": 47.4, "ix": -66.762, "iy": 39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "019", "kind": "glass", "tag": null, "label": null, "section": "Bleacher Side", "sectionKey": "BLEACHER", "thickness": "1/2\"", "width_in": 48, "s0": 61.35849, "s1": 65.35849, "d": "M -64.690,45.400 L -63.890,45.400 L -63.090,45.400 L -62.290,45.400 L -61.490,45.400 L -60.690,45.400 L -60.690,42.500 L -61.490,42.500 L -62.290,42.500 L -63.090,42.500 L -63.890,42.500 L -64.690,42.500 Z", "cx": -62.69, "cy": 43.95, "lx": -62.69, "ly": 47.4, "ix": -62.69, "iy": 39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "020", "kind": "glass", "tag": null, "label": null, "section": "Bleacher Side", "sectionKey": "BLEACHER", "thickness": "1/2\"", "width_in": 48, "s0": 65.43024, "s1": 69.43024, "d": "M -60.618,45.400 L -59.818,45.400 L -59.018,45.400 L -58.218,45.400 L -57.418,45.400 L -56.618,45.400 L -56.618,42.500 L -57.418,42.500 L -58.218,42.500 L -59.018,42.500 L -59.818,42.500 L -60.618,42.500 Z", "cx": -58.618, "cy": 43.95, "lx": -58.618, "ly": 47.4, "ix": -58.618, "iy": 39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "021", "kind": "glass", "tag": null, "label": null, "section": "Bleacher Side", "sectionKey": "BLEACHER", "thickness": "1/2\"", "width_in": 48, "s0": 69.502, "s1": 73.502, "d": "M -56.546,45.400 L -55.746,45.400 L -54.946,45.400 L -54.146,45.400 L -53.346,45.400 L -52.546,45.400 L -52.546,42.500 L -53.346,42.500 L -54.146,42.500 L -54.946,42.500 L -55.746,42.500 L -56.546,42.500 Z", "cx": -54.546, "cy": 43.95, "lx": -54.546, "ly": 47.4, "ix": -54.546, "iy": 39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "022", "kind": "glass", "tag": null, "label": null, "section": "Bleacher Side", "sectionKey": "BLEACHER", "thickness": "1/2\"", "width_in": 48, "s0": 73.57376, "s1": 77.57376, "d": "M -52.475,45.400 L -51.675,45.400 L -50.875,45.400 L -50.075,45.400 L -49.275,45.400 L -48.475,45.400 L -48.475,42.500 L -49.275,42.500 L -50.075,42.500 L -50.875,42.500 L -51.675,42.500 L -52.475,42.500 Z", "cx": -50.475, "cy": 43.95, "lx": -50.475, "ly": 47.4, "ix": -50.475, "iy": 39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "023", "kind": "glass", "tag": null, "label": null, "section": "Bleacher Side", "sectionKey": "BLEACHER", "thickness": "1/2\"", "width_in": 48, "s0": 77.64552, "s1": 81.64552, "d": "M -48.403,45.400 L -47.603,45.400 L -46.803,45.400 L -46.003,45.400 L -45.203,45.400 L -44.403,45.400 L -44.403,42.500 L -45.203,42.500 L -46.003,42.500 L -46.803,42.500 L -47.603,42.500 L -48.403,42.500 Z", "cx": -46.403, "cy": 43.95, "lx": -46.403, "ly": 47.4, "ix": -46.403, "iy": 39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "024", "kind": "glass", "tag": null, "label": null, "section": "Bleacher Side", "sectionKey": "BLEACHER", "thickness": "1/2\"", "width_in": 48, "s0": 81.71728, "s1": 85.71728, "d": "M -44.331,45.400 L -43.531,45.400 L -42.731,45.400 L -41.931,45.400 L -41.131,45.400 L -40.331,45.400 L -40.331,42.500 L -41.131,42.500 L -41.931,42.500 L -42.731,42.500 L -43.531,42.500 L -44.331,42.500 Z", "cx": -42.331, "cy": 43.95, "lx": -42.331, "ly": 47.4, "ix": -42.331, "iy": 39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "025", "kind": "glass", "tag": null, "label": null, "section": "Bleacher Side", "sectionKey": "BLEACHER", "thickness": "1/2\"", "width_in": 48, "s0": 85.78904, "s1": 89.78904, "d": "M -40.259,45.400 L -39.459,45.400 L -38.659,45.400 L -37.859,45.400 L -37.059,45.400 L -36.259,45.400 L -36.259,42.500 L -37.059,42.500 L -37.859,42.500 L -38.659,42.500 L -39.459,42.500 L -40.259,42.500 Z", "cx": -38.259, "cy": 43.95, "lx": -38.259, "ly": 47.4, "ix": -38.259, "iy": 39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "026", "kind": "glass", "tag": null, "label": null, "section": "Bleacher Side", "sectionKey": "BLEACHER", "thickness": "1/2\"", "width_in": 48, "s0": 89.8608, "s1": 93.8608, "d": "M -36.188,45.400 L -35.388,45.400 L -34.588,45.400 L -33.788,45.400 L -32.988,45.400 L -32.188,45.400 L -32.188,42.500 L -32.988,42.500 L -33.788,42.500 L -34.588,42.500 L -35.388,42.500 L -36.188,42.500 Z", "cx": -34.188, "cy": 43.95, "lx": -34.188, "ly": 47.4, "ix": -34.188, "iy": 39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "027", "kind": "glass", "tag": null, "label": null, "section": "Bleacher Side", "sectionKey": "BLEACHER", "thickness": "1/2\"", "width_in": 48, "s0": 93.93256, "s1": 97.93256, "d": "M -32.116,45.400 L -31.316,45.400 L -30.516,45.400 L -29.716,45.400 L -28.916,45.400 L -28.116,45.400 L -28.116,42.500 L -28.916,42.500 L -29.716,42.500 L -30.516,42.500 L -31.316,42.500 L -32.116,42.500 Z", "cx": -30.116, "cy": 43.95, "lx": -30.116, "ly": 47.4, "ix": -30.116, "iy": 39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "028", "kind": "glass", "tag": null, "label": null, "section": "Bleacher Side", "sectionKey": "BLEACHER", "thickness": "1/2\"", "width_in": 48, "s0": 98.00432, "s1": 102.00432, "d": "M -28.044,45.400 L -27.244,45.400 L -26.444,45.400 L -25.644,45.400 L -24.844,45.400 L -24.044,45.400 L -24.044,42.500 L -24.844,42.500 L -25.644,42.500 L -26.444,42.500 L -27.244,42.500 L -28.044,42.500 Z", "cx": -26.044, "cy": 43.95, "lx": -26.044, "ly": 47.4, "ix": -26.044, "iy": 39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "029", "kind": "glass", "tag": null, "label": null, "section": "Bleacher Side", "sectionKey": "BLEACHER", "thickness": "1/2\"", "width_in": 48, "s0": 102.07608, "s1": 106.07608, "d": "M -23.972,45.400 L -23.172,45.400 L -22.372,45.400 L -21.572,45.400 L -20.772,45.400 L -19.972,45.400 L -19.972,42.500 L -20.772,42.500 L -21.572,42.500 L -22.372,42.500 L -23.172,42.500 L -23.972,42.500 Z", "cx": -21.972, "cy": 43.95, "lx": -21.972, "ly": 47.4, "ix": -21.972, "iy": 39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "030", "kind": "glass", "tag": null, "label": null, "section": "Bleacher Side", "sectionKey": "BLEACHER", "thickness": "1/2\"", "width_in": 48, "s0": 106.14784, "s1": 110.14784, "d": "M -19.900,45.400 L -19.100,45.400 L -18.300,45.400 L -17.500,45.400 L -16.700,45.400 L -15.900,45.400 L -15.900,42.500 L -16.700,42.500 L -17.500,42.500 L -18.300,42.500 L -19.100,42.500 L -19.900,42.500 Z", "cx": -17.9, "cy": 43.95, "lx": -17.9, "ly": 47.4, "ix": -17.9, "iy": 39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "031", "kind": "glass", "tag": null, "label": null, "section": "Bleacher Side", "sectionKey": "BLEACHER", "thickness": "1/2\"", "width_in": 48, "s0": 110.2196, "s1": 114.2196, "d": "M -15.829,45.400 L -15.029,45.400 L -14.229,45.400 L -13.429,45.400 L -12.629,45.400 L -11.829,45.400 L -11.829,42.500 L -12.629,42.500 L -13.429,42.500 L -14.229,42.500 L -15.029,42.500 L -15.829,42.500 Z", "cx": -13.829, "cy": 43.95, "lx": -13.829, "ly": 47.4, "ix": -13.829, "iy": 39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "032", "kind": "glass", "tag": null, "label": null, "section": "Bleacher Side", "sectionKey": "BLEACHER", "thickness": "1/2\"", "width_in": 48, "s0": 114.29136, "s1": 118.29136, "d": "M -11.757,45.400 L -10.957,45.400 L -10.157,45.400 L -9.357,45.400 L -8.557,45.400 L -7.757,45.400 L -7.757,42.500 L -8.557,42.500 L -9.357,42.500 L -10.157,42.500 L -10.957,42.500 L -11.757,42.500 Z", "cx": -9.757, "cy": 43.95, "lx": -9.757, "ly": 47.4, "ix": -9.757, "iy": 39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "033", "kind": "glass", "tag": null, "label": null, "section": "Bleacher Side", "sectionKey": "BLEACHER", "thickness": "1/2\"", "width_in": 48, "s0": 118.36312, "s1": 122.36312, "d": "M -7.685,45.400 L -6.885,45.400 L -6.085,45.400 L -5.285,45.400 L -4.485,45.400 L -3.685,45.400 L -3.685,42.500 L -4.485,42.500 L -5.285,42.500 L -6.085,42.500 L -6.885,42.500 L -7.685,42.500 Z", "cx": -5.685, "cy": 43.95, "lx": -5.685, "ly": 47.4, "ix": -5.685, "iy": 39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "034", "kind": "glass", "tag": null, "label": null, "section": "Bleacher Side", "sectionKey": "BLEACHER", "thickness": "1/2\"", "width_in": 26, "s0": 122.43487, "s1": 124.60154, "d": "M -3.613,45.400 L -2.891,45.400 L -2.169,45.400 L -1.447,45.400 L -1.447,42.500 L -2.169,42.500 L -2.891,42.500 L -3.613,42.500 Z", "cx": -2.53, "cy": 43.95, "lx": -2.53, "ly": 47.4, "ix": -2.53, "iy": 39.9, "rot": 0.0, "ftin": "2' 2\"", "len_ft": 2.167}, {"id": "035", "kind": "glass", "tag": "door", "label": "Door", "section": "Bleacher Side", "sectionKey": "BLEACHER", "thickness": "1/2\"", "width_in": 33, "s0": 124.6733, "s1": 127.4233, "d": "M -1.375,45.400 L -0.688,45.400 L -0.000,45.400 L 0.687,45.400 L 1.375,45.400 L 1.375,42.500 L 0.687,42.500 L -0.000,42.500 L -0.688,42.500 L -1.375,42.500 Z", "cx": -0.0, "cy": 43.95, "lx": -0.0, "ly": 47.4, "ix": -0.0, "iy": 39.9, "rot": 0.0, "ftin": "2' 9\"", "len_ft": 2.75}, {"id": "036", "kind": "glass", "tag": null, "label": null, "section": "Bleacher Side", "sectionKey": "BLEACHER", "thickness": "1/2\"", "width_in": 26, "s0": 127.49506, "s1": 129.66173, "d": "M 1.447,45.400 L 2.169,45.400 L 2.891,45.400 L 3.613,45.400 L 3.613,42.500 L 2.891,42.500 L 2.169,42.500 L 1.447,42.500 Z", "cx": 2.53, "cy": 43.95, "lx": 2.53, "ly": 47.4, "ix": 2.53, "iy": 39.9, "rot": 0.0, "ftin": "2' 2\"", "len_ft": 2.167}, {"id": "037", "kind": "glass", "tag": null, "label": null, "section": "Bleacher Side", "sectionKey": "BLEACHER", "thickness": "1/2\"", "width_in": 48, "s0": 129.73349, "s1": 133.73349, "d": "M 3.685,45.400 L 4.485,45.400 L 5.285,45.400 L 6.085,45.400 L 6.885,45.400 L 7.685,45.400 L 7.685,42.500 L 6.885,42.500 L 6.085,42.500 L 5.285,42.500 L 4.485,42.500 L 3.685,42.500 Z", "cx": 5.685, "cy": 43.95, "lx": 5.685, "ly": 47.4, "ix": 5.685, "iy": 39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "038", "kind": "glass", "tag": null, "label": null, "section": "Bleacher Side", "sectionKey": "BLEACHER", "thickness": "1/2\"", "width_in": 48, "s0": 133.80524, "s1": 137.80524, "d": "M 7.757,45.400 L 8.557,45.400 L 9.357,45.400 L 10.157,45.400 L 10.957,45.400 L 11.757,45.400 L 11.757,42.500 L 10.957,42.500 L 10.157,42.500 L 9.357,42.500 L 8.557,42.500 L 7.757,42.500 Z", "cx": 9.757, "cy": 43.95, "lx": 9.757, "ly": 47.4, "ix": 9.757, "iy": 39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "039", "kind": "glass", "tag": null, "label": null, "section": "Bleacher Side", "sectionKey": "BLEACHER", "thickness": "1/2\"", "width_in": 48, "s0": 137.877, "s1": 141.877, "d": "M 11.829,45.400 L 12.629,45.400 L 13.429,45.400 L 14.229,45.400 L 15.029,45.400 L 15.829,45.400 L 15.829,42.500 L 15.029,42.500 L 14.229,42.500 L 13.429,42.500 L 12.629,42.500 L 11.829,42.500 Z", "cx": 13.829, "cy": 43.95, "lx": 13.829, "ly": 47.4, "ix": 13.829, "iy": 39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "040", "kind": "glass", "tag": null, "label": null, "section": "Bleacher Side", "sectionKey": "BLEACHER", "thickness": "1/2\"", "width_in": 48, "s0": 141.94876, "s1": 145.94876, "d": "M 15.900,45.400 L 16.700,45.400 L 17.500,45.400 L 18.300,45.400 L 19.100,45.400 L 19.900,45.400 L 19.900,42.500 L 19.100,42.500 L 18.300,42.500 L 17.500,42.500 L 16.700,42.500 L 15.900,42.500 Z", "cx": 17.9, "cy": 43.95, "lx": 17.9, "ly": 47.4, "ix": 17.9, "iy": 39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "041", "kind": "glass", "tag": null, "label": null, "section": "Bleacher Side", "sectionKey": "BLEACHER", "thickness": "1/2\"", "width_in": 48, "s0": 146.02052, "s1": 150.02052, "d": "M 19.972,45.400 L 20.772,45.400 L 21.572,45.400 L 22.372,45.400 L 23.172,45.400 L 23.972,45.400 L 23.972,42.500 L 23.172,42.500 L 22.372,42.500 L 21.572,42.500 L 20.772,42.500 L 19.972,42.500 Z", "cx": 21.972, "cy": 43.95, "lx": 21.972, "ly": 47.4, "ix": 21.972, "iy": 39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "042", "kind": "glass", "tag": null, "label": null, "section": "Bleacher Side", "sectionKey": "BLEACHER", "thickness": "1/2\"", "width_in": 48, "s0": 150.09228, "s1": 154.09228, "d": "M 24.044,45.400 L 24.844,45.400 L 25.644,45.400 L 26.444,45.400 L 27.244,45.400 L 28.044,45.400 L 28.044,42.500 L 27.244,42.500 L 26.444,42.500 L 25.644,42.500 L 24.844,42.500 L 24.044,42.500 Z", "cx": 26.044, "cy": 43.95, "lx": 26.044, "ly": 47.4, "ix": 26.044, "iy": 39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "043", "kind": "glass", "tag": null, "label": null, "section": "Bleacher Side", "sectionKey": "BLEACHER", "thickness": "1/2\"", "width_in": 48, "s0": 154.16404, "s1": 158.16404, "d": "M 28.116,45.400 L 28.916,45.400 L 29.716,45.400 L 30.516,45.400 L 31.316,45.400 L 32.116,45.400 L 32.116,42.500 L 31.316,42.500 L 30.516,42.500 L 29.716,42.500 L 28.916,42.500 L 28.116,42.500 Z", "cx": 30.116, "cy": 43.95, "lx": 30.116, "ly": 47.4, "ix": 30.116, "iy": 39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "044", "kind": "glass", "tag": null, "label": null, "section": "Bleacher Side", "sectionKey": "BLEACHER", "thickness": "1/2\"", "width_in": 48, "s0": 158.2358, "s1": 162.2358, "d": "M 32.187,45.400 L 32.987,45.400 L 33.787,45.400 L 34.587,45.400 L 35.387,45.400 L 36.187,45.400 L 36.187,42.500 L 35.387,42.500 L 34.587,42.500 L 33.787,42.500 L 32.987,42.500 L 32.187,42.500 Z", "cx": 34.187, "cy": 43.95, "lx": 34.187, "ly": 47.4, "ix": 34.187, "iy": 39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "045", "kind": "glass", "tag": null, "label": null, "section": "Bleacher Side", "sectionKey": "BLEACHER", "thickness": "1/2\"", "width_in": 48, "s0": 162.30756, "s1": 166.30756, "d": "M 36.259,45.400 L 37.059,45.400 L 37.859,45.400 L 38.659,45.400 L 39.459,45.400 L 40.259,45.400 L 40.259,42.500 L 39.459,42.500 L 38.659,42.500 L 37.859,42.500 L 37.059,42.500 L 36.259,42.500 Z", "cx": 38.259, "cy": 43.95, "lx": 38.259, "ly": 47.4, "ix": 38.259, "iy": 39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "046", "kind": "glass", "tag": null, "label": null, "section": "Bleacher Side", "sectionKey": "BLEACHER", "thickness": "1/2\"", "width_in": 48, "s0": 166.37932, "s1": 170.37932, "d": "M 40.331,45.400 L 41.131,45.400 L 41.931,45.400 L 42.731,45.400 L 43.531,45.400 L 44.331,45.400 L 44.331,42.500 L 43.531,42.500 L 42.731,42.500 L 41.931,42.500 L 41.131,42.500 L 40.331,42.500 Z", "cx": 42.331, "cy": 43.95, "lx": 42.331, "ly": 47.4, "ix": 42.331, "iy": 39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "047", "kind": "glass", "tag": null, "label": null, "section": "Bleacher Side", "sectionKey": "BLEACHER", "thickness": "1/2\"", "width_in": 48, "s0": 170.45108, "s1": 174.45108, "d": "M 44.403,45.400 L 45.203,45.400 L 46.003,45.400 L 46.803,45.400 L 47.603,45.400 L 48.403,45.400 L 48.403,42.500 L 47.603,42.500 L 46.803,42.500 L 46.003,42.500 L 45.203,42.500 L 44.403,42.500 Z", "cx": 46.403, "cy": 43.95, "lx": 46.403, "ly": 47.4, "ix": 46.403, "iy": 39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "048", "kind": "glass", "tag": null, "label": null, "section": "Bleacher Side", "sectionKey": "BLEACHER", "thickness": "1/2\"", "width_in": 48, "s0": 174.52284, "s1": 178.52284, "d": "M 48.475,45.400 L 49.275,45.400 L 50.075,45.400 L 50.875,45.400 L 51.675,45.400 L 52.475,45.400 L 52.475,42.500 L 51.675,42.500 L 50.875,42.500 L 50.075,42.500 L 49.275,42.500 L 48.475,42.500 Z", "cx": 50.475, "cy": 43.95, "lx": 50.475, "ly": 47.4, "ix": 50.475, "iy": 39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "049", "kind": "glass", "tag": null, "label": null, "section": "Bleacher Side", "sectionKey": "BLEACHER", "thickness": "1/2\"", "width_in": 48, "s0": 178.5946, "s1": 182.5946, "d": "M 52.546,45.400 L 53.346,45.400 L 54.146,45.400 L 54.946,45.400 L 55.746,45.400 L 56.546,45.400 L 56.546,42.500 L 55.746,42.500 L 54.946,42.500 L 54.146,42.500 L 53.346,42.500 L 52.546,42.500 Z", "cx": 54.546, "cy": 43.95, "lx": 54.546, "ly": 47.4, "ix": 54.546, "iy": 39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "050", "kind": "glass", "tag": null, "label": null, "section": "Bleacher Side", "sectionKey": "BLEACHER", "thickness": "1/2\"", "width_in": 48, "s0": 182.66636, "s1": 186.66636, "d": "M 56.618,45.400 L 57.418,45.400 L 58.218,45.400 L 59.018,45.400 L 59.818,45.400 L 60.618,45.400 L 60.618,42.500 L 59.818,42.500 L 59.018,42.500 L 58.218,42.500 L 57.418,42.500 L 56.618,42.500 Z", "cx": 58.618, "cy": 43.95, "lx": 58.618, "ly": 47.4, "ix": 58.618, "iy": 39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "051", "kind": "glass", "tag": null, "label": null, "section": "Bleacher Side", "sectionKey": "BLEACHER", "thickness": "1/2\"", "width_in": 48, "s0": 186.73812, "s1": 190.73812, "d": "M 60.690,45.400 L 61.490,45.400 L 62.290,45.400 L 63.090,45.400 L 63.890,45.400 L 64.690,45.400 L 64.690,42.500 L 63.890,42.500 L 63.090,42.500 L 62.290,42.500 L 61.490,42.500 L 60.690,42.500 Z", "cx": 62.69, "cy": 43.95, "lx": 62.69, "ly": 47.4, "ix": 62.69, "iy": 39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "052", "kind": "glass", "tag": null, "label": null, "section": "Bleacher Side", "sectionKey": "BLEACHER", "thickness": "1/2\"", "width_in": 48, "s0": 190.80987, "s1": 194.80987, "d": "M 64.762,45.400 L 65.562,45.400 L 66.362,45.400 L 67.162,45.400 L 67.962,45.400 L 68.762,45.400 L 68.762,42.500 L 67.962,42.500 L 67.162,42.500 L 66.362,42.500 L 65.562,42.500 L 64.762,42.500 Z", "cx": 66.762, "cy": 43.95, "lx": 66.762, "ly": 47.4, "ix": 66.762, "iy": 39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "053", "kind": "glass", "tag": null, "label": null, "section": "Bleacher Side", "sectionKey": "BLEACHER", "thickness": "1/2\"", "width_in": 48, "s0": 194.88163, "s1": 198.88163, "d": "M 68.833,45.400 L 69.633,45.400 L 70.433,45.400 L 71.233,45.400 L 72.033,45.400 L 72.833,45.400 L 72.833,42.500 L 72.033,42.500 L 71.233,42.500 L 70.433,42.500 L 69.633,42.500 L 68.833,42.500 Z", "cx": 70.833, "cy": 43.95, "lx": 70.833, "ly": 47.4, "ix": 70.833, "iy": 39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "054", "kind": "glass", "tag": null, "label": null, "section": "Lobby End", "sectionKey": "LOBBY", "thickness": "5/8\"", "width_in": 42, "s0": 198.88163, "s1": 202.38163, "d": "M 72.833,45.400 L 73.802,45.384 L 74.769,45.338 L 75.734,45.260 L 76.696,45.151 L 76.324,42.275 L 75.454,42.373 L 74.582,42.444 L 73.708,42.486 L 72.833,42.500 Z", "cx": 74.675, "cy": 43.891, "lx": 74.898, "ly": 47.333, "ix": 74.415, "iy": 39.849, "rot": -3.69, "ftin": "3' 6\"", "len_ft": 3.5}, {"id": "055", "kind": "glass", "tag": null, "label": null, "section": "Lobby End", "sectionKey": "LOBBY", "thickness": "5/8\"", "width_in": 42, "s0": 202.45195, "s1": 205.95195, "d": "M 76.773,45.141 L 77.731,44.998 L 78.684,44.825 L 79.631,44.622 L 80.570,44.387 L 79.824,41.585 L 78.975,41.797 L 78.120,41.981 L 77.259,42.137 L 76.393,42.266 Z", "cx": 78.402, "cy": 43.403, "lx": 79.073, "ly": 46.787, "ix": 77.614, "iy": 39.43, "rot": -11.22, "ftin": "3' 6\"", "len_ft": 3.5}, {"id": "056", "kind": "glass", "tag": null, "label": null, "section": "Lobby End", "sectionKey": "LOBBY", "thickness": "5/8\"", "width_in": 43, "s0": 206.02227, "s1": 209.60561, "d": "M 80.646,44.367 L 81.599,44.094 L 82.542,43.789 L 83.475,43.454 L 84.396,43.088 L 83.281,40.411 L 82.448,40.742 L 81.606,41.045 L 80.753,41.320 L 79.892,41.567 Z", "cx": 82.074, "cy": 42.417, "lx": 83.188, "ly": 45.682, "ix": 80.766, "iy": 38.584, "rot": -18.84, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "057", "kind": "glass", "tag": null, "label": null, "section": "Lobby End", "sectionKey": "LOBBY", "thickness": "5/8\"", "width_in": 43, "s0": 209.67593, "s1": 213.25926, "d": "M 84.468,43.058 L 85.376,42.659 L 86.270,42.231 L 87.149,41.773 L 88.013,41.287 L 86.549,38.783 L 85.769,39.223 L 84.974,39.636 L 84.166,40.023 L 83.346,40.384 Z", "cx": 85.622, "cy": 40.933, "lx": 87.164, "ly": 44.02, "ix": 83.812, "iy": 37.31, "rot": -26.54, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "058", "kind": "glass", "tag": null, "label": null, "section": "Lobby End", "sectionKey": "LOBBY", "thickness": "5/8\"", "width_in": 43, "s0": 213.32958, "s1": 216.91292, "d": "M 88.080,41.247 L 88.926,40.730 L 89.755,40.186 L 90.565,39.615 L 91.356,39.017 L 89.570,36.733 L 88.855,37.273 L 88.123,37.789 L 87.374,38.281 L 86.610,38.748 Z", "cx": 88.939, "cy": 38.988, "lx": 90.881, "ly": 41.839, "ix": 86.66, "iy": 35.64, "rot": -34.25, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "059", "kind": "glass", "tag": null, "label": null, "section": "Lobby End", "sectionKey": "LOBBY", "thickness": "5/8\"", "width_in": 43, "s0": 216.98324, "s1": 220.56657, "d": "M 91.417,38.969 L 92.187,38.343 L 92.935,37.693 L 93.661,37.018 L 94.364,36.319 L 92.288,34.295 L 91.652,34.926 L 90.996,35.536 L 90.320,36.124 L 89.625,36.689 Z", "cx": 91.965, "cy": 36.614, "lx": 94.272, "ly": 39.18, "ix": 89.258, "iy": 33.603, "rot": -41.96, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "060", "kind": "glass", "tag": null, "label": null, "section": "Lobby End", "sectionKey": "LOBBY", "thickness": "5/8\"", "width_in": 43, "s0": 220.63689, "s1": 224.22022, "d": "M 94.419,36.264 L 95.097,35.541 L 95.751,34.796 L 96.380,34.029 L 96.984,33.243 L 94.655,31.515 L 94.109,32.226 L 93.541,32.918 L 92.950,33.592 L 92.337,34.245 Z", "cx": 94.646, "cy": 33.857, "lx": 97.276, "ly": 36.09, "ix": 91.559, "iy": 31.235, "rot": -49.66, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "061", "kind": "glass", "tag": null, "label": null, "section": "Lobby End", "sectionKey": "LOBBY", "thickness": "5/8\"", "width_in": 43, "s0": 224.29054, "s1": 227.87388, "d": "M 97.030,33.180 L 97.606,32.373 L 98.154,31.547 L 98.675,30.703 L 99.167,29.843 L 96.627,28.443 L 96.182,29.221 L 95.712,29.983 L 95.216,30.729 L 94.696,31.459 Z", "cx": 96.933, "cy": 30.765, "lx": 99.838, "ly": 32.625, "ix": 93.522, "iy": 28.581, "rot": -57.37, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "062", "kind": "glass", "tag": null, "label": null, "section": "Lobby End", "sectionKey": "LOBBY", "thickness": "5/8\"", "width_in": 43, "s0": 227.9442, "s1": 231.52753, "d": "M 99.205,29.775 L 99.667,28.897 L 100.099,28.005 L 100.502,27.099 L 100.875,26.181 L 98.170,25.135 L 97.833,25.965 L 97.469,26.783 L 97.078,27.589 L 96.661,28.382 Z", "cx": 98.784, "cy": 27.394, "lx": 101.913, "ly": 28.848, "ix": 95.112, "iy": 25.687, "rot": -65.07, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "063", "kind": "glass", "tag": null, "label": null, "section": "Lobby End", "sectionKey": "LOBBY", "thickness": "5/8\"", "width_in": 43, "s0": 231.59785, "s1": 235.18118, "d": "M 100.903,26.108 L 101.243,25.177 L 101.552,24.235 L 101.830,23.283 L 102.076,22.323 L 99.256,21.649 L 99.033,22.516 L 98.782,23.376 L 98.503,24.228 L 98.196,25.069 Z", "cx": 100.167, "cy": 23.806, "lx": 103.462, "ly": 24.827, "ix": 96.299, "iy": 22.607, "rot": -72.78, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "064", "kind": "glass", "tag": null, "label": null, "section": "Lobby End", "sectionKey": "LOBBY", "thickness": "5/8\"", "width_in": 43, "s0": 235.2515, "s1": 238.83484, "d": "M 102.094,22.247 L 102.306,21.279 L 102.486,20.304 L 102.634,19.323 L 102.749,18.339 L 99.864,18.049 L 99.760,18.939 L 99.626,19.824 L 99.464,20.705 L 99.272,21.580 Z", "cx": 101.056, "cy": 20.064, "lx": 104.459, "ly": 20.634, "ix": 97.062, "iy": 19.395, "rot": -80.48, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "065", "kind": "glass", "tag": null, "label": null, "section": "Lobby End", "sectionKey": "LOBBY", "thickness": "5/8\"", "width_in": 43, "s0": 238.90516, "s1": 242.48849, "d": "M 102.757,18.261 L 102.837,17.273 L 102.885,16.283 L 102.900,15.296 L 102.900,14.400 L 100.000,14.400 L 100.000,15.296 L 99.986,16.191 L 99.943,17.086 L 99.871,17.979 Z", "cx": 101.436, "cy": 16.237, "lx": 104.884, "ly": 16.346, "ix": 97.388, "iy": 16.109, "rot": -88.19, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "066", "kind": "glass", "tag": null, "label": null, "section": "Lobby End", "sectionKey": "LOBBY", "thickness": "5/8\"", "width_in": 43, "s0": 242.55881, "s1": 246.14215, "d": "M 102.900,14.329 L 102.900,13.434 L 102.900,12.538 L 102.900,11.642 L 102.900,10.746 L 100.000,10.746 L 100.000,11.642 L 100.000,12.538 L 100.000,13.434 L 100.000,14.329 Z", "cx": 101.45, "cy": 12.538, "lx": 104.9, "ly": 12.538, "ix": 97.4, "iy": 12.538, "rot": 90.0, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "067", "kind": "glass", "tag": null, "label": null, "section": "Lobby End", "sectionKey": "LOBBY", "thickness": "5/8\"", "width_in": 43, "s0": 246.21247, "s1": 249.7958, "d": "M 102.900,10.676 L 102.900,9.780 L 102.900,8.884 L 102.900,7.988 L 102.900,7.092 L 100.000,7.092 L 100.000,7.988 L 100.000,8.884 L 100.000,9.780 L 100.000,10.676 Z", "cx": 101.45, "cy": 8.884, "lx": 104.9, "ly": 8.884, "ix": 97.4, "iy": 8.884, "rot": 90.0, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "068", "kind": "glass", "tag": null, "label": null, "section": "Lobby End", "sectionKey": "LOBBY", "thickness": "5/8\"", "width_in": 50, "s0": 249.86612, "s1": 254.03279, "d": "M 102.900,7.022 L 102.900,6.189 L 102.900,5.355 L 102.900,4.522 L 102.900,3.689 L 102.900,2.855 L 100.000,2.855 L 100.000,3.689 L 100.000,4.522 L 100.000,5.355 L 100.000,6.189 L 100.000,7.022 Z", "cx": 101.45, "cy": 4.939, "lx": 104.9, "ly": 4.939, "ix": 97.4, "iy": 4.939, "rot": 90.0, "ftin": "4' 2\"", "len_ft": 4.167}, {"id": "069", "kind": "glass", "tag": "door", "label": "Door \u2014 plexi fitted", "section": "Lobby End", "sectionKey": "LOBBY", "thickness": "5/8\"", "width_in": 33, "s0": 254.10311, "s1": 256.85311, "d": "M 102.900,2.785 L 102.900,2.098 L 102.900,1.410 L 102.900,0.723 L 102.900,0.035 L 100.000,0.035 L 100.000,0.723 L 100.000,1.410 L 100.000,2.098 L 100.000,2.785 Z", "cx": 101.45, "cy": 1.41, "lx": 104.9, "ly": 1.41, "ix": 97.4, "iy": 1.41, "rot": 90.0, "ftin": "2' 9\"", "len_ft": 2.75}, {"id": "070", "kind": "glass", "tag": "door", "label": "Door", "section": "Lobby End", "sectionKey": "LOBBY", "thickness": "5/8\"", "width_in": 33, "s0": 256.92343, "s1": 259.67343, "d": "M 102.900,-0.035 L 102.900,-0.723 L 102.900,-1.410 L 102.900,-2.098 L 102.900,-2.785 L 100.000,-2.785 L 100.000,-2.098 L 100.000,-1.410 L 100.000,-0.723 L 100.000,-0.035 Z", "cx": 101.45, "cy": -1.41, "lx": 104.9, "ly": -1.41, "ix": 97.4, "iy": -1.41, "rot": 90.0, "ftin": "2' 9\"", "len_ft": 2.75}, {"id": "071", "kind": "glass", "tag": null, "label": null, "section": "Lobby End", "sectionKey": "LOBBY", "thickness": "5/8\"", "width_in": 50, "s0": 259.74375, "s1": 263.91041, "d": "M 102.900,-2.855 L 102.900,-3.689 L 102.900,-4.522 L 102.900,-5.355 L 102.900,-6.189 L 102.900,-7.022 L 100.000,-7.022 L 100.000,-6.189 L 100.000,-5.355 L 100.000,-4.522 L 100.000,-3.689 L 100.000,-2.855 Z", "cx": 101.45, "cy": -4.939, "lx": 104.9, "ly": -4.939, "ix": 97.4, "iy": -4.939, "rot": 90.0, "ftin": "4' 2\"", "len_ft": 4.167}, {"id": "072", "kind": "glass", "tag": null, "label": null, "section": "Lobby End", "sectionKey": "LOBBY", "thickness": "5/8\"", "width_in": 43, "s0": 263.98073, "s1": 267.56407, "d": "M 102.900,-7.092 L 102.900,-7.988 L 102.900,-8.884 L 102.900,-9.780 L 102.900,-10.676 L 100.000,-10.676 L 100.000,-9.780 L 100.000,-8.884 L 100.000,-7.988 L 100.000,-7.092 Z", "cx": 101.45, "cy": -8.884, "lx": 104.9, "ly": -8.884, "ix": 97.4, "iy": -8.884, "rot": 90.0, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "073", "kind": "glass", "tag": null, "label": null, "section": "Lobby End", "sectionKey": "LOBBY", "thickness": "5/8\"", "width_in": 43, "s0": 267.63439, "s1": 271.21772, "d": "M 102.900,-10.746 L 102.900,-11.642 L 102.900,-12.538 L 102.900,-13.434 L 102.900,-14.329 L 100.000,-14.329 L 100.000,-13.434 L 100.000,-12.538 L 100.000,-11.642 L 100.000,-10.746 Z", "cx": 101.45, "cy": -12.538, "lx": 104.9, "ly": -12.538, "ix": 97.4, "iy": -12.538, "rot": 90.0, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "074", "kind": "glass", "tag": null, "label": null, "section": "Lobby End", "sectionKey": "LOBBY", "thickness": "5/8\"", "width_in": 43, "s0": 271.28804, "s1": 274.87138, "d": "M 102.900,-14.400 L 102.900,-15.296 L 102.885,-16.283 L 102.837,-17.273 L 102.757,-18.261 L 99.871,-17.979 L 99.943,-17.086 L 99.986,-16.191 L 100.000,-15.296 L 100.000,-14.400 Z", "cx": 101.436, "cy": -16.237, "lx": 104.884, "ly": -16.346, "ix": 97.388, "iy": -16.109, "rot": 88.19, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "075", "kind": "glass", "tag": null, "label": null, "section": "Lobby End", "sectionKey": "LOBBY", "thickness": "5/8\"", "width_in": 43, "s0": 274.9417, "s1": 278.52503, "d": "M 102.749,-18.339 L 102.634,-19.323 L 102.486,-20.304 L 102.306,-21.279 L 102.094,-22.247 L 99.272,-21.580 L 99.464,-20.705 L 99.626,-19.824 L 99.760,-18.939 L 99.864,-18.049 Z", "cx": 101.056, "cy": -20.064, "lx": 104.459, "ly": -20.634, "ix": 97.062, "iy": -19.395, "rot": 80.48, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "076", "kind": "glass", "tag": null, "label": null, "section": "Lobby End", "sectionKey": "LOBBY", "thickness": "5/8\"", "width_in": 43, "s0": 278.59535, "s1": 282.17868, "d": "M 102.076,-22.323 L 101.830,-23.283 L 101.552,-24.235 L 101.243,-25.177 L 100.903,-26.108 L 98.196,-25.069 L 98.503,-24.228 L 98.782,-23.376 L 99.033,-22.516 L 99.256,-21.649 Z", "cx": 100.167, "cy": -23.806, "lx": 103.462, "ly": -24.827, "ix": 96.299, "iy": -22.607, "rot": 72.78, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "077", "kind": "glass", "tag": null, "label": null, "section": "Lobby End", "sectionKey": "LOBBY", "thickness": "5/8\"", "width_in": 43, "s0": 282.249, "s1": 285.83234, "d": "M 100.875,-26.181 L 100.502,-27.099 L 100.099,-28.005 L 99.667,-28.897 L 99.205,-29.775 L 96.661,-28.382 L 97.078,-27.589 L 97.469,-26.783 L 97.833,-25.965 L 98.170,-25.135 Z", "cx": 98.784, "cy": -27.394, "lx": 101.913, "ly": -28.848, "ix": 95.112, "iy": -25.687, "rot": 65.07, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "078", "kind": "glass", "tag": null, "label": null, "section": "Lobby End", "sectionKey": "LOBBY", "thickness": "5/8\"", "width_in": 43, "s0": 285.90266, "s1": 289.48599, "d": "M 99.167,-29.843 L 98.675,-30.703 L 98.154,-31.547 L 97.606,-32.373 L 97.030,-33.180 L 94.696,-31.459 L 95.216,-30.729 L 95.712,-29.983 L 96.182,-29.221 L 96.627,-28.443 Z", "cx": 96.933, "cy": -30.765, "lx": 99.838, "ly": -32.625, "ix": 93.522, "iy": -28.581, "rot": 57.37, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "079", "kind": "glass", "tag": null, "label": null, "section": "Lobby End", "sectionKey": "LOBBY", "thickness": "5/8\"", "width_in": 43, "s0": 289.55631, "s1": 293.13964, "d": "M 96.984,-33.243 L 96.380,-34.029 L 95.751,-34.796 L 95.097,-35.541 L 94.419,-36.264 L 92.337,-34.245 L 92.950,-33.591 L 93.541,-32.918 L 94.109,-32.226 L 94.655,-31.515 Z", "cx": 94.646, "cy": -33.857, "lx": 97.276, "ly": -36.09, "ix": 91.559, "iy": -31.235, "rot": 49.66, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "080", "kind": "glass", "tag": null, "label": null, "section": "Lobby End", "sectionKey": "LOBBY", "thickness": "5/8\"", "width_in": 43, "s0": 293.20997, "s1": 296.7933, "d": "M 94.364,-36.319 L 93.661,-37.018 L 92.935,-37.693 L 92.187,-38.343 L 91.417,-38.969 L 89.625,-36.689 L 90.320,-36.124 L 90.996,-35.536 L 91.652,-34.926 L 92.288,-34.295 Z", "cx": 91.965, "cy": -36.614, "lx": 94.272, "ly": -39.18, "ix": 89.258, "iy": -33.603, "rot": 41.96, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "081", "kind": "glass", "tag": null, "label": null, "section": "Lobby End", "sectionKey": "LOBBY", "thickness": "5/8\"", "width_in": 43, "s0": 296.86362, "s1": 300.44695, "d": "M 91.356,-39.017 L 90.565,-39.615 L 89.755,-40.186 L 88.926,-40.730 L 88.080,-41.247 L 86.610,-38.748 L 87.374,-38.281 L 88.123,-37.789 L 88.855,-37.273 L 89.570,-36.733 Z", "cx": 88.939, "cy": -38.988, "lx": 90.881, "ly": -41.839, "ix": 86.66, "iy": -35.64, "rot": 34.25, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "082", "kind": "glass", "tag": "damage", "label": "Cracked", "section": "Lobby End", "sectionKey": "LOBBY", "thickness": "5/8\"", "width_in": 43, "s0": 300.51727, "s1": 304.10061, "d": "M 88.013,-41.287 L 87.149,-41.773 L 86.270,-42.231 L 85.376,-42.659 L 84.468,-43.058 L 83.346,-40.384 L 84.166,-40.023 L 84.974,-39.636 L 85.769,-39.223 L 86.549,-38.783 Z", "cx": 85.622, "cy": -40.933, "lx": 87.164, "ly": -44.02, "ix": 83.812, "iy": -37.31, "rot": 26.54, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "083", "kind": "glass", "tag": null, "label": null, "section": "Lobby End", "sectionKey": "LOBBY", "thickness": "5/8\"", "width_in": 43, "s0": 304.17093, "s1": 307.75426, "d": "M 84.396,-43.088 L 83.475,-43.454 L 82.542,-43.789 L 81.599,-44.094 L 80.646,-44.367 L 79.892,-41.567 L 80.753,-41.320 L 81.606,-41.045 L 82.448,-40.742 L 83.281,-40.411 Z", "cx": 82.074, "cy": -42.417, "lx": 83.188, "ly": -45.682, "ix": 80.766, "iy": -38.584, "rot": 18.84, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "084", "kind": "glass", "tag": null, "label": null, "section": "Lobby End", "sectionKey": "LOBBY", "thickness": "5/8\"", "width_in": 42, "s0": 307.82458, "s1": 311.32458, "d": "M 80.570,-44.387 L 79.631,-44.622 L 78.684,-44.825 L 77.731,-44.998 L 76.773,-45.141 L 76.393,-42.266 L 77.259,-42.137 L 78.120,-41.981 L 78.975,-41.797 L 79.824,-41.585 Z", "cx": 78.402, "cy": -43.403, "lx": 79.073, "ly": -46.787, "ix": 77.614, "iy": -39.43, "rot": 11.22, "ftin": "3' 6\"", "len_ft": 3.5}, {"id": "085", "kind": "glass", "tag": null, "label": null, "section": "Lobby End", "sectionKey": "LOBBY", "thickness": "5/8\"", "width_in": 42, "s0": 311.3949, "s1": 314.8949, "d": "M 76.696,-45.151 L 75.734,-45.260 L 74.769,-45.338 L 73.802,-45.384 L 72.833,-45.400 L 72.833,-42.500 L 73.708,-42.486 L 74.582,-42.444 L 75.454,-42.373 L 76.324,-42.275 Z", "cx": 74.675, "cy": -43.891, "lx": 74.898, "ly": -47.333, "ix": 74.415, "iy": -39.849, "rot": 3.69, "ftin": "3' 6\"", "len_ft": 3.5}, {"id": "086", "kind": "glass", "tag": null, "label": null, "section": "Bench Side", "sectionKey": "BENCH", "thickness": "1/2\"", "width_in": 48, "s0": 314.8949, "s1": 318.8949, "d": "M 72.833,-45.400 L 72.033,-45.400 L 71.233,-45.400 L 70.433,-45.400 L 69.633,-45.400 L 68.833,-45.400 L 68.833,-42.500 L 69.633,-42.500 L 70.433,-42.500 L 71.233,-42.500 L 72.033,-42.500 L 72.833,-42.500 Z", "cx": 70.833, "cy": -43.95, "lx": 70.833, "ly": -47.4, "ix": 70.833, "iy": -39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "087", "kind": "glass", "tag": null, "label": null, "section": "Bench Side", "sectionKey": "BENCH", "thickness": "1/2\"", "width_in": 48, "s0": 318.96114, "s1": 322.96114, "d": "M 68.767,-45.400 L 67.967,-45.400 L 67.167,-45.400 L 66.367,-45.400 L 65.567,-45.400 L 64.767,-45.400 L 64.767,-42.500 L 65.567,-42.500 L 66.367,-42.500 L 67.167,-42.500 L 67.967,-42.500 L 68.767,-42.500 Z", "cx": 66.767, "cy": -43.95, "lx": 66.767, "ly": -47.4, "ix": 66.767, "iy": -39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "088", "kind": "glass", "tag": null, "label": null, "section": "Bench Side", "sectionKey": "BENCH", "thickness": "1/2\"", "width_in": 48, "s0": 323.02738, "s1": 327.02738, "d": "M 64.701,-45.400 L 63.901,-45.400 L 63.101,-45.400 L 62.301,-45.400 L 61.501,-45.400 L 60.701,-45.400 L 60.701,-42.500 L 61.501,-42.500 L 62.301,-42.500 L 63.101,-42.500 L 63.901,-42.500 L 64.701,-42.500 Z", "cx": 62.701, "cy": -43.95, "lx": 62.701, "ly": -47.4, "ix": 62.701, "iy": -39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "089", "kind": "glass", "tag": null, "label": null, "section": "Bench Side", "sectionKey": "BENCH", "thickness": "1/2\"", "width_in": 48, "s0": 327.09362, "s1": 331.09362, "d": "M 60.635,-45.400 L 59.835,-45.400 L 59.035,-45.400 L 58.235,-45.400 L 57.435,-45.400 L 56.635,-45.400 L 56.635,-42.500 L 57.435,-42.500 L 58.235,-42.500 L 59.035,-42.500 L 59.835,-42.500 L 60.635,-42.500 Z", "cx": 58.635, "cy": -43.95, "lx": 58.635, "ly": -47.4, "ix": 58.635, "iy": -39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "090", "kind": "glass", "tag": null, "label": null, "section": "Bench Side", "sectionKey": "BENCH", "thickness": "1/2\"", "width_in": 48, "s0": 331.15986, "s1": 335.15986, "d": "M 56.568,-45.400 L 55.768,-45.400 L 54.968,-45.400 L 54.168,-45.400 L 53.368,-45.400 L 52.568,-45.400 L 52.568,-42.500 L 53.368,-42.500 L 54.168,-42.500 L 54.968,-42.500 L 55.768,-42.500 L 56.568,-42.500 Z", "cx": 54.568, "cy": -43.95, "lx": 54.568, "ly": -47.4, "ix": 54.568, "iy": -39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "091", "kind": "glass", "tag": null, "label": null, "section": "Bench Side", "sectionKey": "BENCH", "thickness": "1/2\"", "width_in": 48, "s0": 335.2261, "s1": 339.2261, "d": "M 52.502,-45.400 L 51.702,-45.400 L 50.902,-45.400 L 50.102,-45.400 L 49.302,-45.400 L 48.502,-45.400 L 48.502,-42.500 L 49.302,-42.500 L 50.102,-42.500 L 50.902,-42.500 L 51.702,-42.500 L 52.502,-42.500 Z", "cx": 50.502, "cy": -43.95, "lx": 50.502, "ly": -47.4, "ix": 50.502, "iy": -39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "092", "kind": "glass", "tag": null, "label": null, "section": "Bench Side", "sectionKey": "BENCH", "thickness": "1/2\"", "width_in": 48, "s0": 339.29234, "s1": 343.29234, "d": "M 48.436,-45.400 L 47.636,-45.400 L 46.836,-45.400 L 46.036,-45.400 L 45.236,-45.400 L 44.436,-45.400 L 44.436,-42.500 L 45.236,-42.500 L 46.036,-42.500 L 46.836,-42.500 L 47.636,-42.500 L 48.436,-42.500 Z", "cx": 46.436, "cy": -43.95, "lx": 46.436, "ly": -47.4, "ix": 46.436, "iy": -39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "093", "kind": "glass", "tag": null, "label": null, "section": "Bench Side", "sectionKey": "BENCH", "thickness": "1/2\"", "width_in": 29.25, "s0": 343.35858, "s1": 345.79608, "d": "M 44.370,-45.400 L 43.760,-45.400 L 43.151,-45.400 L 42.542,-45.400 L 41.932,-45.400 L 41.932,-42.500 L 42.542,-42.500 L 43.151,-42.500 L 43.760,-42.500 L 44.370,-42.500 Z", "cx": 43.151, "cy": -43.95, "lx": 43.151, "ly": -47.4, "ix": 43.151, "iy": -39.9, "rot": 0.0, "ftin": "2' 5.25\"", "len_ft": 2.438}, {"id": null, "kind": "open", "tag": null, "label": "Player bench", "section": "Bench Side", "sectionKey": "BENCH", "thickness": "1/2\"", "width_in": 353.92, "s0": 345.86232, "s1": 375.35537, "d": "M 41.866,-45.400 L 40.732,-45.400 L 39.597,-45.400 L 38.463,-45.400 L 37.329,-45.400 L 36.194,-45.400 L 35.060,-45.400 L 33.925,-45.400 L 32.791,-45.400 L 31.657,-45.400 L 30.522,-45.400 L 29.388,-45.400 L 28.254,-45.400 L 27.119,-45.400 L 25.985,-45.400 L 24.851,-45.400 L 23.716,-45.400 L 22.582,-45.400 L 21.448,-45.400 L 20.313,-45.400 L 19.179,-45.400 L 18.045,-45.400 L 16.910,-45.400 L 15.776,-45.400 L 14.642,-45.400 L 13.507,-45.400 L 12.373,-45.400 L 12.373,-42.500 L 13.507,-42.500 L 14.642,-42.500 L 15.776,-42.500 L 16.910,-42.500 L 18.045,-42.500 L 19.179,-42.500 L 20.313,-42.500 L 21.448,-42.500 L 22.582,-42.500 L 23.716,-42.500 L 24.851,-42.500 L 25.985,-42.500 L 27.119,-42.500 L 28.254,-42.500 L 29.388,-42.500 L 30.522,-42.500 L 31.657,-42.500 L 32.791,-42.500 L 33.925,-42.500 L 35.060,-42.500 L 36.194,-42.500 L 37.329,-42.500 L 38.463,-42.500 L 39.597,-42.500 L 40.732,-42.500 L 41.866,-42.500 Z", "cx": 27.119, "cy": -43.95, "lx": 27.119, "ly": -47.4, "ix": 27.119, "iy": -39.9, "rot": 0.0, "ftin": "29' 6\"", "len_ft": 29.493}, {"id": "094", "kind": "glass", "tag": null, "label": null, "section": "Bench Side", "sectionKey": "BENCH", "thickness": "1/2\"", "width_in": 14.5, "s0": 375.42161, "s1": 376.62994, "d": "M 12.307,-45.400 L 11.904,-45.400 L 11.501,-45.400 L 11.098,-45.400 L 11.098,-42.500 L 11.501,-42.500 L 11.904,-42.500 L 12.307,-42.500 Z", "cx": 11.702, "cy": -43.95, "lx": 11.702, "ly": -47.4, "ix": 11.702, "iy": -39.9, "rot": 0.0, "ftin": "1' 2.5\"", "len_ft": 1.208}, {"id": "095", "kind": "glass", "tag": null, "label": null, "section": "Bench Side", "sectionKey": "BENCH", "thickness": "1/2\"", "width_in": 48, "s0": 376.69618, "s1": 380.69618, "d": "M 11.032,-45.400 L 10.232,-45.400 L 9.432,-45.400 L 8.632,-45.400 L 7.832,-45.400 L 7.032,-45.400 L 7.032,-42.500 L 7.832,-42.500 L 8.632,-42.500 L 9.432,-42.500 L 10.232,-42.500 L 11.032,-42.500 Z", "cx": 9.032, "cy": -43.95, "lx": 9.032, "ly": -47.4, "ix": 9.032, "iy": -39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "096", "kind": "glass", "tag": "door", "label": "Door \u2014 penalty box", "section": "Bench Side", "sectionKey": "BENCH", "thickness": "1/2\"", "width_in": 27, "s0": 380.76242, "s1": 383.01242, "d": "M 6.966,-45.400 L 6.216,-45.400 L 5.466,-45.400 L 4.716,-45.400 L 4.716,-42.500 L 5.466,-42.500 L 6.216,-42.500 L 6.966,-42.500 Z", "cx": 5.841, "cy": -43.95, "lx": 5.841, "ly": -47.4, "ix": 5.841, "iy": -39.9, "rot": 0.0, "ftin": "2' 3\"", "len_ft": 2.25}, {"id": "097", "kind": "glass", "tag": null, "label": null, "section": "Bench Side", "sectionKey": "BENCH", "thickness": "1/2\"", "width_in": 13.5, "s0": 383.07866, "s1": 384.20366, "d": "M 4.650,-45.400 L 4.087,-45.400 L 3.525,-45.400 L 3.525,-42.500 L 4.087,-42.500 L 4.650,-42.500 Z", "cx": 4.087, "cy": -43.95, "lx": 4.087, "ly": -47.4, "ix": 4.087, "iy": -39.9, "rot": 0.0, "ftin": "1' 1.5\"", "len_ft": 1.125}, {"id": "098", "kind": "glass", "tag": null, "label": null, "section": "Bench Side", "sectionKey": "BENCH", "thickness": "1/2\"", "width_in": 48, "s0": 384.2699, "s1": 388.2699, "d": "M 3.458,-45.400 L 2.658,-45.400 L 1.858,-45.400 L 1.058,-45.400 L 0.258,-45.400 L -0.542,-45.400 L -0.542,-42.500 L 0.258,-42.500 L 1.058,-42.500 L 1.858,-42.500 L 2.658,-42.500 L 3.458,-42.500 Z", "cx": 1.458, "cy": -43.95, "lx": 1.458, "ly": -47.4, "ix": 1.458, "iy": -39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "099", "kind": "glass", "tag": "feature", "label": "Scorekeeper opening", "section": "Bench Side", "sectionKey": "BENCH", "thickness": "1/2\"", "width_in": 48, "s0": 388.33614, "s1": 392.33614, "d": "M -0.608,-45.400 L -1.408,-45.400 L -2.208,-45.400 L -3.008,-45.400 L -3.808,-45.400 L -4.608,-45.400 L -4.608,-42.500 L -3.808,-42.500 L -3.008,-42.500 L -2.208,-42.500 L -1.408,-42.500 L -0.608,-42.500 Z", "cx": -2.608, "cy": -43.95, "lx": -2.608, "ly": -47.4, "ix": -2.608, "iy": -39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "100", "kind": "glass", "tag": "door", "label": "Door \u2014 penalty box", "section": "Bench Side", "sectionKey": "BENCH", "thickness": "1/2\"", "width_in": 27, "s0": 392.40238, "s1": 394.65238, "d": "M -4.674,-45.400 L -5.424,-45.400 L -6.174,-45.400 L -6.924,-45.400 L -6.924,-42.500 L -6.174,-42.500 L -5.424,-42.500 L -4.674,-42.500 Z", "cx": -5.799, "cy": -43.95, "lx": -5.799, "ly": -47.4, "ix": -5.799, "iy": -39.9, "rot": 0.0, "ftin": "2' 3\"", "len_ft": 2.25}, {"id": "101", "kind": "glass", "tag": null, "label": null, "section": "Bench Side", "sectionKey": "BENCH", "thickness": "1/2\"", "width_in": 48, "s0": 394.71862, "s1": 398.71862, "d": "M -6.990,-45.400 L -7.790,-45.400 L -8.590,-45.400 L -9.390,-45.400 L -10.190,-45.400 L -10.990,-45.400 L -10.990,-42.500 L -10.190,-42.500 L -9.390,-42.500 L -8.590,-42.500 L -7.790,-42.500 L -6.990,-42.500 Z", "cx": -8.99, "cy": -43.95, "lx": -8.99, "ly": -47.4, "ix": -8.99, "iy": -39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "102", "kind": "glass", "tag": null, "label": null, "section": "Bench Side", "sectionKey": "BENCH", "thickness": "1/2\"", "width_in": 16, "s0": 398.78486, "s1": 400.11819, "d": "M -11.057,-45.400 L -11.501,-45.400 L -11.946,-45.400 L -12.390,-45.400 L -12.390,-42.500 L -11.946,-42.500 L -11.501,-42.500 L -11.057,-42.500 Z", "cx": -11.723, "cy": -43.95, "lx": -11.723, "ly": -47.4, "ix": -11.723, "iy": -39.9, "rot": 0.0, "ftin": "1' 4\"", "len_ft": 1.333}, {"id": null, "kind": "open", "tag": null, "label": "Player bench", "section": "Bench Side", "sectionKey": "BENCH", "thickness": "1/2\"", "width_in": 353.92, "s0": 400.18443, "s1": 429.67749, "d": "M -12.456,-45.400 L -13.591,-45.400 L -14.725,-45.400 L -15.859,-45.400 L -16.994,-45.400 L -18.128,-45.400 L -19.262,-45.400 L -20.397,-45.400 L -21.531,-45.400 L -22.665,-45.400 L -23.800,-45.400 L -24.934,-45.400 L -26.068,-45.400 L -27.203,-45.400 L -28.337,-45.400 L -29.471,-45.400 L -30.606,-45.400 L -31.740,-45.400 L -32.874,-45.400 L -34.009,-45.400 L -35.143,-45.400 L -36.278,-45.400 L -37.412,-45.400 L -38.546,-45.400 L -39.681,-45.400 L -40.815,-45.400 L -41.949,-45.400 L -41.949,-42.500 L -40.815,-42.500 L -39.681,-42.500 L -38.546,-42.500 L -37.412,-42.500 L -36.278,-42.500 L -35.143,-42.500 L -34.009,-42.500 L -32.874,-42.500 L -31.740,-42.500 L -30.606,-42.500 L -29.471,-42.500 L -28.337,-42.500 L -27.203,-42.500 L -26.068,-42.500 L -24.934,-42.500 L -23.800,-42.500 L -22.665,-42.500 L -21.531,-42.500 L -20.397,-42.500 L -19.262,-42.500 L -18.128,-42.500 L -16.994,-42.500 L -15.859,-42.500 L -14.725,-42.500 L -13.591,-42.500 L -12.456,-42.500 Z", "cx": -27.203, "cy": -43.95, "lx": -27.203, "ly": -47.4, "ix": -27.203, "iy": -39.9, "rot": 0.0, "ftin": "29' 6\"", "len_ft": 29.493}, {"id": "103", "kind": "glass", "tag": null, "label": null, "section": "Bench Side", "sectionKey": "BENCH", "thickness": "1/2\"", "width_in": 28.25, "s0": 429.74373, "s1": 432.09789, "d": "M -42.015,-45.400 L -42.800,-45.400 L -43.585,-45.400 L -44.370,-45.400 L -44.370,-42.500 L -43.585,-42.500 L -42.800,-42.500 L -42.015,-42.500 Z", "cx": -43.193, "cy": -43.95, "lx": -43.193, "ly": -47.4, "ix": -43.193, "iy": -39.9, "rot": 0.0, "ftin": "2' 4.25\"", "len_ft": 2.354}, {"id": "104", "kind": "glass", "tag": null, "label": null, "section": "Bench Side", "sectionKey": "BENCH", "thickness": "1/2\"", "width_in": 48, "s0": 432.16413, "s1": 436.16413, "d": "M -44.436,-45.400 L -45.236,-45.400 L -46.036,-45.400 L -46.836,-45.400 L -47.636,-45.400 L -48.436,-45.400 L -48.436,-42.500 L -47.636,-42.500 L -46.836,-42.500 L -46.036,-42.500 L -45.236,-42.500 L -44.436,-42.500 Z", "cx": -46.436, "cy": -43.95, "lx": -46.436, "ly": -47.4, "ix": -46.436, "iy": -39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "105", "kind": "glass", "tag": null, "label": null, "section": "Bench Side", "sectionKey": "BENCH", "thickness": "1/2\"", "width_in": 48, "s0": 436.23037, "s1": 440.23037, "d": "M -48.502,-45.400 L -49.302,-45.400 L -50.102,-45.400 L -50.902,-45.400 L -51.702,-45.400 L -52.502,-45.400 L -52.502,-42.500 L -51.702,-42.500 L -50.902,-42.500 L -50.102,-42.500 L -49.302,-42.500 L -48.502,-42.500 Z", "cx": -50.502, "cy": -43.95, "lx": -50.502, "ly": -47.4, "ix": -50.502, "iy": -39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "106", "kind": "glass", "tag": null, "label": null, "section": "Bench Side", "sectionKey": "BENCH", "thickness": "1/2\"", "width_in": 48, "s0": 440.29661, "s1": 444.29661, "d": "M -52.568,-45.400 L -53.368,-45.400 L -54.168,-45.400 L -54.968,-45.400 L -55.768,-45.400 L -56.568,-45.400 L -56.568,-42.500 L -55.768,-42.500 L -54.968,-42.500 L -54.168,-42.500 L -53.368,-42.500 L -52.568,-42.500 Z", "cx": -54.568, "cy": -43.95, "lx": -54.568, "ly": -47.4, "ix": -54.568, "iy": -39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "107", "kind": "glass", "tag": null, "label": null, "section": "Bench Side", "sectionKey": "BENCH", "thickness": "1/2\"", "width_in": 48, "s0": 444.36285, "s1": 448.36285, "d": "M -56.635,-45.400 L -57.435,-45.400 L -58.235,-45.400 L -59.035,-45.400 L -59.835,-45.400 L -60.635,-45.400 L -60.635,-42.500 L -59.835,-42.500 L -59.035,-42.500 L -58.235,-42.500 L -57.435,-42.500 L -56.635,-42.500 Z", "cx": -58.635, "cy": -43.95, "lx": -58.635, "ly": -47.4, "ix": -58.635, "iy": -39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "108", "kind": "glass", "tag": null, "label": null, "section": "Bench Side", "sectionKey": "BENCH", "thickness": "1/2\"", "width_in": 48, "s0": 448.42909, "s1": 452.42909, "d": "M -60.701,-45.400 L -61.501,-45.400 L -62.301,-45.400 L -63.101,-45.400 L -63.901,-45.400 L -64.701,-45.400 L -64.701,-42.500 L -63.901,-42.500 L -63.101,-42.500 L -62.301,-42.500 L -61.501,-42.500 L -60.701,-42.500 Z", "cx": -62.701, "cy": -43.95, "lx": -62.701, "ly": -47.4, "ix": -62.701, "iy": -39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "109", "kind": "glass", "tag": null, "label": null, "section": "Bench Side", "sectionKey": "BENCH", "thickness": "1/2\"", "width_in": 48, "s0": 452.49533, "s1": 456.49533, "d": "M -64.767,-45.400 L -65.567,-45.400 L -66.367,-45.400 L -67.167,-45.400 L -67.967,-45.400 L -68.767,-45.400 L -68.767,-42.500 L -67.967,-42.500 L -67.167,-42.500 L -66.367,-42.500 L -65.567,-42.500 L -64.767,-42.500 Z", "cx": -66.767, "cy": -43.95, "lx": -66.767, "ly": -47.4, "ix": -66.767, "iy": -39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "110", "kind": "glass", "tag": null, "label": null, "section": "Bench Side", "sectionKey": "BENCH", "thickness": "1/2\"", "width_in": 48, "s0": 456.56157, "s1": 460.56157, "d": "M -68.833,-45.400 L -69.633,-45.400 L -70.433,-45.400 L -71.233,-45.400 L -72.033,-45.400 L -72.833,-45.400 L -72.833,-42.500 L -72.033,-42.500 L -71.233,-42.500 L -70.433,-42.500 L -69.633,-42.500 L -68.833,-42.500 Z", "cx": -70.833, "cy": -43.95, "lx": -70.833, "ly": -47.4, "ix": -70.833, "iy": -39.9, "rot": 0.0, "ftin": "4'", "len_ft": 4.0}, {"id": "111", "kind": "glass", "tag": "assumed", "label": "Added to close the end \u2014 verify", "section": "Zamboni End (to doors)", "sectionKey": "ZAM_B", "thickness": "5/8\"", "width_in": 43, "s0": 460.56157, "s1": 464.1449, "d": "M -72.833,-45.400 L -73.825,-45.384 L -74.815,-45.335 L -75.803,-45.253 L -76.788,-45.139 L -76.406,-42.264 L -75.516,-42.367 L -74.624,-42.441 L -73.729,-42.485 L -72.833,-42.500 Z", "cx": -74.719, "cy": -43.888, "lx": -74.947, "ly": -47.33, "ix": -74.452, "iy": -39.847, "rot": 356.22, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "112", "kind": "glass", "tag": null, "label": null, "section": "Zamboni End (to doors)", "sectionKey": "ZAM_B", "thickness": "5/8\"", "width_in": 43, "s0": 464.2599, "s1": 467.84323, "d": "M -76.914,-45.122 L -77.894,-44.971 L -78.868,-44.788 L -79.836,-44.573 L -80.796,-44.326 L -80.028,-41.530 L -79.161,-41.753 L -78.286,-41.947 L -77.406,-42.112 L -76.520,-42.249 Z", "cx": -78.577, "cy": -43.368, "lx": -79.27, "ly": -46.747, "ix": -77.764, "iy": -39.4, "rot": 348.42, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "113", "kind": "glass", "tag": null, "label": null, "section": "Zamboni End (to doors)", "sectionKey": "ZAM_B", "thickness": "5/8\"", "width_in": 43, "s0": 467.95823, "s1": 471.54156, "d": "M -80.919,-44.292 L -81.869,-44.010 L -82.810,-43.697 L -83.739,-43.352 L -84.657,-42.977 L -83.517,-40.311 L -82.688,-40.650 L -81.847,-40.961 L -80.998,-41.244 L -80.139,-41.499 Z", "cx": -82.329, "cy": -42.329, "lx": -83.473, "ly": -45.583, "ix": -80.985, "iy": -38.508, "rot": 340.62, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "114", "kind": "glass", "tag": null, "label": null, "section": "Zamboni End (to doors)", "sectionKey": "ZAM_B", "thickness": "5/8\"", "width_in": 43, "s0": 471.65656, "s1": 475.23989, "d": "M -84.774,-42.927 L -85.677,-42.519 L -86.567,-42.080 L -87.441,-41.613 L -88.300,-41.117 L -86.808,-38.630 L -86.032,-39.078 L -85.242,-39.500 L -84.439,-39.896 L -83.622,-40.266 Z", "cx": -85.904, "cy": -40.79, "lx": -87.48, "ly": -43.859, "ix": -84.055, "iy": -37.188, "rot": 332.82, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "115", "kind": "glass", "tag": null, "label": null, "section": "Zamboni End (to doors)", "sectionKey": "ZAM_B", "thickness": "5/8\"", "width_in": 43, "s0": 475.35489, "s1": 478.93823, "d": "M -88.409,-41.051 L -89.248,-40.524 L -90.070,-39.969 L -90.872,-39.387 L -91.656,-38.779 L -89.840,-36.518 L -89.133,-37.067 L -88.407,-37.593 L -87.665,-38.094 L -86.906,-38.571 Z", "cx": -89.238, "cy": -38.781, "lx": -91.216, "ly": -41.608, "ix": -86.917, "iy": -35.462, "rot": 325.02, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "116", "kind": "glass", "tag": null, "label": null, "section": "Zamboni End (to doors)", "sectionKey": "ZAM_B", "thickness": "5/8\"", "width_in": 43, "s0": 479.05322, "s1": 482.63656, "d": "M -91.755,-38.700 L -92.515,-38.063 L -93.254,-37.402 L -93.970,-36.717 L -94.664,-36.008 L -92.558,-34.014 L -91.931,-34.654 L -91.284,-35.273 L -90.617,-35.871 L -89.930,-36.446 Z", "cx": -92.269, "cy": -36.338, "lx": -94.612, "ly": -38.87, "ix": -89.518, "iy": -33.365, "rot": 317.22, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "117", "kind": "glass", "tag": null, "label": null, "section": "Zamboni End (to doors)", "sectionKey": "ZAM_B", "thickness": "5/8\"", "width_in": 43, "s0": 482.75155, "s1": 486.33489, "d": "M -94.751,-35.915 L -95.418,-35.182 L -96.060,-34.426 L -96.677,-33.650 L -97.267,-32.854 L -94.911,-31.164 L -94.377,-31.883 L -93.819,-32.585 L -93.239,-33.267 L -92.637,-33.930 Z", "cx": -94.94, "cy": -33.506, "lx": -97.605, "ly": -35.696, "ix": -91.811, "iy": -30.934, "rot": 309.42, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "118", "kind": "glass", "tag": null, "label": null, "section": "Zamboni End (to doors)", "sectionKey": "ZAM_B", "thickness": "5/8\"", "width_in": 43, "s0": 486.44989, "s1": 490.03322, "d": "M -97.341,-32.751 L -97.902,-31.933 L -98.436,-31.097 L -98.942,-30.245 L -99.419,-29.376 L -96.855,-28.021 L -96.424,-28.807 L -95.967,-29.577 L -95.484,-30.332 L -94.978,-31.071 Z", "cx": -97.201, "cy": -30.337, "lx": -100.139, "ly": -32.146, "ix": -93.753, "iy": -28.214, "rot": 301.62, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "119", "kind": "glass", "tag": null, "label": null, "section": "Zamboni End (to doors)", "sectionKey": "ZAM_B", "thickness": "5/8\"", "width_in": 43, "s0": 490.14822, "s1": 493.73155, "d": "M -99.478,-29.263 L -99.923,-28.377 L -100.339,-27.477 L -100.724,-26.564 L -101.079,-25.638 L -98.355,-24.644 L -98.034,-25.480 L -97.686,-26.306 L -97.310,-27.119 L -96.908,-27.920 Z", "cx": -99.012, "cy": -26.891, "lx": -102.168, "ly": -28.285, "ix": -95.307, "iy": -25.256, "rot": 293.82, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "120", "kind": "glass", "tag": null, "label": null, "section": "Zamboni End (to doors)", "sectionKey": "ZAM_B", "thickness": "5/8\"", "width_in": 43, "s0": 493.84655, "s1": 497.42988, "d": "M -101.122,-25.518 L -101.443,-24.580 L -101.732,-23.632 L -101.990,-22.674 L -102.216,-21.709 L -99.382,-21.094 L -99.178,-21.966 L -98.945,-22.831 L -98.683,-23.688 L -98.394,-24.536 Z", "cx": -100.338, "cy": -23.232, "lx": -103.654, "ly": -24.184, "ix": -96.446, "iy": -22.114, "rot": 286.02, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "121", "kind": "glass", "tag": null, "label": null, "section": "Zamboni End (to doors)", "sectionKey": "ZAM_B", "thickness": "5/8\"", "width_in": 43, "s0": 497.54488, "s1": 501.12821, "d": "M -102.243,-21.585 L -102.433,-20.612 L -102.591,-19.633 L -102.717,-18.650 L -102.810,-17.663 L -99.918,-17.438 L -99.834,-18.330 L -99.721,-19.218 L -99.578,-20.103 L -99.406,-20.982 Z", "cx": -101.156, "cy": -19.426, "lx": -104.57, "ly": -19.919, "ix": -97.148, "iy": -18.846, "rot": 278.22, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "122", "kind": "glass", "tag": null, "label": null, "section": "Zamboni End (to doors)", "sectionKey": "ZAM_B", "thickness": "5/8\"", "width_in": 43, "s0": 501.24321, "s1": 504.82654, "d": "M -102.819,-17.536 L -102.876,-16.546 L -102.899,-15.555 L -102.900,-14.637 L -102.900,-13.742 L -100.000,-13.742 L -100.000,-14.637 L -99.999,-15.533 L -99.978,-16.429 L -99.927,-17.323 Z", "cx": -101.449, "cy": -15.544, "lx": -104.899, "ly": -15.569, "ix": -97.399, "iy": -15.514, "rot": 270.42, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "123", "kind": "glass", "tag": null, "label": null, "section": "Zamboni End (to doors)", "sectionKey": "ZAM_B", "thickness": "5/8\"", "width_in": 43, "s0": 504.94154, "s1": 508.52488, "d": "M -102.900,-13.627 L -102.900,-12.731 L -102.900,-11.835 L -102.900,-10.939 L -102.900,-10.043 L -100.000,-10.043 L -100.000,-10.939 L -100.000,-11.835 L -100.000,-12.731 L -100.000,-13.627 Z", "cx": -101.45, "cy": -11.835, "lx": -104.9, "ly": -11.835, "ix": -97.4, "iy": -11.835, "rot": 270.0, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "124", "kind": "glass", "tag": null, "label": null, "section": "Zamboni End (to doors)", "sectionKey": "ZAM_B", "thickness": "5/8\"", "width_in": 43, "s0": 508.63987, "s1": 512.22321, "d": "M -102.900,-9.928 L -102.900,-9.032 L -102.900,-8.137 L -102.900,-7.241 L -102.900,-6.345 L -100.000,-6.345 L -100.000,-7.241 L -100.000,-8.137 L -100.000,-9.032 L -100.000,-9.928 Z", "cx": -101.45, "cy": -8.137, "lx": -104.9, "ly": -8.137, "ix": -97.4, "iy": -8.137, "rot": 270.0, "ftin": "3' 7\"", "len_ft": 3.583}, {"id": "125", "kind": "glass", "tag": null, "label": null, "section": "Zamboni End (to doors)", "sectionKey": "ZAM_B", "thickness": "5/8\"", "width_in": 14.5, "s0": 512.3382, "s1": 513.54654, "d": "M -102.900,-6.230 L -102.900,-5.827 L -102.900,-5.424 L -102.900,-5.022 L -100.000,-5.022 L -100.000,-5.424 L -100.000,-5.827 L -100.000,-6.230 Z", "cx": -101.45, "cy": -5.626, "lx": -104.9, "ly": -5.626, "ix": -97.4, "iy": -5.626, "rot": 270.0, "ftin": "1' 2.5\"", "len_ft": 1.208}, {"id": "126", "kind": "glass", "tag": "zamdoor", "label": "Zamboni door", "section": "Zamboni End (to doors)", "sectionKey": "ZAM_B", "thickness": "5/8\"", "width_in": 57.5, "s0": 513.66154, "s1": 518.4532, "d": "M -102.900,-4.907 L -102.900,-3.948 L -102.900,-2.990 L -102.900,-2.032 L -102.900,-1.073 L -102.900,-0.115 L -100.000,-0.115 L -100.000,-1.073 L -100.000,-2.032 L -100.000,-2.990 L -100.000,-3.948 L -100.000,-4.907 Z", "cx": -101.45, "cy": -2.511, "lx": -104.9, "ly": -2.511, "ix": -97.4, "iy": -2.511, "rot": 270.0, "ftin": "4' 9.5\"", "len_ft": 4.792}, {"id": "127", "kind": "glass", "tag": "zamdoor", "label": "Zamboni door", "section": "Zamboni End (to doors)", "sectionKey": "ZAM_B", "thickness": "5/8\"", "width_in": 57.5, "s0": 518.5682, "s1": 523.35987, "d": "M -102.900,-0.000 L -102.900,0.958 L -102.900,1.917 L -102.900,2.875 L -102.900,3.833 L -102.900,4.792 L -100.000,4.792 L -100.000,3.833 L -100.000,2.875 L -100.000,1.917 L -100.000,0.958 L -100.000,-0.000 Z", "cx": -101.45, "cy": 2.396, "lx": -104.9, "ly": 2.396, "ix": -97.4, "iy": 2.396, "rot": 270.0, "ftin": "4' 9.5\"", "len_ft": 4.792}], "cond": {"069": {"status": "plexi", "note": "Plexi currently installed (per measurement doc)"}, "082": {"status": "replace", "note": "Cracked (per measurement doc)"}}, "meta": {"joint_in": 0.861, "radius_label": "27\u2032 2\u2033", "bench_gap_in": 353.92, "bench_gap_ft": "29' 6\"", "zam_end_in": 0, "zgap_ft": null}};
 /* ---------------- layouts ----------------
@@ -575,7 +657,7 @@ function markings(){
   });
   return `<g opacity=".5" clip-path="url(#iceclip)">${g.join('')}</g>`;
 }
-function buildPlan(){
+function buildPlan(target){
   const parts = [];
   parts.push(`<defs>
     <clipPath id="iceclip"><path d="${icePath()}"/></clipPath>
@@ -630,10 +712,10 @@ function buildPlan(){
   parts.push(`<text class="dim-t" x="0" y="${W/2 + 14.1}">${ftin(L)}</text>`);
   parts.push(`<text class="dim-t" x="${-(L/2 + 13.6)}" y="0" transform="rotate(-90 ${-(L/2 + 13.6)} 0)">${ftin(W)}</text>`);
   const vx = -(L/2 + 18), vy = -(W/2 + 17.5);
-  document.getElementById('plan').innerHTML =
+  document.getElementById(target || 'plan').innerHTML =
     `<svg class="rink" viewBox="${vx} ${vy} ${L + 36} ${W + 35}" role="img" `
     + `aria-label="Plan view of the rink glass at ${esc(facilityName(activeBucket))}">${parts.join('')}</svg>`;
-  document.querySelectorAll('.pnl').forEach(el =>
+  document.querySelectorAll('#' + (target || 'plan') + ' .pnl').forEach(el =>
     el.addEventListener('click', () => select(el.dataset.id)));
 }
 
@@ -776,10 +858,22 @@ let who = '';
 let records = {};             // bucket -> panelId -> {status,note,by,at,updatedAt}
 let facilities = {};          // facilityId -> {id,name,ord} - the Ice app owns these
 let boundFacilityId = null;   // which facility record names the legacy bucket
+let FACILITY_NAMES = {};      // names for rinks built here, before Ice has a record for them
 let bindingAt = '';           // its updatedAt, so the binding merges newest-wins
 let activeBucket = LEGACY;
 
 const bucketOf = b => (records[b] = records[b] || {});
+
+/* The only way to change which rink is on screen. `state` is a live alias for
+   the active bucket's panels, so moving activeBucket without repointing it
+   leaves edits landing on the rink you just left - which is exactly what
+   happened when the builder first saved a rink and the next condition mark
+   went to Conway instead. Keep the three together. */
+function setBucket(b){
+  activeBucket = b;
+  state = bucketOf(b);
+  useLayout(b);
+}
 const recId = (bucket, pid) => bucket === LEGACY ? pid : bucket + ':' + pid;
 function splitId(rid){
   const i = String(rid).indexOf(':');
@@ -788,7 +882,16 @@ function splitId(rid){
 }
 function facilityName(bucket){
   const f = facilities[bucket === LEGACY ? boundFacilityId : bucket];
-  return (f && f.name) || (bucket === LEGACY ? 'Conway Arena' : 'Unnamed facility');
+  /* A rink built here has no facility record until somebody adds one in the
+     Ice app, so it carries the name it was given at the boards. */
+  return (f && f.name) || FACILITY_NAMES[bucket]
+      || (bucket === LEGACY ? 'Conway Arena' : 'Unnamed facility');
+}
+/* Everything except Conway, whose layout is compiled into this file. */
+function BUILT_LAYOUTS(){
+  const out = {};
+  for(const k in LAYOUTS) if(k !== LEGACY && k.indexOf('__') !== 0) out[k] = LAYOUTS[k];
+  return out;
 }
 function paintFacility(){
   const set = (id, txt) => { const el = document.getElementById(id); if(el) el.textContent = txt; };
@@ -813,7 +916,8 @@ function ensureBinding(){
 }
 
 const SYNC=(typeof Sync!=="undefined")?Sync:null;   // absent if sync.js failed to load; the page still works locally
-const snapshot = () => JSON.stringify({records, who, boundFacilityId, bindingAt, activeBucket});
+const snapshot = () => JSON.stringify({records, who, boundFacilityId, bindingAt, activeBucket,
+                                       names: FACILITY_NAMES, built: BUILT_LAYOUTS()});
 function store(){ Store.set(KEY, snapshot()); say('Saved'); if(SYNC) SYNC.nudge(); }
 
 async function restore(){
@@ -823,6 +927,12 @@ async function restore(){
     records = saved.records; who = saved.who || '';
     boundFacilityId = saved.boundFacilityId || null; bindingAt = saved.bindingAt || '';
     activeBucket = saved.activeBucket || LEGACY;
+    FACILITY_NAMES = saved.names || {};
+    /* Layouts built on this device come back with it. Conway's is compiled in,
+       so it is never stored and never overwritten from storage. */
+    const built = saved.built || {};
+    for(const k in built) if(k !== LEGACY) LAYOUTS[k] = built[k];
+    if(!LAYOUTS[activeBucket]) activeBucket = LEGACY;
   } else {
     let v1 = null;
     try{ v1 = JSON.parse(await Store.get(KEY_V1) || 'null'); }catch(e){}
@@ -834,7 +944,7 @@ async function restore(){
   }
   const legacy = bucketOf(LEGACY);
   for(const id in legacy){ if(legacy[id] && !legacy[id].updatedAt) legacy[id].updatedAt = legacy[id].at || '1970-01-01'; }
-  state = bucketOf(activeBucket);
+  setBucket(activeBucket);
   document.getElementById('who').value = who;
 }
 const nowISO = () => new Date().toISOString();
@@ -912,10 +1022,286 @@ function setTheme(t){ applyTheme(t); Store.set('rink_theme', t); }
 th.light.addEventListener('click', ()=>setTheme('light'));
 th.dark.addEventListener('click',  ()=>setTheme('dark'));
 
+/* ---------------- the rink builder ----------------
+
+   Four steps, meant to be worked through on a tablet standing at the boards:
+   the sheet, the glass, the walk, then check the drawing against the building.
+
+   The walk starts at a corner, and that is what makes sections simple: begin at
+   a corner and the four stretches are the four walls, so nobody has to be told
+   what a section is. Gates, doors and benches are pieces you place as you come
+   to them, not decisions made up front.
+
+   The number that matters while you are out there is the joint — board length,
+   less the widths entered, shared between them. Negative means the pieces do
+   not fit. Implausibly wide means one has been missed. It is the same
+   arithmetic that shows Conway's Zamboni end sitting outside the band its other
+   three sections agree on. */
+const BLD = {
+  step: 1, name: '', L: 200, W: 85, Rft: 27, Rin: 2,
+  height: 75, vary: false, thickness: '5/8"',
+  startsAtEnd: true, walls: [], wi: 0, built: null
+};
+const KINDS = { glass:{label:'Glass'}, door:{label:'Door'},
+                gate:{label:'Zamboni gate'}, open:{label:'Opening, no glass'} };
+const $b = id => document.getElementById(id);
+const bldR = () => BLD.Rft + BLD.Rin/12;
+
+/* The four walls in the order they are walked, with the board length of each.
+   Starting at an end means the first stretch carries two corner arcs. */
+function bldWalls(){
+  const R = bldR(), walk = boardWalk(BLD.L, BLD.W, R);
+  const origin = BLD.startsAtEnd ? walk.walls.leftEnd : walk.walls.topSide;
+  const breaks = sectionBreaks(walk, origin);
+  return { origin, perimeter: walk.perimeter,
+           spans: breaks.map((b, i) => b - (i ? breaks[i-1] : 0)) };
+}
+const bldNames = () => BLD.startsAtEnd
+  ? ['First end', 'First side', 'Far end', 'Far side']
+  : ['First side', 'Far end', 'Far side', 'Near end'];
+function bldEnsureWalls(){
+  const n = bldNames();
+  for(let i = 0; i < 4; i++) if(!BLD.walls[i]) BLD.walls[i] = { name:n[i], items:[] };
+  BLD.walls.length = 4;
+}
+
+/* Board length, what the entered widths use, and the joint that follows. */
+function bldTally(i){
+  const span = bldWalls().spans[i] || 0, items = BLD.walls[i].items;
+  const used = items.reduce((a, it) => a + it.width_in/12, 0);
+  const gaps = Math.max(0, items.length - 1);
+  return { span, used, left: span - used, count: items.length,
+           joint: gaps ? (span - used)*12/gaps : null };
+}
+function bldJointState(t){
+  if(t.left < -0.01) return 'bad';
+  if(t.joint == null) return '';
+  return (t.joint < 0) ? 'bad' : (t.joint > 2 || t.joint < 0.1) ? 'warn' : '';
+}
+
+function bldSpec(){
+  const w = bldWalls();
+  return { L: BLD.L, W: BLD.W, R: bldR(), origin: w.origin, glassHeight: BLD.height,
+    sections: BLD.walls.map((x, i) => ({ key: 'W' + (i+1), name: x.name,
+      items: x.items.map(it => ({
+        kind: it.kind === 'gate' || it.kind === 'door' ? 'glass' : it.kind,
+        width_in: it.width_in,
+        tag: it.kind === 'gate' ? 'zamdoor' : (it.kind === 'door' ? 'door' : null),
+        label: it.label || (it.kind === 'gate' ? 'Zamboni gate' : it.kind === 'door' ? 'Door' : null),
+        thickness: BLD.thickness, height_in: it.height_in || null })) })) };
+}
+
+function bldStep1(){
+  return '<h3>The sheet</h3>'
+  + '<p class="note">Measure the ice, not the boards. The corner radius is 27&#8242; 2&#8243; on'
+  + ' rinks built to the usual template &mdash; change it only if you know yours differs.</p>'
+  + '<div class="bld-grid">'
+  + '<div class="bld-f"><label for="bL">Length (feet)</label><input id="bL" type="number" inputmode="decimal" step="0.5" value="' + BLD.L + '"></div>'
+  + '<div class="bld-f"><label for="bW">Width (feet)</label><input id="bW" type="number" inputmode="decimal" step="0.5" value="' + BLD.W + '"></div>'
+  + '<div class="bld-f"><label for="bRf">Corner radius (ft)</label><input id="bRf" type="number" inputmode="decimal" step="1" value="' + BLD.Rft + '"></div>'
+  + '<div class="bld-f"><label for="bRi">and inches</label><input id="bRi" type="number" inputmode="decimal" step="0.5" value="' + BLD.Rin + '"></div>'
+  + '</div><div class="bld-readout" id="bRead"></div>'
+  + '<div class="bld-f" style="margin-top:4px"><label for="bName">What is this rink called?</label>'
+  + '<input id="bName" type="text" placeholder="e.g. Nashua Arena &mdash; Rink 2" value="' + esc(BLD.name) + '"></div>';
+}
+function bldStep1Read(){
+  const R = bldR();
+  if(!(BLD.L > 2*R && BLD.W > 2*R))
+    return '<div class="bad"><b>&mdash;</b><span>corner too big for the sheet</span></div>';
+  const w = bldWalls();
+  return '<div><b>' + w.perimeter.toFixed(1) + '&#8242;</b><span>Boards to walk</span></div>'
+       + w.spans.map((v, i) => '<div><b>' + v.toFixed(1) + '&#8242;</b><span>Stretch ' + (i+1) + '</span></div>').join('');
+}
+function bldStep2(){
+  return '<h3>The glass</h3>'
+  + '<p class="note">Most rinks run one height the whole way round. If yours does not, tick the box'
+  + ' and you will be asked for a height with each pane.</p>'
+  + '<div class="bld-grid">'
+  + '<div class="bld-f"><label for="bH">Glass height (inches)</label><input id="bH" type="number" inputmode="numeric" step="1" value="' + BLD.height + '"><span class="hint">75&#8243; is the common height</span></div>'
+  + '<div class="bld-f"><label for="bT">Thickness</label><input id="bT" type="text" value="' + esc(BLD.thickness) + '"><span class="hint">recorded against every pane</span></div>'
+  + '</div>'
+  + '<label class="bld-check"><input type="checkbox" id="bVary"' + (BLD.vary ? ' checked' : '') + '>'
+  + '<span>Heights vary around this rink &mdash; ask me for each one</span></label>'
+  + '<label class="bld-check"><input type="checkbox" id="bEnd"' + (BLD.startsAtEnd ? ' checked' : '') + '>'
+  + '<span>I am starting at an <b>end</b> of the rink rather than along a side. Start at a corner'
+  + ' either way &mdash; then the four stretches are the four walls.</span></label>';
+}
+function bldStep3(){
+  bldEnsureWalls();
+  const i = BLD.wi, wall = BLD.walls[i], t = bldTally(i), st = bldJointState(t);
+  const chips = wall.items.map((it, n) =>
+      '<span class="bld-chip ' + it.kind + '">' + esc(String(it.width_in)) + '&#8243;'
+    + (it.kind !== 'glass' ? ' &middot; ' + KINDS[it.kind].label : '')
+    + (it.height_in ? ' &middot; ' + it.height_in + '&#8243;h' : '')
+    + '<button type="button" data-rm="' + n + '" aria-label="Remove">&times;</button></span>').join('');
+  return '<h3>Stretch ' + (i+1) + ' of 4 &mdash; ' + esc(wall.name) + '</h3>'
+  + '<p class="note">Walk it in order and enter each piece as you reach it. The joint below is what'
+  + ' is left over, shared between the pieces &mdash; it is how you know the run closes.</p>'
+  + '<div class="bld-f" style="max-width:300px"><label for="bWn">Call this stretch</label>'
+  + '<input id="bWn" type="text" value="' + esc(wall.name) + '"></div>'
+  + '<div class="bld-readout">'
+  + '<div><b>' + t.span.toFixed(2) + '&#8242;</b><span>Board length</span></div>'
+  + '<div><b>' + t.used.toFixed(2) + '&#8242;</b><span>Entered (' + t.count + ')</span></div>'
+  + '<div class="' + (t.left < -0.01 ? 'bad' : '') + '"><b>' + t.left.toFixed(2) + '&#8242;</b><span>Left to fill</span></div>'
+  + '<div class="' + st + '"><b>' + (t.joint == null ? '&mdash;' : t.joint.toFixed(3) + '&#8243;') + '</b><span>Joint</span></div>'
+  + '</div>'
+  + '<div class="bld-list">' + (chips || '<span style="font-size:12.5px;color:var(--ink-3)">nothing entered yet</span>') + '</div>'
+  + '<div class="bld-add">'
+  + '<div class="bld-f"><label for="bK">Piece</label><select id="bK">'
+  + Object.keys(KINDS).map(k => '<option value="' + k + '">' + KINDS[k].label + '</option>').join('')
+  + '</select></div>'
+  + '<div class="bld-f"><label for="bWi">Width (inches)</label><input id="bWi" type="number" inputmode="decimal" step="0.25"></div>'
+  + (BLD.vary ? '<div class="bld-f"><label for="bHi">Height</label><input id="bHi" type="number" inputmode="numeric" step="1" value="' + BLD.height + '"></div>' : '')
+  + '<div class="bld-f wide"><label for="bLb">Note (optional)</label><input id="bLb" type="text" placeholder="e.g. home bench"></div>'
+  + '<div class="bld-f"><label>&nbsp;</label><button type="button" id="bAdd" class="bld-addbtn">Add</button></div>'
+  + '</div>';
+}
+function bldStep4(){
+  BLD.built = generateLayout(bldSpec());
+  const rows = BLD.built.sections.map(r => {
+    const bad = r.slack_ft < -0.01, warn = !bad && (r.joint_in > 2 || r.joint_in < 0.1);
+    return '<tr class="' + (bad ? 'bad' : warn ? 'warn' : '') + '"><td>' + esc(r.name) + '</td>'
+      + '<td class="n">' + r.span_ft.toFixed(2) + '&#8242;</td><td class="n">' + r.glass + '</td>'
+      + '<td class="n">' + r.used_ft.toFixed(2) + '&#8242;</td>'
+      + '<td class="n">' + r.joint_in.toFixed(3) + '&#8243;</td></tr>';
+  }).join('');
+  const off = BLD.built.sections.filter(r => r.slack_ft < -0.01 || r.joint_in > 2 || r.joint_in < 0.1);
+  return '<h3>Check it against the building</h3>'
+  + '<p class="note">This is the drawing your entries produce. Walk it against the rink before'
+  + ' saving &mdash; a stretch whose joint is far off the others usually means a piece was missed'
+  + ' or counted twice, not that the tape was wrong.</p>'
+  + '<div id="bldPlan"></div>'
+  + '<table class="bld-secs"><thead><tr><th>Stretch</th><th>Boards</th><th>Panes</th><th>Glass</th><th>Joint</th></tr></thead><tbody>'
+  + rows + '</tbody></table>'
+  + (off.length ? '<p class="note" style="margin-top:14px;color:var(--plexi)"><b>' + off.length
+      + ' stretch' + (off.length === 1 ? '' : 'es') + '</b> came out with joints unlike the others.'
+      + ' Worth a second look before saving.</p>' : '');
+}
+
+function bldSay(msg, bad){
+  const m = $b('bldMsg'); m.textContent = msg || ''; m.className = 'bld-msg' + (bad ? ' bad' : '');
+}
+function bldRender(){
+  const body = $b('bldBody');
+  body.innerHTML = BLD.step === 1 ? bldStep1() : BLD.step === 2 ? bldStep2()
+                 : BLD.step === 3 ? bldStep3() : bldStep4();
+  Array.prototype.forEach.call($b('bldSteps').children, (el, n) => {
+    el.classList.toggle('on', n + 1 === BLD.step);
+    el.classList.toggle('done', n + 1 < BLD.step);
+  });
+  $b('bldBack').disabled = (BLD.step === 1);
+  $b('bldNext').textContent = BLD.step === 4 ? 'Save this rink'
+                            : (BLD.step === 3 && BLD.wi < 3) ? 'Next stretch' : 'Next';
+  bldSay('');
+
+  if(BLD.step === 1){
+    const upd = () => {
+      BLD.L = +$b('bL').value || 0; BLD.W = +$b('bW').value || 0;
+      BLD.Rft = +$b('bRf').value || 0; BLD.Rin = +$b('bRi').value || 0;
+      $b('bRead').innerHTML = bldStep1Read();
+    };
+    ['bL','bW','bRf','bRi'].forEach(id => $b(id).addEventListener('input', upd));
+    $b('bName').addEventListener('input', e => { BLD.name = e.target.value; });
+    upd();
+  }
+  if(BLD.step === 2){
+    $b('bH').addEventListener('input', e => { BLD.height = +e.target.value || 0; });
+    $b('bT').addEventListener('input', e => { BLD.thickness = e.target.value; });
+    $b('bVary').addEventListener('change', e => { BLD.vary = e.target.checked; });
+    $b('bEnd').addEventListener('change', e => { BLD.startsAtEnd = e.target.checked; bldRender(); });
+  }
+  if(BLD.step === 3){
+    const wall = BLD.walls[BLD.wi];
+    $b('bWn').addEventListener('input', e => { wall.name = e.target.value; });
+    $b('bAdd').addEventListener('click', () => {
+      const w = +$b('bWi').value;
+      if(!(w > 0)){ bldSay('Give the piece a width first.', true); $b('bWi').focus(); return; }
+      wall.items.push({ kind: $b('bK').value, width_in: w,
+                        label: ($b('bLb').value || '').trim() || null,
+                        height_in: BLD.vary ? (+$b('bHi').value || null) : null });
+      bldRender(); $b('bWi').focus();
+    });
+    $b('bWi').addEventListener('keydown', e => {
+      if(e.key === 'Enter'){ e.preventDefault(); $b('bAdd').click(); } });
+    body.querySelectorAll('[data-rm]').forEach(btn => btn.addEventListener('click', () => {
+      wall.items.splice(+btn.dataset.rm, 1); bldRender(); }));
+  }
+  if(BLD.step === 4){
+    /* Drawn through the app's own renderer so the preview cannot drift from
+       what gets saved, then the page is put straight back as it was. */
+    LAYOUTS.__preview = BLD.built;
+    const keep = activeBucket;
+    useLayout('__preview'); buildPlan('bldPlan');
+    document.querySelectorAll('#bldPlan .pnl').forEach(el => el.setAttribute('fill', 'var(--ok-soft)'));
+    useLayout(keep); buildPlan();
+    delete LAYOUTS.__preview;
+  }
+}
+
+function bldValidate(){
+  if(BLD.step === 1){
+    const R = bldR();
+    if(!(BLD.L > 0 && BLD.W > 0)) return 'Give the sheet a length and a width.';
+    if(!(BLD.L > 2*R && BLD.W > 2*R)) return 'That corner radius is too big for a sheet this size.';
+    if(!BLD.name.trim()) return 'Give the rink a name so it can be told apart.';
+  }
+  if(BLD.step === 2 && !(BLD.height > 0)) return 'Give the glass a height.';
+  if(BLD.step === 3){
+    const t = bldTally(BLD.wi);
+    if(!t.count) return 'Enter the pieces along this stretch before moving on.';
+    if(t.left < -0.01) return 'These pieces overrun the boards by '
+      + Math.abs(t.left*12).toFixed(1) + '\u2033. Check the widths.';
+  }
+  return null;
+}
+function bldNext(){
+  const err = bldValidate();
+  if(err){ bldSay(err, true); return; }
+  if(BLD.step === 3 && BLD.wi < 3){ BLD.wi++; bldRender(); return; }
+  if(BLD.step === 4){ bldSave(); return; }
+  BLD.step++; bldRender();
+}
+function bldBack(){
+  if(BLD.step === 3 && BLD.wi > 0){ BLD.wi--; bldRender(); return; }
+  if(BLD.step > 1){ BLD.step--; bldRender(); }
+}
+function bldOpen(){
+  BLD.step = 1; BLD.wi = 0; BLD.walls = []; BLD.name = ''; BLD.built = null;
+  $b('builder').hidden = false; bldRender();
+}
+function bldClose(){ $b('builder').hidden = true; }
+
+function bldSave(){
+  const bucket = 'r' + Math.random().toString(36).slice(2, 9);
+  const lay = BLD.built, n = lay.panels.filter(x => x.kind === 'glass').length;
+  lay.edges = {};                       // stretches are named individually, not by edge
+  lay.copy = {
+    lede: ' \u00b7 ' + n + ' pieces in running order. Click any panel on the plan or in the'
+        + ' schedule to record its condition.',
+    planNote: BLD.startsAtEnd ? 'walked from an end' : 'walked from a side',
+    footer: n + ' pieces \u00b7 glass ' + BLD.height + '\u2033 high \u00b7 measurements as recorded'
+  };
+  LAYOUTS[bucket] = lay;
+  FACILITY_NAMES[bucket] = BLD.name.trim();
+  setBucket(bucket);                    // records, layout and `state`, together
+  store();
+  bldClose();
+  buildPlan(); rail(); totals(); table(); detail(); paint(); paintFacility();
+  say('Rink added \u2014 ' + n + ' pieces.');
+}
+
 (async function boot(){
   applyTheme(document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark');
   await restore();
   buildPlan(); rail(); totals(); table(); detail(); paint(); paintFacility();
+
+  document.getElementById('addRink').addEventListener('click', bldOpen);
+  document.getElementById('bldNext').addEventListener('click', bldNext);
+  document.getElementById('bldBack').addEventListener('click', bldBack);
+  document.getElementById('bldClose').addEventListener('click', bldClose);
+  document.addEventListener('keydown', e => {
+    if(e.key === 'Escape' && !document.getElementById('builder').hidden) bldClose();
+  });
 
   if(!SYNC) return;
   SYNC.attach({
@@ -966,7 +1352,7 @@ th.dark.addEventListener('click',  ()=>setTheme('dark'));
 
       if(ensureBinding()) taken++;
       if(taken){
-        state=bucketOf(activeBucket);
+        setBucket(activeBucket);
         Store.set(KEY, snapshot());
         paintFacility(); rail(); table(); detail(); paint();
       }
