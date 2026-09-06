@@ -281,6 +281,11 @@ footer{font-size:12.5px;color:var(--ink-3);text-align:center;font-family:var(--m
   .bld-secs td.n{font-family:var(--mono)}
   .bld-secs tr.warn td.n{color:var(--plexi)} .bld-secs tr.bad td.n{color:var(--replace)}
   #bldPlan{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:10px;overflow-x:auto}
+  .bld-seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+  .bld-seg button{appearance:none;font:inherit;font-size:15px;font-weight:600;padding:12px 22px;
+    background:var(--surface-2);color:var(--ink-2);border:0;cursor:pointer;min-width:82px}
+  .bld-seg button[aria-pressed="true"]{background:var(--accent);color:var(--ground);font-weight:700}
+  .bld-seg button+button{border-left:1px solid var(--line)}
   .bld-addbtn{height:46px;padding:0 22px;border-radius:9px;border:1px solid var(--accent);
     background:var(--accent);color:var(--ground);font:inherit;font-size:15px;font-weight:700;cursor:pointer}
   #bldPlan svg{width:100%;height:auto;display:block}
@@ -1039,8 +1044,20 @@ th.dark.addEventListener('click',  ()=>setTheme('dark'));
    three sections agree on. */
 const BLD = {
   step: 1, name: '', L: 200, W: 85, Rft: 27, Rin: 2,
-  height: 75, vary: false, thickness: '5/8"',
-  startsAtEnd: true, walls: [], wi: 0, built: null
+  height: 75, vary: false, thickness: '1/2"',
+  start: 'centre', walls: [], wi: 0, built: null
+};
+const THICKNESSES = ['1/2"', '5/8"'];
+/* Where the walk begins. The centre red line is the default because every
+   rink has one, it is painted on the ice, and "start at the red line" leaves
+   nothing to interpret — where "start at a corner" invites the question of
+   which corner. Beginning mid-side splits that side in two, so the walk reads
+   as five stretches rather than four; Conway's own survey is shaped exactly
+   that way, split either side of the Zamboni doors. */
+const STARTS = {
+  centre: 'The centre red line',
+  side:   'A corner, walking onto a side',
+  end:    'A corner, walking onto an end'
 };
 const KINDS = { glass:{label:'Glass'}, door:{label:'Door'},
                 gate:{label:'Zamboni gate'}, open:{label:'Opening, no glass'} };
@@ -1051,18 +1068,24 @@ const bldR = () => BLD.Rft + BLD.Rin/12;
    Starting at an end means the first stretch carries two corner arcs. */
 function bldWalls(){
   const R = bldR(), walk = boardWalk(BLD.L, BLD.W, R);
-  const origin = BLD.startsAtEnd ? walk.walls.leftEnd : walk.walls.topSide;
+  const origin = BLD.start === 'end'  ? walk.walls.leftEnd
+               : BLD.start === 'side' ? walk.walls.topSide
+               : walk.walls.topSide + (BLD.L - 2*R)/2;   // the centre red line
   const breaks = sectionBreaks(walk, origin);
   return { origin, perimeter: walk.perimeter,
            spans: breaks.map((b, i) => b - (i ? breaks[i-1] : 0)) };
 }
-const bldNames = () => BLD.startsAtEnd
-  ? ['First end', 'First side', 'Far end', 'Far side']
-  : ['First side', 'Far end', 'Far side', 'Near end'];
+const bldNames = () =>
+    BLD.start === 'centre' ? ['Start side, to the corner', 'First end', 'Far side', 'Far end',
+                              'Start side, back to the line']
+  : BLD.start === 'end'    ? ['First end', 'First side', 'Far end', 'Far side']
+                           : ['First side', 'Far end', 'Far side', 'Near end'];
 function bldEnsureWalls(){
   const n = bldNames();
-  for(let i = 0; i < 4; i++) if(!BLD.walls[i]) BLD.walls[i] = { name:n[i], items:[] };
-  BLD.walls.length = 4;
+  for(let i = 0; i < n.length; i++)
+    if(!BLD.walls[i]) BLD.walls[i] = { name:n[i], items:[], thickness: BLD.thickness };
+  BLD.walls.length = n.length;
+  if(BLD.wi >= n.length) BLD.wi = n.length - 1;
 }
 
 /* Board length, what the entered widths use, and the joint that follows. */
@@ -1088,7 +1111,7 @@ function bldSpec(){
         width_in: it.width_in,
         tag: it.kind === 'gate' ? 'zamdoor' : (it.kind === 'door' ? 'door' : null),
         label: it.label || (it.kind === 'gate' ? 'Zamboni gate' : it.kind === 'door' ? 'Door' : null),
-        thickness: BLD.thickness, height_in: it.height_in || null })) })) };
+        thickness: x.thickness || BLD.thickness, height_in: it.height_in || null })) })) };
 }
 
 function bldStep1(){
@@ -1110,7 +1133,8 @@ function bldStep1Read(){
     return '<div class="bad"><b>&mdash;</b><span>corner too big for the sheet</span></div>';
   const w = bldWalls();
   return '<div><b>' + w.perimeter.toFixed(1) + '&#8242;</b><span>Boards to walk</span></div>'
-       + w.spans.map((v, i) => '<div><b>' + v.toFixed(1) + '&#8242;</b><span>Stretch ' + (i+1) + '</span></div>').join('');
+       + w.spans.map((v, i) => '<div><b>' + v.toFixed(1) + '&#8242;</b><span>Stretch ' + (i+1)
+           + ' of ' + w.spans.length + '</span></div>').join('');
 }
 function bldStep2(){
   return '<h3>The glass</h3>'
@@ -1118,13 +1142,18 @@ function bldStep2(){
   + ' and you will be asked for a height with each pane.</p>'
   + '<div class="bld-grid">'
   + '<div class="bld-f"><label for="bH">Glass height (inches)</label><input id="bH" type="number" inputmode="numeric" step="1" value="' + BLD.height + '"><span class="hint">75&#8243; is the common height</span></div>'
-  + '<div class="bld-f"><label for="bT">Thickness</label><input id="bT" type="text" value="' + esc(BLD.thickness) + '"><span class="hint">recorded against every pane</span></div>'
+  + '<div class="bld-f"><label for="bStart">Where does the walk start?</label><select id="bStart">'
+  + Object.keys(STARTS).map(k => '<option value="' + k + '"' + (BLD.start === k ? ' selected' : '')
+      + '>' + STARTS[k] + '</option>').join('')
+  + '</select><span class="hint">the red line is painted on every sheet</span></div>'
   + '</div>'
+  + '<div class="bld-f" style="margin-top:16px"><label>Thickness to start with</label>'
+  + '<div class="bld-seg" id="bT" role="group" aria-label="Glass thickness">'
+  + THICKNESSES.map(t => '<button type="button" data-t="' + esc(t) + '" aria-pressed="'
+      + (BLD.thickness === t) + '">' + t + '</button>').join('')
+  + '</div><span class="hint">set per stretch as you walk &mdash; ends and sides often differ</span></div>'
   + '<label class="bld-check"><input type="checkbox" id="bVary"' + (BLD.vary ? ' checked' : '') + '>'
-  + '<span>Heights vary around this rink &mdash; ask me for each one</span></label>'
-  + '<label class="bld-check"><input type="checkbox" id="bEnd"' + (BLD.startsAtEnd ? ' checked' : '') + '>'
-  + '<span>I am starting at an <b>end</b> of the rink rather than along a side. Start at a corner'
-  + ' either way &mdash; then the four stretches are the four walls.</span></label>';
+  + '<span>Heights vary around this rink &mdash; ask me for each one</span></label>';
 }
 function bldStep3(){
   bldEnsureWalls();
@@ -1134,11 +1163,17 @@ function bldStep3(){
     + (it.kind !== 'glass' ? ' &middot; ' + KINDS[it.kind].label : '')
     + (it.height_in ? ' &middot; ' + it.height_in + '&#8243;h' : '')
     + '<button type="button" data-rm="' + n + '" aria-label="Remove">&times;</button></span>').join('');
-  return '<h3>Stretch ' + (i+1) + ' of 4 &mdash; ' + esc(wall.name) + '</h3>'
+  return '<h3>Stretch ' + (i+1) + ' of ' + BLD.walls.length + ' &mdash; ' + esc(wall.name) + '</h3>'
   + '<p class="note">Walk it in order and enter each piece as you reach it. The joint below is what'
   + ' is left over, shared between the pieces &mdash; it is how you know the run closes.</p>'
-  + '<div class="bld-f" style="max-width:300px"><label for="bWn">Call this stretch</label>'
+  + '<div class="bld-grid" style="max-width:560px">'
+  + '<div class="bld-f"><label for="bWn">Call this stretch</label>'
   + '<input id="bWn" type="text" value="' + esc(wall.name) + '"></div>'
+  + '<div class="bld-f"><label>Glass thickness here</label>'
+  + '<div class="bld-seg" id="bWt" role="group" aria-label="Thickness along this stretch">'
+  + THICKNESSES.map(t => '<button type="button" data-t="' + esc(t) + '" aria-pressed="'
+      + ((wall.thickness || BLD.thickness) === t) + '">' + t + '</button>').join('')
+  + '</div></div></div>'
   + '<div class="bld-readout">'
   + '<div><b>' + t.span.toFixed(2) + '&#8242;</b><span>Board length</span></div>'
   + '<div><b>' + t.used.toFixed(2) + '&#8242;</b><span>Entered (' + t.count + ')</span></div>'
@@ -1191,7 +1226,7 @@ function bldRender(){
   });
   $b('bldBack').disabled = (BLD.step === 1);
   $b('bldNext').textContent = BLD.step === 4 ? 'Save this rink'
-                            : (BLD.step === 3 && BLD.wi < 3) ? 'Next stretch' : 'Next';
+    : (BLD.step === 3 && BLD.wi < BLD.walls.length - 1) ? 'Next stretch' : 'Next';
   bldSay('');
 
   if(BLD.step === 1){
@@ -1206,13 +1241,24 @@ function bldRender(){
   }
   if(BLD.step === 2){
     $b('bH').addEventListener('input', e => { BLD.height = +e.target.value || 0; });
-    $b('bT').addEventListener('input', e => { BLD.thickness = e.target.value; });
+    $b('bT').querySelectorAll('button').forEach(btn => btn.addEventListener('click', () => {
+      BLD.thickness = btn.dataset.t; bldRender(); }));
     $b('bVary').addEventListener('change', e => { BLD.vary = e.target.checked; });
-    $b('bEnd').addEventListener('change', e => { BLD.startsAtEnd = e.target.checked; bldRender(); });
+    $b('bStart').addEventListener('change', e => {
+      /* The stretches are a different shape under a different start, so what
+         has been entered against the old ones cannot be carried over. */
+      BLD.start = e.target.value; BLD.walls = []; BLD.wi = 0; bldRender(); });
   }
   if(BLD.step === 3){
     const wall = BLD.walls[BLD.wi];
     $b('bWn').addEventListener('input', e => { wall.name = e.target.value; });
+    $b('bWt').querySelectorAll('button').forEach(btn => btn.addEventListener('click', () => {
+      wall.thickness = btn.dataset.t;
+      /* Carry it on to stretches not yet reached, so a rink that is one
+         thickness throughout is entered once. */
+      for(let k = BLD.wi + 1; k < BLD.walls.length; k++)
+        if(!BLD.walls[k].items.length) BLD.walls[k].thickness = btn.dataset.t;
+      bldRender(); }));
     $b('bAdd').addEventListener('click', () => {
       const w = +$b('bWi').value;
       if(!(w > 0)){ bldSay('Give the piece a width first.', true); $b('bWi').focus(); return; }
@@ -1257,7 +1303,7 @@ function bldValidate(){
 function bldNext(){
   const err = bldValidate();
   if(err){ bldSay(err, true); return; }
-  if(BLD.step === 3 && BLD.wi < 3){ BLD.wi++; bldRender(); return; }
+  if(BLD.step === 3 && BLD.wi < BLD.walls.length - 1){ BLD.wi++; bldRender(); return; }
   if(BLD.step === 4){ bldSave(); return; }
   BLD.step++; bldRender();
 }
@@ -1278,7 +1324,7 @@ function bldSave(){
   lay.copy = {
     lede: ' \u00b7 ' + n + ' pieces in running order. Click any panel on the plan or in the'
         + ' schedule to record its condition.',
-    planNote: BLD.startsAtEnd ? 'walked from an end' : 'walked from a side',
+    planNote: 'walked from ' + STARTS[BLD.start].toLowerCase(),
     footer: n + ' pieces \u00b7 glass ' + BLD.height + '\u2033 high \u00b7 measurements as recorded'
   };
   LAYOUTS[bucket] = lay;

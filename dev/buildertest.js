@@ -53,12 +53,30 @@ await p.click('#bldNext'); await sleep(200);
 /* ---------------- step 2: the glass ---------------- */
 ok('it moves on to the glass', /The glass/.test(await p.textContent('#bldBody')));
 await p.fill('#bH', '72');
-await p.click('#bldNext'); await sleep(200);
+/* The centre red line is the default start, and it splits the side it begins
+   on, so the walk reads as five stretches rather than four. */
+ok('the walk starts at the centre red line',
+   (await p.evaluate(() => BLD.start)) === 'centre');
+/* The two that actually get ordered, written the way Conway's survey writes
+   them so a value from the builder compares equal to one from the survey. */
+const opts = await p.evaluate(() =>
+  Array.from(document.querySelectorAll('#bT button')).map(b => b.dataset.t));
+ok('thickness offers the two real options', opts.join(' ') === String.fromCharCode(49,47,50,34)
+   + ' ' + String.fromCharCode(53,47,56,34), JSON.stringify(opts));
+const HALF = String.fromCharCode(49,47,50,34), FIVE8 = String.fromCharCode(53,47,56,34);
+const pickThickness = (sel, t) => p.evaluate(a => {
+  document.querySelectorAll(a.sel + ' button').forEach(b => { if (b.dataset.t === a.t) b.click(); });
+}, { sel: sel, t: t });
+await pickThickness('#bT', HALF);
+await p.click('#bldNext'); await sleep(250);
 
 /* ---------------- step 3: the walk ---------------- */
-ok('it starts the walk', /Stretch 1 of 4/.test(await p.textContent('#bldBody')));
+ok('it starts the walk', /Stretch 1 of 5/.test(await p.textContent('#bldBody')),
+   (await p.textContent('#bldBody')).slice(0, 40));
 
 const spans = await p.evaluate(() => bldWalls().spans);
+ok('five stretches, the start side halved',
+   spans.length === 5 && Math.abs(spans[0] - spans[4]) < 0.01, JSON.stringify(spans.map(v => +v.toFixed(1))));
 const addPiece = async (kind, width, note) => {
   await p.selectOption('#bK', kind);
   await p.fill('#bWi', String(width));
@@ -66,23 +84,27 @@ const addPiece = async (kind, width, note) => {
   await p.click('#bAdd'); await sleep(90);
 };
 
-/* Fill each stretch to roughly its board length, so the joints come out sane. */
-for (let w = 0; w < 4; w++) {
+/* Fill each stretch to roughly its board length, so the joints come out sane.
+   Ends get 5/8in and sides 1/2in, the way Conway is actually glazed. */
+for (let w = 0; w < spans.length; w++) {
   const span = spans[w];
-  if (w === 1) {                                  // a side with a bench and a door
+  const isEnd = (w === 1 || w === 3);
+  await pickThickness('#bWt', isEnd ? FIVE8 : HALF);
+  await sleep(80);
+  if (w === 2) {                                  // the far side: a bench and a door
     await addPiece('open', 300, 'home bench');
     await addPiece('door', 36, 'penalty box');
   }
-  if (w === 2) await addPiece('gate', 115, 'Zamboni');
+  if (w === 1) await addPiece('gate', 115, 'Zamboni');
   const already = await p.evaluate(() => bldTally(BLD.wi).used * 12);
   let left = span * 12 - already;
   const n = Math.max(1, Math.round(left / 48));
   const each = Math.floor((left / n) * 4) / 4 - 0.25;   // leave a little slack for joints
   for (let i = 0; i < n; i++) await addPiece('glass', each);
-  if (w < 3) { await p.click('#bldNext'); await sleep(200); }
+  if (w < spans.length - 1) { await p.click('#bldNext'); await sleep(200); }
 }
 
-const t3 = await p.evaluate(() => bldTally(3));
+const t3 = await p.evaluate(() => bldTally(BLD.wi));
 ok('the joint is worked out live', t3.joint != null && t3.joint > 0, JSON.stringify(t3.joint));
 ok('nothing overruns the boards', t3.left >= -0.01, String(t3.left));
 
@@ -90,7 +112,7 @@ ok('nothing overruns the boards', t3.left >= -0.01, String(t3.left));
 await addPiece('glass', 600);
 await p.click('#bldNext');
 ok('an overrun is refused', /overrun/i.test(await p.textContent('#bldMsg')), await p.textContent('#bldMsg'));
-await p.evaluate(() => { BLD.walls[3].items.pop(); bldRender(); }); await sleep(150);
+await p.evaluate(() => { BLD.walls[BLD.wi].items.pop(); bldRender(); }); await sleep(150);
 
 await p.click('#bldNext'); await sleep(600);
 
@@ -104,7 +126,17 @@ const prev = await p.evaluate(() => ({
 }));
 ok('the preview has the pieces in it', prev.panels > 10, String(prev.panels));
 ok('the preview is sized for a 185ft sheet', prev.viewBox.indexOf('-110.5') === 0, prev.viewBox);
-ok('a row per stretch', prev.rows === 4, String(prev.rows));
+ok('a row per stretch', prev.rows === 5, String(prev.rows));
+/* Thickness is recorded per stretch, because ends and sides differ. */
+const thick = await p.evaluate(() => {
+  const by = {};
+  BLD.built.panels.filter(x => x.kind === 'glass')
+    .forEach(x => { (by[x.sectionKey] = by[x.sectionKey] || {})[x.thickness] = 1; });
+  return Object.keys(by).map(k => k + ':' + Object.keys(by[k]).join(','));
+});
+ok('ends and sides carry different thicknesses',
+   thick.some(t => t.indexOf('5/8') >= 0) && thick.some(t => t.indexOf('1/2') >= 0),
+   JSON.stringify(thick));
 ok('the page underneath is left alone', prev.pagePanels === 127, String(prev.pagePanels));
 
 /* ---------------- save, and use it ---------------- */
@@ -148,6 +180,16 @@ ok('the rink is still there after a reload', back.bucket === after.bucket, back.
 ok('with its layout', back.panels === after.panels, back.panels + ' vs ' + after.panels);
 ok('its name', /Rink 2/.test(back.name), back.name);
 ok('and the condition recorded against it', back.mark === 'replace', String(back.mark));
+
+/* Changing where the walk starts changes the shape of the stretches, so what
+   was entered against the old ones cannot be carried across. */
+await p.click('#addRink'); await sleep(200);
+await p.fill('#bName', 'Third rink'); await p.click('#bldNext'); await sleep(200);
+await p.selectOption('#bStart', 'end'); await sleep(200);
+await p.click('#bldNext'); await sleep(250);
+ok('a corner start gives four stretches', /Stretch 1 of 4/.test(await p.textContent('#bldBody')),
+   (await p.textContent('#bldBody')).slice(0, 40));
+await p.click('#bldClose'); await sleep(150);
 
 ok('nothing threw throughout', errs.length === 0, JSON.stringify(errs.slice(0, 3)));
 
