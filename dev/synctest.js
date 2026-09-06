@@ -28,7 +28,7 @@ await A.p.goto(B+'/ice.html'); await sleep(1200);
 ok('gate appears on a new device', await A.p.isVisible('.sync-gate #sg-code'));
 
 await signIn(A.p,'wrongcode'); await sleep(900);
-ok('a wrong code is refused', (await A.p.textContent('.sync-gate .err')).includes("doesn't match"));
+ok('a wrong code is refused', (await A.p.textContent('.sync-gate .sync-err')).includes("doesn't match"));
 
 await A.p.fill('.sync-gate #sg-code','test-access-code');
 await A.p.click('.sync-gate button'); await sleep(2500);

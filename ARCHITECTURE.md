@@ -167,9 +167,19 @@ anything starts from nothing.
 
 ## Testing
 
-The sandbox where Claude runs cannot reach `supabase.co` (egress policy). So
-`dev/fake-supabase.js` speaks the same auth and REST dialect and serves the site
-on `localhost:8200`. It can also fake a paused project and flaky writes.
+`dev/fake-supabase.js` speaks the same auth and REST dialect as the real project
+and serves the site on `localhost:8200`, so the suite never touches production
+data. It can also fake a paused project and flaky writes.
+
+One-time setup. Node and Playwright are development-only — nothing shipped
+depends on them, and `node_modules` is gitignored because Pages serves
+everything in this repo:
+
+```
+cd dev && npm install && npx playwright install chromium
+```
+
+Then from the repo root:
 
 ```
 node dev/fake-supabase.js &
@@ -177,12 +187,25 @@ node dev/synctest.js       # 20 checks: sign-in, two devices, offline, paused
 node dev/conflicttest.js   # 10 checks: no churn, contested edits, retries
 node dev/e2e.js            # 14 checks: legacy migration, backup merge
 node dev/homecheck.js      # 23 checks: the gate, card figures, a rotated code
+node dev/reg.js            #  8 checks: rounds persist, prefs stay separate
+node dev/resume.js         #  9 checks: coming back lands where you left off
 ```
 
-Tests point `window.__SYNC_CONFIG__` at the fake via `addInitScript`; the real
-pages never read it.
+84 checks in all. Tests point `window.__SYNC_CONFIG__` at the fake via
+`addInitScript`; the real pages never read it.
 
----
+**Seed a session the fake server actually issued.** A made-up token takes a 401
+on its first data call, which expires it locally and re-gates the device. That
+is correct — it is what makes a rotated access code bite — but the gate then
+covers the page and every later click in the test fails on "sync-gate intercepts
+pointer events", which reads like a dozen unrelated failures. `seedSignedIn()`
+does a real password grant and keeps what comes back.
+
+**A device that must not sync needs a dead port, not a bad token.** `e2e.js`
+device B exists to prove a *backup file* merges two separate machines. Sign it in
+properly and it pulls A's records down before the import, so the merge under test
+does nothing. Point it at `localhost:8299` instead: it keeps a session, so no
+gate, but it can never reach a server.
 
 ## Known open items
 

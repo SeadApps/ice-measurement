@@ -3,3 +3,8 @@
 # everything here, so committing it publishes a live probe of the project's
 # auth setup. Kept locally only. Delete this line if it should ship after all.
 supabase-check.html
+
+# Playwright and its browsers, pulled down by `npm install` in dev/. Never
+# committed: GitHub Pages serves everything in this repo, and node_modules is
+# both enormous and irrelevant to the site.
+node_modules/

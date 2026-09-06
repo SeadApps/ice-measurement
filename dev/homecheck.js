@@ -170,13 +170,24 @@ const b = await chromium.launch();
 
   /* Rotating the access code invalidates every stored refresh token. */
   await fetch(B + '/__reset');
+
+  /* Expire the stored token, then reload. The reload is the point: sync.js
+     keeps the session in a closure that start() populates once, so editing
+     localStorage on a running page changes nothing it will ever read again.
+     Booting fresh is what makes it pick the expired token up, try to refresh,
+     and be turned away. */
   await p.evaluate(() => {
     const s = JSON.parse(localStorage.getItem('rink_session'));
     s.expires_at = Date.now() - 1000;
     localStorage.setItem('rink_session', JSON.stringify(s));
   });
-  p.evaluate(() => Sync.sync('revoked-test')).catch(() => {});   // settles at the gate
-  await sleep(2500);
+  await p.reload();
+  await sleep(3000);                                   // boot, refresh, rejection, gate
+
+  /* And a couple more while it is up, to prove they do not stack. */
+  p.evaluate(() => Sync.sync('race-1')).catch(() => {});
+  p.evaluate(() => Sync.sync('race-2')).catch(() => {});
+  await sleep(800);
 
   ok('a rejected token puts the gate back up', await p.isVisible('.sync-gate'));
   ok('a rejected token clears the session',
