@@ -187,11 +187,14 @@ node dev/synctest.js       # 20 checks: sign-in, two devices, offline, paused
 node dev/conflicttest.js   # 10 checks: no churn, contested edits, retries
 node dev/e2e.js            # 14 checks: legacy migration, backup merge
 node dev/homecheck.js      # 23 checks: the gate, card figures, a rotated code
+node dev/cursortest.js     #  6 checks: one pull cursor per app, not per device
+node dev/facilitytest.js   # 15 checks: facilities in Glass, ids scoped without a migration
+node dev/layouttest.js     # 19 checks: the renderer draws a layout, not Conway
 node dev/reg.js            #  8 checks: rounds persist, prefs stay separate
 node dev/resume.js         #  9 checks: coming back lands where you left off
 ```
 
-84 checks in all. Tests point `window.__SYNC_CONFIG__` at the fake via
+124 checks in all. Tests point `window.__SYNC_CONFIG__` at the fake via
 `addInitScript`; the real pages never read it.
 
 **Seed a session the fake server actually issued.** A made-up token takes a 401
@@ -206,6 +209,40 @@ device B exists to prove a *backup file* merges two separate machines. Sign it i
 properly and it pulls A's records down before the import, so the merge under test
 does nothing. Point it at `localhost:8299` instead: it keeps a session, so no
 gate, but it can never reach a server.
+
+## Glass layouts
+
+**The renderer draws a layout, not Conway.** A layout is everything needed to
+draw one rink: `rink` dimensions, the `panels` run, `meta` from the survey,
+`glassHeight`, the names of its four `edges`, an optional `zamDoorLabel`, and
+the page `copy`. Conway's is `LAYOUTS.legacy`, built from the embedded `DATA`
+blob plus the strings that used to be written into the drawing code.
+
+Conway's specifics did not disappear in G2 — they moved into its layout. That
+is what let the change be verified by rendering: the output is byte-identical
+apart from the plan's `aria-label`, which now names the facility.
+
+`useLayout(bucket)` reassigns `L, W, R, GLASS, SEC_ORDER, META, LAYOUT` in one
+place. Every drawing function closes over those, so switching rink costs one
+call rather than threading a layout argument through all of them.
+
+Three things follow from the sheet rather than being written down: the
+`viewBox`, both overall dimension texts, and the four edge labels. `SEC_ORDER`
+is the order sections are first walked in, so it cannot drift from the panels.
+
+**Markings are drawn only on a regulation sheet.** Goal lines scale with `L`,
+but blue lines sit at ±25 ft and faceoff spots at ±69/±22 — fixed distances, not
+proportions. Stretched onto a shorter sheet they would draw lines that are not
+painted on that ice. Anything other than 200×85 gets its outline, its panels and
+a centre line.
+
+**Anything a rink might not have is guarded.** The Zamboni callout was
+`GLASS.find(p => p.tag === 'zamdoor')` dereferenced immediately; a rink whose
+gate is tagged differently threw there and took the whole plan down with it,
+not just the label. Openings are counted from the run instead of assumed to be
+two benches, and the uniform-joint row appears only where a survey supplied one.
+
+---
 
 ## Known open items
 
