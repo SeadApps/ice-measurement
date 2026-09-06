@@ -171,9 +171,19 @@ async function iceStat(){
 }
 
 async function glassStat(){
-  const rec = await readJSON('glass_record_v1');
-  if(!rec || !rec.panels) return 'Open Glass Manager to load this device';
-  const p = Object.values(rec.panels).filter(Boolean);
+  /* v2 keeps panels in per-facility buckets; v1 was one flat map. Read the
+     current shape first and fall back, the same way the Ice card does — a
+     device that has not opened Glass since the move still has only v1. */
+  const v2 = await readJSON('glass_record_v2');
+  let p = null;
+  if(v2 && v2.records){
+    p = [];
+    for(const bucket in v2.records) p = p.concat(Object.values(v2.records[bucket] || {}).filter(Boolean));
+  } else {
+    const v1 = await readJSON('glass_record_v1');
+    if(v1 && v1.panels) p = Object.values(v1.panels).filter(Boolean);
+  }
+  if(!p) return 'Open Glass Manager to load this device';
   const rep = p.filter(v => v.status === 'replace').length;
   const plx = p.filter(v => v.status === 'plexi').length;
   return '<b>127</b> panels &middot; ' +

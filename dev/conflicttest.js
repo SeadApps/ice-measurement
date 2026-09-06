@@ -17,7 +17,11 @@ async function signIn(p){
   await p.fill('.sync-gate #sg-code','test-access-code');
   await p.click('.sync-gate button'); await sleep(2500);
 }
-const panels=p=>p.evaluate(()=>JSON.parse(localStorage.getItem('glass_record_v1')||'{}').panels||{});
+const panels=p=>p.evaluate(()=>(() => {
+  const v2 = JSON.parse(localStorage.getItem('glass_record_v2') || 'null');
+  if (v2 && v2.records) return v2.records.legacy || {};
+  return JSON.parse(localStorage.getItem('glass_record_v1') || '{}').panels || {};
+})());
 
 (async()=>{
 await fetch(B+'/__reset');
