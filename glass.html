@@ -397,6 +397,7 @@ document.documentElement.setAttribute("data-theme",_t==="light"?"light":"dark");
 </div>
 
 <script src="sync.js"></script>
+<script src="records.js"></script>
 <div class="bld" id="builder" hidden role="dialog" aria-modal="true" aria-labelledby="bldTitle">
   <div class="bld-box">
     <div class="bld-head">
@@ -844,11 +845,7 @@ function select(id){ sel = (sel===id?null:id); detail(); table(); paint(); }
 
 /* ---------------- persistence ---------------- */
 /* Same wrapper the Ice app uses: a host-provided store if one exists, else this browser. */
-const Store={
-  async get(k){ try{ if(window.storage&&window.storage.get){const r=await window.storage.get(k); return r?r.value:null;} }catch(e){}
-                try{ return localStorage.getItem(k); }catch(e){ return null; } },
-  async set(k,v){ try{ if(window.storage&&window.storage.set){ await window.storage.set(k,v); return; } }catch(e){}
-                  try{ localStorage.setItem(k,v); }catch(e){} }};
+const Store = Records.Store;      // the same wrapper all three pages had a copy of
 /* Panels belong to a facility now.
 
    The original 127 live in a bucket called "legacy" and keep bare record ids
