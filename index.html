@@ -61,6 +61,35 @@
   .card .stat b{color:var(--frost);font-weight:700}
   .card .stat b.warn{color:#e8b54a}
 
+  /* Where you are. The fleet Ice's home screen shows, lifted up a level. */
+  .fleet{display:grid;gap:8px}
+  .fl-row{display:grid;grid-template-columns:1fr auto;gap:10px 14px;align-items:center;
+    background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:12px 15px;
+    color:inherit;font:inherit;text-align:left;width:100%;cursor:pointer;appearance:none;
+    transition:border-color .12s}
+  .fl-row:hover{border-color:#3a5b72}
+  [data-theme="light"] .fl-row:hover{border-color:#9fb6c6}
+  .fl-row:focus-visible{outline:2px solid var(--frost);outline-offset:2px}
+  .fl-row[aria-current="true"]{border-color:var(--frost)}
+  .fl-name{display:flex;flex-direction:column;gap:2px;min-width:0}
+  .fl-name b{font-size:14px;font-weight:700}
+  .fl-name span{font-size:11.5px;color:var(--ink-dim)}
+  .fl-meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+  .fl-when{font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);white-space:nowrap}
+  /* Where you are and how the sheet is doing are two different facts. Standing
+     on an overdue rink must not be what hides that it is overdue. */
+  .fl-badge,.fl-here{font-family:var(--mono);font-size:10px;letter-spacing:.09em;
+    text-transform:uppercase;padding:3px 9px;border-radius:999px;background:var(--panel-2);
+    color:var(--ink-dim);white-space:nowrap}
+  .fl-here{background:var(--frost);color:#06222b}
+  .fl-badge.over{background:#3a2f16;color:#e8b54a}
+  [data-theme="light"] .fl-badge.over{background:#faeed2;color:#a8760d}
+  .fleetnote{margin:12px 0 0;font-family:var(--mono);font-size:11px;color:var(--ink-faint)}
+  @media (max-width:560px){
+    .fl-row{grid-template-columns:1fr}
+    .fl-meta{justify-content:flex-start}
+  }
+
   footer{margin-top:auto;padding-top:26px;border-top:1px solid var(--line);
     font-family:var(--mono);font-size:11px;color:var(--ink-faint);display:flex;gap:14px;flex-wrap:wrap}
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
@@ -80,6 +109,12 @@ document.documentElement.setAttribute("data-theme",_t==="light"?"light":"dark");
       <button type="button" id="thLight">Light</button><button type="button" id="thDark">Dark</button>
     </div>
   </div>
+
+  <section id="whereWrap" hidden>
+    <span class="eyebrow">Where you are</span>
+    <div class="fleet" id="fleet"></div>
+    <p class="fleetnote" id="fleetNote"></p>
+  </section>
 
   <span class="eyebrow">Apps</span>
   <div class="grid">
@@ -186,9 +221,102 @@ async function glassStat(){
   if(!p) return 'Open Glass Manager to load this device';
   const rep = p.filter(v => v.status === 'replace').length;
   const plx = p.filter(v => v.status === 'plexi').length;
-  return '<b>127</b> panels &middot; ' +
+  /* Glass writes a piece count per rink for this page, because 127 was
+     Conway's - hardcoded here, and wrong for every rink built since. A device
+     that has not opened Glass since that shipped has no counts, and says
+     nothing rather than guessing. */
+  const counts = (v2 && v2.counts) || null;
+  const rinks = counts ? Object.keys(counts).length : 0;
+  const pieces = counts ? Object.keys(counts).reduce((a, k) => a + (counts[k] || 0), 0) : 0;
+  const head = pieces
+    ? '<b>' + pieces + '</b> piece' + (pieces === 1 ? '' : 's')
+      + (rinks > 1 ? ' across ' + rinks + ' rinks' : '') + ' &middot; '
+    : '';
+  return head +
          (rep ? '<b class="warn">' + rep + '</b> to replace' : 'none flagged') +
          (plx ? ' &middot; <b class="warn">' + plx + '</b> on plexi' : '');
+}
+
+/* ---------- where you are ----------
+   You are at a rink doing work there, not hopping between arenas mid-task, so
+   the rink is picked here and the tool second. These are the same v4 records
+   the Ice card reads.
+
+   The only thing written is `ice_v4_prefs`, which is device-local and
+   deliberately never synced - which sheet you are looking at is exactly the
+   fact that should not drag another device's view around. No synced record is
+   touched, so the rule keeping this page out of the sent-map still holds. */
+const PREFS = 'ice_v4_prefs';
+const byOrd = (a, b) => (a.ord||0) - (b.ord||0) || String(a.id).localeCompare(String(b.id));
+
+async function fleetRows(){
+  const [fac, sh, se, prefs] = await Promise.all(
+    ['ice_v4_facilities','ice_v4_sheets','ice_v4_sessions', PREFS].map(readJSON));
+  const facs = liveRecords(fac).sort(byOrd);
+  const sheets = liveRecords(sh).sort(byOrd);
+  const sessions = liveRecords(se);
+  const od = (prefs && prefs.overdueDays != null) ? prefs.overdueDays : 7;
+  const rows = [];
+  facs.forEach(f => sheets.filter(s => s.facilityId === f.id).forEach(s => {
+    /* Ice flags a sheet from its last round that actually has readings in it;
+       an empty session is a sheet nobody has been to yet. The same rule has to
+       apply here or the two screens would disagree about what is overdue. */
+    const withData = sessions
+      .filter(x => x.sheetId === s.id && x.data && Object.keys(x.data).length)
+      .sort((a, b) => new Date(b.date) - new Date(a.date));
+    const last = withData[0] || null;
+    const days = last ? Math.floor((Date.now() - new Date(last.date)) / 86400000) : null;
+    rows.push({ f: f, s: s, last: last, over: days != null && days > od });
+  }));
+  return { rows: rows, prefs: prefs || {}, sessions: sessions };
+}
+
+async function selectSheet(fid, sid, sessions){
+  /* Read, set, write back: every other preference on this device - theme,
+     units, which screen Ice was on - lives in the same object. */
+  const prefs = (await readJSON(PREFS)) || {};
+  prefs.activeFacility = fid;
+  prefs.activeSheet = sid;
+  const newest = sessions.filter(x => x.sheetId === sid)
+                         .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+  if(newest) prefs.activeSession = newest.id;   // Ice repairs this itself if a sheet has none
+  await Store.set(PREFS, JSON.stringify(prefs));
+  await paintAll();
+}
+
+async function paintFleet(){
+  const wrap = document.getElementById('whereWrap');
+  const el = document.getElementById('fleet');
+  const { rows, prefs, sessions } = await fleetRows();
+  /* One sheet is not a choice. A mandatory "choose where you are" step for a
+     one-rink operation is friction wearing the costume of structure. */
+  if(rows.length < 2){ wrap.hidden = true; el.innerHTML = ''; return; }
+  el.innerHTML = '';
+  rows.forEach(r => {
+    const here = r.s.id === prefs.activeSheet;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'fl-row';
+    if(here) b.setAttribute('aria-current', 'true');
+    b.innerHTML = '<span class="fl-name"><b></b><span></span></span>'
+                + '<span class="fl-meta"><span class="fl-when"></span>'
+                + '<span class="fl-here"' + (here ? '' : ' hidden') + '>you are here</span>'
+                + '<span class="fl-badge' + (r.over ? ' over' : '') + '"></span></span>';
+    /* Names are somebody's typed input; set as text, never as markup. */
+    b.querySelector('.fl-name b').textContent = r.s.name || 'Sheet';
+    b.querySelector('.fl-name span').textContent = r.f.name || 'Facility';
+    b.querySelector('.fl-when').textContent =
+      r.last ? 'last round ' + (ago(r.last.date) || 'unknown') : 'no rounds yet';
+    b.querySelector('.fl-badge').textContent = r.over ? 'overdue' : r.last ? 'ok' : 'empty';
+    b.addEventListener('click', () => selectSheet(r.f.id, r.s.id, sessions));
+    el.appendChild(b);
+  });
+  const over = rows.filter(r => r.over).length;
+  const facs = Object.keys(rows.reduce((a, r) => { a[r.f.id] = 1; return a; }, {})).length;
+  document.getElementById('fleetNote').textContent =
+    rows.length + ' sheets across ' + facs + ' facilit' + (facs === 1 ? 'y' : 'ies')
+    + (over ? ' \u00b7 ' + over + ' overdue' : '');
+  wrap.hidden = false;
 }
 
 async function cardStats(){
@@ -198,17 +326,25 @@ async function cardStats(){
   catch(e){ document.getElementById('statGlass').textContent = ''; }
 }
 
+/* Nothing about the rinks renders until the gate is passed, the fleet least of
+   all - it names every facility. Both go through here, after Sync.verify(). */
+async function paintAll(){
+  try{ await paintFleet(); }
+  catch(e){ document.getElementById('whereWrap').hidden = true; }
+  await cardStats();
+}
+
 /* ---------- the gate ----------
    Nothing about the rinks is shown before a successful sign-in. That was
    already true in practice, but only because a new device happens to have no
    local data to show — nothing actually checked. Now it is checked. */
 (async function boot(){
-  if(typeof Sync === 'undefined'){ await cardStats(); return; }  // sync.js failed to load
+  if(typeof Sync === 'undefined'){ await paintAll(); return; }  // sync.js failed to load
   await Sync.start({title:'Arena Management System'});
   await Sync.verify();          // catches a rotated code; re-gates without syncing
   const bar = document.querySelector('.home-bar');
   if(bar) bar.insertBefore(Sync.signOutEl(), bar.querySelector('.themeseg'));
-  await cardStats();
+  await paintAll();
 })();
 </script>
 
