@@ -31,6 +31,7 @@ per-kind maps in local storage, and each carries its own timestamp.
 | `session` | `ice_v4_sessions` | `sheetId`, date, mode, `data` (readings), `notes` |
 | `glass_panel` | `glass_record_v2` | status, note, by, at (`glass_record_v1` kept as a fallback) |
 | `glass_binding` | `glass_record_v2` | `sheetId` — which ice surface the Conway panels are the glass for |
+| `glass_layout` | `glass_record_v2` | the walk a built rink was made from; the drawing is regenerated |
 | — | `ice_v4_prefs` | **device-local, never synced** |
 
 ### Why not one blob
@@ -192,6 +193,7 @@ node dev/cursortest.js     #  6 checks: one pull cursor per app, not per device
 node dev/facilitytest.js   # 27 checks: facilities in Glass, ids scoped without a migration,
                            #            and the glass bound to a sheet rather than a building
 node dev/layouttest.js     # 19 checks: the renderer draws a layout, not Conway
+node dev/layoutsynctest.js # 20 checks: a built rink crosses devices as its walk
 node dev/gentest.js        # 14 checks: the generator reproduces Conway's survey
 node dev/buildertest.js    # 42 checks: walking a rink in, what it writes, and the way back off it
 node dev/reg.js            #  8 checks: rounds persist, prefs stay separate
@@ -245,6 +247,35 @@ a centre line.
 gate is tagged differently threw there and took the whole plan down with it,
 not just the label. Openings are counted from the run instead of assumed to be
 two benches, and the uniform-joint row appears only where a survey supplied one.
+
+### Sending a rink: the walk, not the drawing
+
+A generated layout is around 60KB — a panel per piece, each carrying an SVG
+path, label anchors and arc-length positions. None of it travels.
+`generateLayout()` is deterministic, so the roughly 2KB spec that produced it
+redraws the same rink anywhere. `glass_layout` holds that walk — dimensions,
+corner radius, origin, glass height, where the walk began, and the stretches
+with their pieces — and every device regenerates the panels from it. Devices
+store the walk too, under `specs`, and redraw on load.
+
+`layoutFromSpec()` is the single way in. `bldSave()` goes through it as well,
+rebuilding from the spec rather than keeping the preview it already had, so a
+rink saved locally is exactly what every other device will draw from the
+record. `layoutsynctest` asserts the strong form: two devices' panel runs hash
+identical when only the walk was ever sent.
+
+Three things follow that are worth knowing:
+
+- **Conway is never sent.** Its layout is compiled into this file, so
+  `collect()` skips `legacy` and `apply()` ignores any record claiming to be
+  it.
+- **A malformed spec is skipped, not fatal.** `tryLayout()` swallows the
+  throw, because one bad record must not take down a pull that is also carrying
+  good ones.
+- **Rinks built before this shipped cannot be sent.** They have only the
+  drawing, no walk. They are held under `built` and written back untouched so
+  a save cannot drop them, and they stay on the device that made them until
+  that rink is walked again.
 
 ### Switching rink, and a spec strip that follows
 
@@ -302,3 +333,8 @@ where that facility has more than one surface, so Conway still reads
   attribution without individual logins.
 - **No realtime.** Sync happens on open and on focus. Supabase realtime would
   make the desktop update while you watch; not needed so far.
+- **A built rink is not an ice surface yet.** The builder writes a Glass-only
+  rink — a layout and a local name, with no `facility` or `sheet` record
+  behind it, so Ice knows nothing about it and its glass hangs off a bucket id
+  rather than a sheet. Adding a rink is really adding an ice surface and should
+  write those records too, which belongs on the launcher rather than in Glass.
