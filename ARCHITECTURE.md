@@ -193,7 +193,7 @@ node dev/facilitytest.js   # 27 checks: facilities in Glass, ids scoped without 
                            #            and the glass bound to a sheet rather than a building
 node dev/layouttest.js     # 19 checks: the renderer draws a layout, not Conway
 node dev/gentest.js        # 14 checks: the generator reproduces Conway's survey
-node dev/buildertest.js    # 33 checks: walking a rink in, and what it writes
+node dev/buildertest.js    # 42 checks: walking a rink in, what it writes, and the way back off it
 node dev/reg.js            #  8 checks: rounds persist, prefs stay separate
 node dev/resume.js         #  9 checks: coming back lands where you left off
 ```
@@ -245,6 +245,24 @@ a centre line.
 gate is tagged differently threw there and took the whole plan down with it,
 not just the label. Openings are counted from the run instead of assumed to be
 two benches, and the uniform-joint row appears only where a survey supplied one.
+
+### Switching rink, and a spec strip that follows
+
+`bldSave()` moves to the rink it has just made. Until the picker existed
+nothing could move you off it again short of clearing site data, which made the
+builder a one-way door.
+
+`fillRinks()` lists every layout the device holds and hides itself below two,
+because a mandatory "choose where you are" step for a one-rink operation is
+friction wearing the costume of structure. `switchRink()` writes through
+`Store.set` rather than `store()`: looking at a different rink changes no
+record, so it should neither nudge sync nor claim a save.
+
+Three figures in the spec strip — sheet size, corner radius and glass in run —
+were Conway's, written into the markup, and stayed Conway's on any rink you
+switched to. They are read from the layout now. Derived that way they reproduce
+Conway's own strip character for character, which is how the change was checked
+and what `buildertest` asserts.
 
 ### Glass belongs to a sheet, not a facility
 

@@ -28,6 +28,10 @@ p.on('pageerror', e => errs.push(String(e).split('\n')[0]));
 await p.goto(B + '/glass.html'); await sleep(1500);
 await p.evaluate(() => document.querySelectorAll('.sync-gate').forEach(e => e.remove()));
 
+/* One rink is not a choice, so there is nothing to pick from yet. */
+ok('a device with only Conway has no picker',
+   await p.evaluate(() => document.getElementById('rinkPick').hidden));
+
 /* ---------------- step 1: the sheet ---------------- */
 await p.click('#addRink');
 ok('the builder opens', await p.isVisible('#builder'));
@@ -180,6 +184,46 @@ ok('the rink is still there after a reload', back.bucket === after.bucket, back.
 ok('with its layout', back.panels === after.panels, back.panels + ' vs ' + after.panels);
 ok('its name', /Rink 2/.test(back.name), back.name);
 ok('and the condition recorded against it', back.mark === 'replace', String(back.mark));
+
+/* ---------------- the way back off it ---------------- */
+
+/* bldSave() moves you to the rink it just made. Until now nothing could move
+   you off it again short of clearing site data. */
+ok('the picker appears once there are two rinks',
+   !(await p.evaluate(() => document.getElementById('rinkPick').hidden)));
+const rinkOpts = await p.evaluate(() =>
+  [...document.getElementById('rinkPick').options].map(o => o.textContent));
+ok('it lists both, Conway first', rinkOpts.length === 2 && /Conway/.test(rinkOpts[0]), JSON.stringify(rinkOpts));
+
+const built = await p.evaluate(() => ({
+  size: document.getElementById('specSize').textContent,
+  run: document.getElementById('specRun').textContent
+}));
+ok('the spec strip shows the built rink, not Conway', built.size.indexOf('185') === 0, built.size);
+
+await p.selectOption('#rinkPick', 'legacy'); await sleep(700);
+const home = await p.evaluate(() => ({
+  bucket: activeBucket,
+  panels: document.querySelectorAll('#plan .pnl').length,
+  size: document.getElementById('specSize').textContent,
+  radius: document.getElementById('specRadius').textContent,
+  run: document.getElementById('specRun').textContent
+}));
+ok('choosing Conway goes back to it', home.bucket === 'legacy', home.bucket);
+ok('with its own plan', home.panels === 127, String(home.panels));
+/* Three of these were Conway's figures written into the markup. Read from the
+   layout they have to reproduce them exactly, or the strip is now computing
+   something different from the survey it came from. */
+ok('and the strip reads exactly what the markup used to say',
+   home.size === '200\u2032 \u00d7 85\u2032' && home.radius === '27\u2032 2\u2033'
+   && home.run === '455\u2032 8\u2033', JSON.stringify(home));
+ok("the built rink's run really was a different figure", built.run !== home.run,
+   built.run + ' vs ' + home.run);
+
+await p.reload(); await sleep(1800);
+await p.evaluate(() => document.querySelectorAll('.sync-gate').forEach(e => e.remove()));
+ok('and the rink you chose survives a reload',
+   (await p.evaluate(() => activeBucket)) === 'legacy');
 
 /* Changing where the walk starts changes the shape of the stretches, so what
    was entered against the old ones cannot be carried across. */

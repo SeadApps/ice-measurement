@@ -233,6 +233,11 @@ footer{font-size:12.5px;color:var(--ink-3);text-align:center;font-family:var(--m
   .bld-head .sub{font-size:12.5px;color:var(--ink-2)}
   .bld-x{margin-left:auto;appearance:none;font:inherit;font-size:13px;background:var(--surface);
     color:var(--ink-2);border:1px solid var(--line);border-radius:8px;padding:8px 14px;cursor:pointer}
+  /* The picker takes the auto margin while it is shown and hands it back to the
+     add button on a device that only has the one rink. */
+  .rinkpick{margin-left:auto;appearance:none;font:inherit;font-size:13px;background:var(--surface);
+    color:var(--ink-2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer}
+  .rinkpick:not([hidden])+.bld-x{margin-left:8px}
   .bld-steps{display:flex;gap:6px;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;
     text-transform:uppercase}
   .bld-steps span{flex:1;padding:7px 8px;text-align:center;border-radius:7px;background:var(--surface);
@@ -307,6 +312,7 @@ document.documentElement.setAttribute("data-theme",_t==="light"?"light":"dark");
     <a href="ice.html">Ice</a>
     <a href="glass.html" aria-current="page">Glass</a>
   </nav>
+  <select class="rinkpick" id="rinkPick" aria-label="Rink" hidden></select>
   <button type="button" class="bld-x" id="addRink">+ Add a rink</button>
   <div class="themeseg" role="group" aria-label="Theme">
     <button type="button" id="thLight">Light</button><button type="button" id="thDark">Dark</button>
@@ -316,10 +322,10 @@ document.documentElement.setAttribute("data-theme",_t==="light"?"light":"dark");
 <div class="specstrip">
   <p class="lede"><span id="facName">Conway Arena</span><span id="ledeRest"></span></p>
   <div class="specs">
-    <div class="spec"><b>200&prime; &times; 85&prime;</b><span>Ice sheet</span></div>
-    <div class="spec"><b>27&prime; 2&Prime;</b><span>Corner radius</span></div>
+    <div class="spec"><b id="specSize">200&prime; &times; 85&prime;</b><span>Ice sheet</span></div>
+    <div class="spec"><b id="specRadius">27&prime; 2&Prime;</b><span>Corner radius</span></div>
     <div class="spec"><b id="specHeight">75&Prime;</b><span>Glass height</span></div>
-    <div class="spec"><b>455&prime; 8&Prime;</b><span>Glass in run</span></div>
+    <div class="spec"><b id="specRun">455&prime; 8&Prime;</b><span>Glass in run</span></div>
   </div>
 </div>
 
@@ -923,6 +929,38 @@ function paintFacility(){
   set('planNote', copy.planNote || '');
   set('pageFooter', copy.footer || '');
   set('specHeight', LAYOUT.glassHeight + '″');
+  /* These three were Conway's, written into the markup. Read from the layout
+     they reproduce Conway's own strip exactly, which is how the change was
+     checked - and they are no longer wrong the moment you switch rink. */
+  set('specSize', fmtFt(L * 12) + ' × ' + fmtFt(W * 12));
+  set('specRadius', fmtFt(R * 12));
+  set('specRun', fmtFt(GLASS.reduce((a, p) => a + p.width_in, 0)));
+  fillRinks();
+}
+
+/* The way back off a rink the builder just made. Before this, bldSave() moved
+   you to the new rink and nothing could move you off it. */
+function fillRinks(){
+  const sel = document.getElementById('rinkPick');
+  if(!sel) return;
+  const keys = Object.keys(LAYOUTS).filter(k => k.indexOf('__') !== 0);
+  keys.sort((a, b) => a === LEGACY ? -1 : b === LEGACY ? 1
+                    : facilityName(a).localeCompare(facilityName(b)));
+  sel.innerHTML = keys.map(k => '<option value="' + esc(k) + '"'
+    + (k === activeBucket ? ' selected' : '') + '>' + esc(facilityName(k)) + '</option>').join('');
+  /* One rink is not a choice. A mandatory picker for a one-rink operation is
+     friction wearing the costume of structure. */
+  sel.hidden = keys.length < 2;
+}
+
+function switchRink(b){
+  if(!LAYOUTS[b] || b === activeBucket) return;
+  setBucket(b);                         // records, layout and `state`, together
+  /* Written straight out rather than through store(), which would also nudge
+     sync and claim a save. Looking at a different rink changes no record. */
+  Store.set(KEY, snapshot());
+  buildPlan(); rail(); totals(); table(); detail(); paint(); paintFacility();
+  say('Showing ' + facilityName(b) + '.');
 }
 
 const byOrd = (a,b) => (a.ord||0)-(b.ord||0) || String(a.id).localeCompare(String(b.id));
@@ -1376,6 +1414,7 @@ function bldSave(){
   buildPlan(); rail(); totals(); table(); detail(); paint(); paintFacility();
 
   document.getElementById('addRink').addEventListener('click', bldOpen);
+  document.getElementById('rinkPick').addEventListener('change', e => switchRink(e.target.value));
   document.getElementById('bldNext').addEventListener('click', bldNext);
   document.getElementById('bldBack').addEventListener('click', bldBack);
   document.getElementById('bldClose').addEventListener('click', bldClose);
