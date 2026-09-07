@@ -100,6 +100,40 @@ ok('and shows the Zamboni end as the odd one out',
    bySec.ZAM_A.joint < 0.5 && bySec.ZAM_B.joint > 1.2,
    bySec.ZAM_A.joint + ' / ' + bySec.ZAM_B.joint);
 
+/* ---------------- which way the building faces ---------------- */
+
+/* Nothing recorded it, so a rink walked back in could come out mirrored
+   against the survey. Turning or mirroring must move the drawing and leave
+   every number alone - it is the same rink, drawn the other way round. */
+const facing = await p.evaluate(() => {
+  const base = { L:200, W:85, R:27.1667, origin:0, glassHeight:75,
+    sections: ['A','B','C','D'].map((k,i) => ({ key:'W'+i, name:k,
+      items: Array.from({length:40}, () => ({ kind:'glass', width_in:48 })) })) };
+  const mk = o => generateLayout(Object.assign({}, base, o));
+  const plain = mk({}), flip = mk({flip:true}), turn = mk({turn:true}), both = mk({flip:true,turn:true});
+  const at = l => ({ cx:+l.panels[3].cx.toFixed(3), cy:+l.panels[3].cy.toFixed(3), rot:l.panels[3].rot });
+  const nums = l => JSON.stringify({ per:l.rink.perimeter_ft, n:l.panels.length,
+                                     j:l.sections.map(s => s.joint_in) });
+  return { plain:at(plain), flip:at(flip), turn:at(turn), both:at(both),
+           numsPlain:nums(plain), numsFlip:nums(flip), numsTurn:nums(turn) };
+});
+ok('mirroring flips the rink across its long axis',
+   facing.flip.cy === -facing.plain.cy && facing.flip.cx === facing.plain.cx,
+   JSON.stringify([facing.plain, facing.flip]));
+ok('turning it puts both the other way round',
+   facing.turn.cx === -facing.plain.cx && facing.turn.cy === -facing.plain.cy,
+   JSON.stringify([facing.plain, facing.turn]));
+ok('the two together are the other mirror',
+   facing.both.cx === -facing.plain.cx && facing.both.cy === facing.plain.cy,
+   JSON.stringify([facing.plain, facing.both]));
+/* The text follows the boards, so it has to turn with them or it reads upside
+   down along the far side. */
+ok('the labels turn with it', facing.turn.rot !== facing.plain.rot,
+   facing.plain.rot + ' -> ' + facing.turn.rot);
+/* Arc lengths do not change, so nothing measured does either. */
+ok('and nothing measured changes', facing.numsFlip === facing.numsPlain
+   && facing.numsTurn === facing.numsPlain, facing.numsPlain + ' vs ' + facing.numsFlip);
+
 ok('nothing threw', errs.length === 0, JSON.stringify(errs.slice(0, 2)));
 
 console.log('\n  ' + pass + ' passed, ' + fail + ' failed');

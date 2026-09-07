@@ -116,7 +116,10 @@
   .app.live{display:grid}
   header.bar{display:flex;align-items:center;gap:12px;row-gap:8px;flex-wrap:wrap;padding-bottom:10px}
   /* Below a wide desktop the workspace bar is full; the app switcher stays on the home screen. */
-  @media (max-width:1180px){.app .appsw{display:none}}
+  /* The switcher used to be hidden here, which is exactly where crossing to
+     Glass matters most: a tablet, mid-round, standing in the rink whose glass
+     you want to look at. */
+  @media (max-width:560px){.app .brand-mini,.app .count-pill{display:none}}
   .brand-mini{display:flex;align-items:baseline;gap:8px;margin-right:auto;min-width:0;flex:1 1 auto;overflow:hidden}
   .brand-mini b{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
   .brand-mini .sub{font-size:11px;color:var(--ink-dim);font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
@@ -339,8 +342,7 @@
 <!-- ===================== WORKSPACE ===================== -->
 <div class="app" id="app">
   <header class="bar">
-    <button class="iconbtn" id="homeBtn" title="Home" aria-label="Home">≡</button>
-    <nav class="appsw" aria-label="Apps"><a class="mk" href="index.html" title="All apps">&#9671;</a><a href="ice.html" aria-current="page">Ice</a><a href="glass.html">Glass</a></nav>
+    <nav class="appsw" aria-label="Apps"><a class="mk" href="index.html" title="All apps">&#9671;</a><a href="ice.html" id="homeBtn" aria-current="page" title="Back to the sheets">Ice</a><a href="glass.html">Glass</a></nav>
     <div class="brand-mini"><b id="wsName">Sheet</b><span class="sub" id="wsFac"></span></div>
     <div class="count-pill" id="countPill"><b id="countNum">0</b> / <span id="countTot">33</span> logged</div>
     <div class="seg" role="group" aria-label="View">
@@ -924,7 +926,10 @@ const appEl=$("app");
 function enterWork(view){state.screen="work";compareId=null;clearUndo();hideSel=false;applyGeometry(sheet().size,session().mode);buildBands();buildChips();computeField();computeDelta();
   $("home").style.display="none";appEl.classList.add("live");buildSessSel();sizeLive();setView(view||"map");refresh();persist();}
 function goHome(){state.screen="home";appEl.classList.remove("live");$("home").style.display="block";buildHome();persist();}
-$("homeBtn").addEventListener("click",goHome);
+/* The ≡ is gone; the switcher carries both jobs now. Crossing to Glass is a
+   link, and Ice's own entry - which was a link to the page you are already on,
+   so a no-op reload - goes back to the sheets instead. */
+$("homeBtn").addEventListener("click",e=>{e.preventDefault();goHome();});
 
 /* ---------- HOME build ---------- */
 function sessStats(s){const vals=Object.values(s.data).map(l=>decOf.get(l));if(!vals.length)return null;
@@ -1148,7 +1153,8 @@ async function boot(){state=await Repo.load();
   if(state.smoothIdx==null)state.smoothIdx=2;$("smoothSlider").value=state.smoothIdx;
   applyGeometry(sheet().size,session().mode);applyTheme();applyUnitButtons();buildBands();buildChips();bindDrag();
   /* Pick up where this device left off — coming back from another app in the suite
-     lands on the sheet you were working, not the front screen. ≡ still goes home. */
+     lands on the sheet you were working, not the front screen. Ice in the
+     switcher still goes back to them. */
   if(state.screen==="work"&&facility()&&sheet()&&session())enterWork(state.lastView);else goHome();}
 boot().then(()=>{
   if(!SYNC) return;

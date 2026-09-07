@@ -245,9 +245,9 @@ node dev/facilitytest.js   # 32 checks: facilities in Glass, ids scoped without 
                            #            and the glass bound to a sheet rather than a building
 node dev/layouttest.js     # 31 checks: the renderer draws a layout, and notes come off it
 node dev/layoutsynctest.js # 20 checks: a built rink crosses devices as its walk
-node dev/gentest.js        # 14 checks: the generator reproduces Conway's survey
-node dev/buildertest.js    # 42 checks: walking a rink in, what it writes, and the way back off it
-node dev/reg.js            #  8 checks: rounds persist, prefs stay separate
+node dev/gentest.js        # 19 checks: the generator reproduces Conway's survey, either way round
+node dev/buildertest.js    # 60 checks: walking a rink in, what it writes, and the surface it hangs off
+node dev/reg.js            # 14 checks: rounds persist, prefs stay separate, the switcher is reachable
 node dev/resume.js         #  9 checks: coming back lands where you left off
 ```
 
@@ -291,6 +291,13 @@ the store came out they were two copies held together by a comment.
 **One sheet is not a choice.** The section hides itself below two, because a
 mandatory "choose where you are" step for a one-rink operation is friction
 wearing the costume of structure.
+
+**The Ice/Glass switcher is in Ice's workspace at every width.** It used to be
+hidden below 1180px — exactly the width you are on standing in the rink whose
+glass you want to look at, mid-round, on a tablet. The `≡` that shared that bar
+is gone, and Ice's own entry in the switcher does its job instead: it was a link
+to the page you are already on, so it goes back to the sheets. The bar loses a
+button rather than the route home.
 
 **Nothing renders before the gate.** That already mattered for the card
 figures; the fleet is worse, because it names every facility outright.
@@ -347,6 +354,24 @@ a centre line.
 gate is tagged differently threw there and took the whole plan down with it,
 not just the label. Openings are counted from the run instead of assumed to be
 two benches, and the uniform-joint row appears only where a survey supplied one.
+
+### Which way the building faces
+
+Nothing recorded it, so a rink walked back in through the builder could come out
+mirrored against the survey — Conway's benches are at the top of the plan, and a
+rebuilt Conway put them at the bottom. The walk carries `turn` and `flip`, and
+step 4 offers both, which is where you are already holding the drawing up
+against the room.
+
+`orientWalk()` applies them **to the walk, not to the finished drawing**. Every
+coordinate a panel carries — its outline, its label anchors, the angle its text
+sits at — comes off `walk()`, so that is the only place it has to happen. Arc
+lengths do not change, so the sections, the joints and the closing error are
+untouched: it is the same rink, drawn the other way round, and `gentest`
+asserts exactly that.
+
+It lives in the spec, so it travels. A rink arriving on another device faces the
+way the person with the tape was holding it.
 
 ### Taking a note back off
 

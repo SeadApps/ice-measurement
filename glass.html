@@ -528,6 +528,28 @@ function boardWalk(L, W, R){
   return at;
 }
 
+/* Which way the building faces. Nothing recorded it, so a rink walked back in
+   through the builder could come out mirrored against the survey - Conway's
+   benches are at the top of the plan, and a rebuilt Conway put them at the
+   bottom.
+
+   Applied to the walk rather than to the finished drawing: every coordinate a
+   panel carries - its outline, its label anchors, the angle its text sits at -
+   comes off walk(), so this is the only place it has to happen. Arc lengths do
+   not change, so the sections and the closing error are untouched. */
+function orientWalk(walk, spec){
+  const turn = !!spec.turn, flip = !!spec.flip;
+  if(!turn && !flip) return walk;
+  const sx = turn ? -1 : 1, sy = (turn ? -1 : 1) * (flip ? -1 : 1);
+  const out = function(s){
+    const m = walk(s);
+    return { x:m.x*sx, y:m.y*sy, nx:m.nx*sx, ny:m.ny*sy };
+  };
+  out.perimeter = walk.perimeter;
+  out.walls = walk.walls;
+  return out;
+}
+
 /* Where the sections break, measured from the walk's origin: at each wall, and
    at the origin itself when it sits mid-wall — which is why Conway's Zamboni
    end reads as two sections, one either side of the doors. */
@@ -584,7 +606,7 @@ function entryAt(walk, item, sec, s0, s1, id){
    missed a panel. */
 function generateLayout(spec){
   const L = spec.L, W = spec.W, R = spec.R;
-  const walk = boardWalk(L, W, R), per = walk.perimeter, origin = spec.origin || 0;
+  const walk = orientWalk(boardWalk(L, W, R), spec), per = walk.perimeter, origin = spec.origin || 0;
   const breaks = sectionBreaks(walk, origin);
   const panels = [], report = [];
   let num = 0;
@@ -1271,7 +1293,7 @@ th.dark.addEventListener('click',  ()=>setTheme('dark'));
 const BLD = {
   step: 1, name: '', L: 200, W: 85, Rft: 27, Rin: 2,
   height: 75, vary: false, thickness: '1/2"',
-  start: 'centre', walls: [], wi: 0, built: null,
+  start: 'centre', walls: [], wi: 0, built: null, turn: false, flip: false,
   sheet: '__new'          // the surface being walked, or a new one
 };
 const THICKNESSES = ['1/2"', '5/8"'];
@@ -1332,7 +1354,7 @@ function bldJointState(t){
 function bldSpec(){
   const w = bldWalls();
   return { L: BLD.L, W: BLD.W, R: bldR(), origin: w.origin, glassHeight: BLD.height,
-    start: BLD.start,
+    start: BLD.start, turn: BLD.turn, flip: BLD.flip,
     sections: BLD.walls.map((x, i) => ({ key: 'W' + (i+1), name: x.name,
       items: x.items.map(it => ({
         kind: it.kind === 'gate' || it.kind === 'door' ? 'glass' : it.kind,
@@ -1453,6 +1475,13 @@ function bldStep4(){
   + ' saving &mdash; a stretch whose joint is far off the others usually means a piece was missed'
   + ' or counted twice, not that the tape was wrong.</p>'
   + '<div id="bldPlan"></div>'
+  + '<div class="bld-seg" id="bOrient" role="group" aria-label="Which way the rink faces">'
+  + '<button type="button" data-o="turn" aria-pressed="' + (BLD.turn ? 'true' : 'false') + '">Turn 180&deg;</button>'
+  + '<button type="button" data-o="flip" aria-pressed="' + (BLD.flip ? 'true' : 'false') + '">Mirror</button>'
+  + '</div>'
+  + '<p class="note">Hold the drawing up against the room. If the benches are on the wrong side of'
+  + ' it, turn or mirror it until it matches &mdash; the pieces and the closing error do not'
+  + ' change, only which way round it is drawn.</p>'
   + '<table class="bld-secs"><thead><tr><th>Stretch</th><th>Boards</th><th>Panes</th><th>Glass</th><th>Joint</th></tr></thead><tbody>'
   + rows + '</tbody></table>'
   + (off.length ? '<p class="note" style="margin-top:14px;color:var(--plexi)"><b>' + off.length
@@ -1525,6 +1554,8 @@ function bldRender(){
       wall.items.splice(+btn.dataset.rm, 1); bldRender(); }));
   }
   if(BLD.step === 4){
+    $b('bOrient').querySelectorAll('button').forEach(btn => btn.addEventListener('click', () => {
+      BLD[btn.dataset.o] = !BLD[btn.dataset.o]; bldRender(); }));
     /* Drawn through the app's own renderer so the preview cannot drift from
        what gets saved, then the page is put straight back as it was. */
     LAYOUTS.__preview = BLD.built;
@@ -1570,6 +1601,7 @@ async function bldOpen(){
   await loadSurfaces();
   const free = bldFreeSheets();
   BLD.step = 1; BLD.wi = 0; BLD.walls = []; BLD.name = ''; BLD.built = null;
+  BLD.turn = false; BLD.flip = false;
   /* Default to where the launcher says you are, when that surface has no glass
      yet - which is the reason you would be opening this at all. */
   BLD.sheet = (launcherSheet && free.some(s => s.id === launcherSheet)) ? launcherSheet
