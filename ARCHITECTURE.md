@@ -188,7 +188,7 @@ node dev/fake-supabase.js &
 node dev/synctest.js       # 20 checks: sign-in, two devices, offline, paused
 node dev/conflicttest.js   # 10 checks: no churn, contested edits, retries
 node dev/e2e.js            # 14 checks: legacy migration, backup merge
-node dev/homecheck.js      # 23 checks: the gate, card figures, a rotated code
+node dev/homecheck.js      # 48 checks: the gate, the fleet, card figures, a rotated code
 node dev/cursortest.js     #  6 checks: one pull cursor per app, not per device
 node dev/facilitytest.js   # 27 checks: facilities in Glass, ids scoped without a migration,
                            #            and the glass bound to a sheet rather than a building
@@ -215,6 +215,42 @@ device B exists to prove a *backup file* merges two separate machines. Sign it i
 properly and it pulls A's records down before the import, so the merge under test
 does nothing. Point it at `localhost:8299` instead: it keeps a session, so no
 gate, but it can never reach a server.
+
+## The launcher
+
+`index.html` is where you say which rink you are at; the tool comes second. You
+are *at* a rink doing work there, not hopping between arenas mid-task. It shows
+the fleet Ice's home screen shows — every live sheet, when it was last walked,
+and whether that is overdue.
+
+**It still never pulls, and writes no synced record.** The one thing it writes
+is `ice_v4_prefs`, which is device-local and excluded from sync by design:
+which sheet you are looking at is exactly the fact that should not drag another
+device's view around. Ice then opens on that sheet because it already restores
+from those preferences. The write is read-modify-write, because theme, units and
+which screen Ice was on live in the same object.
+
+**Overdue is Ice's rule, not a second one.** The last session that actually has
+readings in it, older than `overdueDays` — 7 by default, and read from those
+same preferences. An empty session is a sheet nobody has been to yet. Two
+screens computing this differently would disagree about what is behind.
+
+**One sheet is not a choice.** The section hides itself below two, because a
+mandatory "choose where you are" step for a one-rink operation is friction
+wearing the costume of structure.
+
+**Nothing renders before the gate.** That already mattered for the card
+figures; the fleet is worse, because it names every facility outright.
+
+**Where you are and how the sheet is doing are two chips, not one.** They were
+one, and standing on an overdue rink was then the thing that hid it was overdue.
+
+The Glass card no longer claims 127 pieces whatever rink you have — that is
+Conway's figure and it was written into this page. Glass writes a piece count
+per rink into its own storage for this page to read, and a device that has not
+opened Glass since that shipped says nothing rather than guessing.
+
+---
 
 ## Glass layouts
 

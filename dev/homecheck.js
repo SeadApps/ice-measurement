@@ -66,10 +66,20 @@ const b = await chromium.launch();
   ok('launcher gates a device that has never signed in', await p.isVisible('.sync-gate'));
 
   /* The point of the gate here: an unauthorised device must learn nothing
-     about the rinks, not even how many sheets exist. */
+     about the rinks, not even how many sheets exist. Records go on the device
+     first, so there is something real to leak - and the fleet is worse than a
+     figure, because it names every facility outright. */
+  await seed(p, V4);
+  await p.reload(); await sleep(1500);
+  ok('records on the device do not open the gate', await p.isVisible('.sync-gate'));
   const shown = await p.evaluate(() => document.getElementById('statIce').textContent
                                      + document.getElementById('statGlass').textContent);
   ok('no rink figures rendered behind the gate', shown.trim() === '', JSON.stringify(shown));
+  const leaked = await p.evaluate(() => document.getElementById('fleet').textContent
+                                      + document.getElementById('fleetNote').textContent);
+  ok('and no facility is named behind it', leaked.trim() === '', JSON.stringify(leaked));
+  ok('the fleet stays hidden until the code is entered',
+     await p.evaluate(() => document.getElementById('whereWrap').hidden));
 
   await signInAtGate(p);
   ok('the code dismisses the gate', !(await p.isVisible('.sync-gate')));
@@ -93,6 +103,108 @@ const b = await chromium.launch();
   ok('ice card skips deleted sheets',      !/4 sheets/.test(ice), ice);
   ok('ice card dates the newest round',    /last round/.test(ice), ice);
   ok('glass card counts what is flagged',  /2 to replace/.test(glass) && /1 on plexi/.test(glass), glass);
+  await ctx.close();
+}
+
+/* ---------------- where you are ---------------- */
+{
+  const { ctx, p } = await device(b);
+  await p.goto(B + '/index.html'); await seedSession(p); await seed(p, V4);
+  /* Rounds with readings in them, so the overdue rule has something to bite
+     on. An empty session is a sheet nobody has actually been to. */
+  await p.evaluate(d => localStorage.setItem('ice_v4_sessions', JSON.stringify({
+    a: { id:'a', sheetId:'s1', date:new Date(Date.now() -  1*d).toISOString(),
+         data:{'0':1}, notes:{}, updatedAt:'2026-09-01T00:00:00.000Z' },
+    b: { id:'b', sheetId:'s2', date:new Date(Date.now() - 21*d).toISOString(),
+         data:{'0':1}, notes:{}, updatedAt:'2026-09-01T00:00:00.000Z' }
+  })), 86400000);
+  await p.reload(); await sleep(1600);
+
+  const rowsOf = () => p.evaluate(() =>
+    [...document.querySelectorAll('#fleet .fl-row')].map(r => ({
+      name: r.querySelector('.fl-name b').textContent,
+      fac: r.querySelector('.fl-name span').textContent,
+      here: !r.querySelector('.fl-here').hidden,
+      badge: r.querySelector('.fl-badge').textContent })));
+
+  const rows = await rowsOf();
+  ok('the fleet lists every live sheet', rows.length === 3, JSON.stringify(rows));
+  ok('a deleted sheet is not among them', !rows.some(r => r.name === 'sX'), JSON.stringify(rows));
+  ok('each row names its sheet and the facility it is in',
+     rows[0].name === 'Main sheet' && rows[0].fac === 'Conway Arena'
+     && rows[2].fac === 'Nashua Rink', JSON.stringify(rows));
+
+  /* Ice's rule, which this page has to agree with: overdue past seven days. */
+  ok('a sheet walked yesterday reads ok', rows[0].badge === 'ok', JSON.stringify(rows));
+  ok('one not walked for three weeks reads overdue', rows[1].badge === 'overdue', JSON.stringify(rows));
+  ok('one never walked is empty, not overdue', rows[2].badge === 'empty', JSON.stringify(rows));
+  const note = await p.textContent('#fleetNote');
+  ok('the summary counts the fleet', /3 sheets across 2 facilities/.test(note), note);
+  ok('and how many are behind', /1 overdue/.test(note), note);
+
+  /* Picking a rink is the only thing this page writes, and it writes it to
+     preferences that are device-local by design. */
+  await p.click('#fleet .fl-row:nth-child(3)'); await sleep(700);
+  const prefs = await p.evaluate(() => JSON.parse(localStorage.getItem('ice_v4_prefs') || '{}'));
+  ok('choosing a rink points Ice at that sheet', prefs.activeSheet === 's3', JSON.stringify(prefs));
+  ok('and at the facility it belongs to', prefs.activeFacility === 'f2', JSON.stringify(prefs));
+  const picked = await rowsOf();
+  ok('the chosen rink says so', picked[2].here && !picked[0].here, JSON.stringify(picked));
+  ok('and it keeps its own status alongside that', picked[2].badge === 'empty',
+     JSON.stringify(picked));
+
+  /* Standing on a rink must not be what hides that it is behind. */
+  await p.click('#fleet .fl-row:nth-child(2)'); await sleep(700);
+  const onOverdue = await rowsOf();
+  ok('an overdue rink you are standing on still reads overdue',
+     onOverdue[1].here && onOverdue[1].badge === 'overdue', JSON.stringify(onOverdue));
+
+  /* Theme, units and the rest live in that same object and must survive. */
+  await p.evaluate(() => localStorage.setItem('ice_v4_prefs',
+    JSON.stringify({ theme:'light', unit:'mm', overdueDays:30, screen:'work' })));
+  await p.reload(); await sleep(1600);
+  ok('the overdue threshold is whatever Ice was set to',
+     (await rowsOf())[1].badge === 'ok', JSON.stringify(await rowsOf()));
+  await p.click('#fleet .fl-row:nth-child(1)'); await sleep(700);
+  const kept = await p.evaluate(() => JSON.parse(localStorage.getItem('ice_v4_prefs') || '{}'));
+  ok('picking a rink leaves every other preference alone',
+     kept.unit === 'mm' && kept.theme === 'light' && kept.screen === 'work', JSON.stringify(kept));
+  ok('while still moving the sheet', kept.activeSheet === 's1', JSON.stringify(kept));
+  await ctx.close();
+}
+
+/* Conway is one arena. A mandatory "choose where you are" step for a one-rink
+   operation is friction wearing the costume of structure. */
+{
+  const { ctx, p } = await device(b);
+  await p.goto(B + '/index.html'); await seedSession(p);
+  await p.evaluate(t => {
+    localStorage.setItem('ice_v4_facilities', JSON.stringify({
+      f1: { id:'f1', name:'Conway Arena', ord:0, updatedAt:t } }));
+    localStorage.setItem('ice_v4_sheets', JSON.stringify({
+      s1: { id:'s1', facilityId:'f1', name:'Main sheet', ord:0, updatedAt:t } }));
+    localStorage.setItem('ice_v4_sessions', JSON.stringify({}));
+  }, '2026-09-01T00:00:00.000Z');
+  await p.reload(); await sleep(1500);
+  ok('a one-rink operation is never asked to choose',
+     await p.evaluate(() => document.getElementById('whereWrap').hidden));
+  await ctx.close();
+}
+
+/* The Glass card used to say 127 for whatever rink you had, because that is
+   Conway's figure and it was written into this page. */
+{
+  const { ctx, p } = await device(b);
+  await p.goto(B + '/index.html'); await seedSession(p);
+  await p.evaluate(() => localStorage.setItem('glass_record_v2', JSON.stringify({
+    records: { legacy: { '069':{status:'plexi'}, '082':{status:'replace'} },
+               rab12x: { '004':{status:'replace'} } },
+    counts: { legacy: 127, rab12x: 96 } })));
+  await p.reload(); await sleep(1500);
+  const g = (await p.textContent('#statGlass')).trim();
+  ok('the glass card counts the pieces it actually has', /223 pieces/.test(g), g);
+  ok('and says how many rinks they are across', /across 2 rinks/.test(g), g);
+  ok('still flagging what needs doing', /2 to replace/.test(g) && /1 on plexi/.test(g), g);
   await ctx.close();
 }
 
@@ -133,6 +245,15 @@ const b = await chromium.launch();
   ok('launcher leaves the sync cursor alone', cursor === null, String(cursor));
   ok('launcher writes no records of its own',
      (await (await fetch(B + '/__rows')).json()).length === before);
+
+  /* Nor when it is actually used. Picking a rink touches preferences only. */
+  await seed(p, V4);
+  await p.reload(); await sleep(1800);
+  await p.click('#fleet .fl-row:nth-child(2)'); await sleep(1500);
+  ok('nor when a rink is picked on it',
+     (await (await fetch(B + '/__rows')).json()).length === before);
+  ok('and it still has no cursor to advance',
+     (await p.evaluate(() => localStorage.getItem('rink_sync_cursor'))) === null);
   await ctx.close();
 }
 
