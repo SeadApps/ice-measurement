@@ -233,6 +233,11 @@ footer{font-size:12.5px;color:var(--ink-3);text-align:center;font-family:var(--m
   .bld-head .sub{font-size:12.5px;color:var(--ink-2)}
   .bld-x{margin-left:auto;appearance:none;font:inherit;font-size:13px;background:var(--surface);
     color:var(--ink-2);border:1px solid var(--line);border-radius:8px;padding:8px 14px;cursor:pointer}
+  /* The picker takes the auto margin while it is shown and hands it back to the
+     add button on a device that only has the one rink. */
+  .rinkpick{margin-left:auto;appearance:none;font:inherit;font-size:13px;background:var(--surface);
+    color:var(--ink-2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer}
+  .rinkpick:not([hidden])+.bld-x{margin-left:8px}
   .bld-steps{display:flex;gap:6px;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;
     text-transform:uppercase}
   .bld-steps span{flex:1;padding:7px 8px;text-align:center;border-radius:7px;background:var(--surface);
@@ -307,6 +312,7 @@ document.documentElement.setAttribute("data-theme",_t==="light"?"light":"dark");
     <a href="ice.html">Ice</a>
     <a href="glass.html" aria-current="page">Glass</a>
   </nav>
+  <select class="rinkpick" id="rinkPick" aria-label="Rink" hidden></select>
   <button type="button" class="bld-x" id="addRink">+ Add a rink</button>
   <div class="themeseg" role="group" aria-label="Theme">
     <button type="button" id="thLight">Light</button><button type="button" id="thDark">Dark</button>
@@ -316,10 +322,10 @@ document.documentElement.setAttribute("data-theme",_t==="light"?"light":"dark");
 <div class="specstrip">
   <p class="lede"><span id="facName">Conway Arena</span><span id="ledeRest"></span></p>
   <div class="specs">
-    <div class="spec"><b>200&prime; &times; 85&prime;</b><span>Ice sheet</span></div>
-    <div class="spec"><b>27&prime; 2&Prime;</b><span>Corner radius</span></div>
+    <div class="spec"><b id="specSize">200&prime; &times; 85&prime;</b><span>Ice sheet</span></div>
+    <div class="spec"><b id="specRadius">27&prime; 2&Prime;</b><span>Corner radius</span></div>
     <div class="spec"><b id="specHeight">75&Prime;</b><span>Glass height</span></div>
-    <div class="spec"><b>455&prime; 8&Prime;</b><span>Glass in run</span></div>
+    <div class="spec"><b id="specRun">455&prime; 8&Prime;</b><span>Glass in run</span></div>
   </div>
 </div>
 
@@ -851,18 +857,25 @@ const Store={
    is no one-shot migration to get right. Facilities added later get scoped
    ids, "<facilityId>:<panelId>".
 
-   The bucket key is the fixed string "legacy" rather than a facility id,
-   because facility records arrive from sync - asynchronously, and possibly
-   never on a device that has only ever run Glass. Which named facility the
-   bucket belongs to is a separate fact that syncs on its own (glass_binding),
-   and only affects what the page is labelled. */
+   The bucket key is the fixed string "legacy" rather than a sheet id, because
+   sheet records arrive from sync - asynchronously, and possibly never on a
+   device that has only ever run Glass. Which ice surface the bucket belongs to
+   is a separate fact that syncs on its own (glass_binding), and only affects
+   what the page is labelled.
+
+   Glass hangs off a *sheet*, not a facility. An arena with two surfaces has
+   two sets of glass, two schedules and two condition records. Conway has one
+   sheet, which is why binding to the facility was indistinguishable here and
+   wrong everywhere else. */
 const KEY = 'glass_record_v2', KEY_V1 = 'glass_record_v1';
 function say(msg){ const n = document.getElementById('savenote'); if(n) n.textContent = msg; }
 function stamp(){ return new Date().toISOString().slice(0,10); }
 let who = '';
 let records = {};             // bucket -> panelId -> {status,note,by,at,updatedAt}
 let facilities = {};          // facilityId -> {id,name,ord} - the Ice app owns these
-let boundFacilityId = null;   // which facility record names the legacy bucket
+let sheets = {};              // sheetId -> {id,facilityId,name,ord} - the Ice app owns these too
+let boundSheetId = null;      // which ice surface the legacy bucket is the glass for
+let pendingFacilityId = null; // a pre-sheet binding, waiting for that facility's sheets
 let FACILITY_NAMES = {};      // names for rinks built here, before Ice has a record for them
 let bindingAt = '';           // its updatedAt, so the binding merges newest-wins
 let activeBucket = LEGACY;
@@ -885,8 +898,18 @@ function splitId(rid){
   return i < 0 ? { bucket: LEGACY, pid: String(rid) }
                : { bucket: rid.slice(0, i), pid: rid.slice(i + 1) };
 }
+/* A bound sheet names its facility. The sheet's own name is appended only
+   where that facility has more than one surface, so a one-rink operation still
+   reads "Conway Arena" and not "Conway Arena - Main sheet". */
 function facilityName(bucket){
-  const f = facilities[bucket === LEGACY ? boundFacilityId : bucket];
+  if(bucket === LEGACY){
+    const sh = sheets[boundSheetId], bf = sh && facilities[sh.facilityId];
+    if(bf && bf.name){
+      const many = Object.keys(sheets).filter(k => sheets[k].facilityId === bf.id).length > 1;
+      return (many && sh.name) ? bf.name + ' - ' + sh.name : bf.name;
+    }
+  }
+  const f = facilities[bucket];
   /* A rink built here has no facility record until somebody adds one in the
      Ice app, so it carries the name it was given at the boards. */
   return (f && f.name) || FACILITY_NAMES[bucket]
@@ -906,23 +929,68 @@ function paintFacility(){
   set('planNote', copy.planNote || '');
   set('pageFooter', copy.footer || '');
   set('specHeight', LAYOUT.glassHeight + '″');
+  /* These three were Conway's, written into the markup. Read from the layout
+     they reproduce Conway's own strip exactly, which is how the change was
+     checked - and they are no longer wrong the moment you switch rink. */
+  set('specSize', fmtFt(L * 12) + ' × ' + fmtFt(W * 12));
+  set('specRadius', fmtFt(R * 12));
+  set('specRun', fmtFt(GLASS.reduce((a, p) => a + p.width_in, 0)));
+  fillRinks();
 }
 
-/* Nothing names the legacy bucket until the Ice app's facilities arrive. Bind
-   it to the first of them once, and let that decision sync so every device
-   agrees; never move it afterwards. */
+/* The way back off a rink the builder just made. Before this, bldSave() moved
+   you to the new rink and nothing could move you off it. */
+function fillRinks(){
+  const sel = document.getElementById('rinkPick');
+  if(!sel) return;
+  const keys = Object.keys(LAYOUTS).filter(k => k.indexOf('__') !== 0);
+  keys.sort((a, b) => a === LEGACY ? -1 : b === LEGACY ? 1
+                    : facilityName(a).localeCompare(facilityName(b)));
+  sel.innerHTML = keys.map(k => '<option value="' + esc(k) + '"'
+    + (k === activeBucket ? ' selected' : '') + '>' + esc(facilityName(k)) + '</option>').join('');
+  /* One rink is not a choice. A mandatory picker for a one-rink operation is
+     friction wearing the costume of structure. */
+  sel.hidden = keys.length < 2;
+}
+
+function switchRink(b){
+  if(!LAYOUTS[b] || b === activeBucket) return;
+  setBucket(b);                         // records, layout and `state`, together
+  /* Written straight out rather than through store(), which would also nudge
+     sync and claim a save. Looking at a different rink changes no record. */
+  Store.set(KEY, snapshot());
+  buildPlan(); rail(); totals(); table(); detail(); paint(); paintFacility();
+  say('Showing ' + facilityName(b) + '.');
+}
+
+const byOrd = (a,b) => (a.ord||0)-(b.ord||0) || String(a.id).localeCompare(String(b.id));
+const sheetsOf = fid => Object.keys(sheets).map(k=>sheets[k])
+                              .filter(s => s && s.facilityId === fid).sort(byOrd);
+function firstSheet(){
+  const facs = Object.keys(facilities).map(k=>facilities[k]).filter(Boolean).sort(byOrd);
+  for(const f of facs){ const own = sheetsOf(f.id); if(own.length) return own[0]; }
+  return null;
+}
+/* Nothing names the legacy bucket until the Ice app's records arrive. Bind it
+   to the first surface of the first facility once, and let that decision sync
+   so every device agrees; never move it afterwards. */
 function ensureBinding(){
-  if(boundFacilityId) return false;
-  const list = Object.keys(facilities).map(k=>facilities[k]).filter(Boolean)
-    .sort((a,b)=>(a.ord||0)-(b.ord||0) || String(a.id).localeCompare(String(b.id)));
-  if(!list.length) return false;
-  boundFacilityId = list[0].id; bindingAt = new Date().toISOString();
+  if(boundSheetId) return false;
+  /* An unresolved facility binding outranks picking one. Wait for that
+     facility's sheets rather than bind to a different rink and sync it out. */
+  if(pendingFacilityId){
+    if(facilities[pendingFacilityId]) return false;
+    pendingFacilityId = null;                    // that facility is gone; pick again
+  }
+  const sh = firstSheet();
+  if(!sh) return false;
+  boundSheetId = sh.id; bindingAt = new Date().toISOString();
   return true;
 }
 
 const SYNC=(typeof Sync!=="undefined")?Sync:null;   // absent if sync.js failed to load; the page still works locally
-const snapshot = () => JSON.stringify({records, who, boundFacilityId, bindingAt, activeBucket,
-                                       names: FACILITY_NAMES, built: BUILT_LAYOUTS()});
+const snapshot = () => JSON.stringify({records, who, boundSheetId, pendingFacilityId, bindingAt,
+                                       activeBucket, names: FACILITY_NAMES, built: BUILT_LAYOUTS()});
 function store(){ Store.set(KEY, snapshot()); say('Saved'); if(SYNC) SYNC.nudge(); }
 
 async function restore(){
@@ -930,7 +998,11 @@ async function restore(){
   try{ saved = JSON.parse(await Store.get(KEY) || 'null'); }catch(e){}
   if(saved && saved.records){
     records = saved.records; who = saved.who || '';
-    boundFacilityId = saved.boundFacilityId || null; bindingAt = saved.bindingAt || '';
+    /* A device upgrading from the facility-bound build has boundFacilityId and
+       no sheets yet. Hold it pending rather than guess - the next pull resolves
+       it to that facility's first surface. */
+    boundSheetId = saved.boundSheetId || null; bindingAt = saved.bindingAt || '';
+    if(!boundSheetId) pendingFacilityId = saved.pendingFacilityId || saved.boundFacilityId || null;
     activeBucket = saved.activeBucket || LEGACY;
     FACILITY_NAMES = saved.names || {};
     /* Layouts built on this device come back with it. Conway's is compiled in,
@@ -1342,6 +1414,7 @@ function bldSave(){
   buildPlan(); rail(); totals(); table(); detail(); paint(); paintFacility();
 
   document.getElementById('addRink').addEventListener('click', bldOpen);
+  document.getElementById('rinkPick').addEventListener('change', e => switchRink(e.target.value));
   document.getElementById('bldNext').addEventListener('click', bldNext);
   document.getElementById('bldBack').addEventListener('click', bldBack);
   document.getElementById('bldClose').addEventListener('click', bldClose);
@@ -1351,17 +1424,25 @@ function bldSave(){
 
   if(!SYNC) return;
   SYNC.attach({
-    /* facility is pulled, never pushed - the Ice app owns those records, and
-       collect() deliberately omits them so nothing here can restamp one. */
-    kinds:['facility','glass_panel','glass_binding'],
+    /* facility and sheet are pulled, never pushed - the Ice app owns those
+       records, and collect() deliberately omits them so nothing here can
+       restamp one. */
+    kinds:['facility','sheet','glass_panel','glass_binding'],
     collect:()=>{
       const panels={};
       for(const bucket in records){
         const m=records[bucket];
         for(const pid in m){ const rid=recId(bucket,pid); panels[rid]=Object.assign({}, m[pid], {id:rid}); }
       }
+      /* facilityId rides along beside sheetId so a device still on the
+         facility-bound build reads a binding it understands, instead of seeing
+         an empty one and re-binding on its own timestamp. */
       const binding={};
-      if(boundFacilityId) binding[LEGACY]={id:LEGACY, facilityId:boundFacilityId, updatedAt:bindingAt};
+      if(boundSheetId){
+        const sh=sheets[boundSheetId];
+        binding[LEGACY]={id:LEGACY, sheetId:boundSheetId,
+                         facilityId:(sh&&sh.facilityId)||null, updatedAt:bindingAt};
+      }
       return {glass_panel:panels, glass_binding:binding};
     },
     apply:(incoming)=>{
@@ -1374,10 +1455,30 @@ function bldSave(){
         facilities[id]={id:id, name:f.name, ord:f.ord}; taken++;
       }
 
+      const shs=incoming.sheet||{};
+      for(const id in shs){
+        const s=shs[id];
+        if(s.deleted){ if(sheets[id]){ delete sheets[id]; taken++; } continue; }
+        sheets[id]={id:id, facilityId:s.facilityId, name:s.name, ord:s.ord}; taken++;
+      }
+
       const binds=incoming.glass_binding||{};
       const b=binds[LEGACY];
       if(b && !b.deleted && (b.updatedAt||'')>bindingAt){
-        boundFacilityId=b.facilityId||null; bindingAt=b.updatedAt||''; taken++;
+        /* A binding written before this change names a facility instead. Hold
+           it until that facility's sheets are known, then take the first. */
+        boundSheetId=b.sheetId||null;
+        pendingFacilityId=boundSheetId?null:(b.facilityId||null);
+        bindingAt=b.updatedAt||''; taken++;
+      }
+      /* Every device picks the same surface from the same records, so this is
+         convergent however it lands. When the binding and the sheets arrive in
+         one pull - the ordinary case - collect() then matches the row and
+         nothing is re-sent; if the sheets come later it is pushed once, with
+         sheetId filled in. */
+      if(!boundSheetId && pendingFacilityId){
+        const own=sheetsOf(pendingFacilityId);
+        if(own.length){ boundSheetId=own[0].id; pendingFacilityId=null; taken++; }
       }
 
       const inc=incoming.glass_panel||{};

@@ -29,7 +29,8 @@ per-kind maps in local storage, and each carries its own timestamp.
 | `facility` | `ice_v4_facilities` | name, settings |
 | `sheet` | `ice_v4_sheets` | `facilityId`, size |
 | `session` | `ice_v4_sessions` | `sheetId`, date, mode, `data` (readings), `notes` |
-| `glass_panel` | `glass_record_v1` | status, note, by, at |
+| `glass_panel` | `glass_record_v2` | status, note, by, at (`glass_record_v1` kept as a fallback) |
+| `glass_binding` | `glass_record_v2` | `sheetId` — which ice surface the Conway panels are the glass for |
 | — | `ice_v4_prefs` | **device-local, never synced** |
 
 ### Why not one blob
@@ -188,8 +189,11 @@ node dev/conflicttest.js   # 10 checks: no churn, contested edits, retries
 node dev/e2e.js            # 14 checks: legacy migration, backup merge
 node dev/homecheck.js      # 23 checks: the gate, card figures, a rotated code
 node dev/cursortest.js     #  6 checks: one pull cursor per app, not per device
-node dev/facilitytest.js   # 15 checks: facilities in Glass, ids scoped without a migration
+node dev/facilitytest.js   # 27 checks: facilities in Glass, ids scoped without a migration,
+                           #            and the glass bound to a sheet rather than a building
 node dev/layouttest.js     # 19 checks: the renderer draws a layout, not Conway
+node dev/gentest.js        # 14 checks: the generator reproduces Conway's survey
+node dev/buildertest.js    # 42 checks: walking a rink in, what it writes, and the way back off it
 node dev/reg.js            #  8 checks: rounds persist, prefs stay separate
 node dev/resume.js         #  9 checks: coming back lands where you left off
 ```
@@ -241,6 +245,50 @@ a centre line.
 gate is tagged differently threw there and took the whole plan down with it,
 not just the label. Openings are counted from the run instead of assumed to be
 two benches, and the uniform-joint row appears only where a survey supplied one.
+
+### Switching rink, and a spec strip that follows
+
+`bldSave()` moves to the rink it has just made. Until the picker existed
+nothing could move you off it again short of clearing site data, which made the
+builder a one-way door.
+
+`fillRinks()` lists every layout the device holds and hides itself below two,
+because a mandatory "choose where you are" step for a one-rink operation is
+friction wearing the costume of structure. `switchRink()` writes through
+`Store.set` rather than `store()`: looking at a different rink changes no
+record, so it should neither nudge sync nor claim a save.
+
+Three figures in the spec strip — sheet size, corner radius and glass in run —
+were Conway's, written into the markup, and stayed Conway's on any rink you
+switched to. They are read from the layout now. Derived that way they reproduce
+Conway's own strip character for character, which is how the change was checked
+and what `buildertest` asserts.
+
+### Glass belongs to a sheet, not a facility
+
+An arena with two ice surfaces has two sets of glass, two schedules and two
+condition records. Conway has one sheet, so binding the panels to the
+*facility* was indistinguishable here and wrong at any multi-surface site —
+which is why it survived G1 unnoticed.
+
+`glass_binding` therefore names a `sheetId`. The indirection G1 introduced
+absorbed the correction exactly as intended: no panel record moved, and no row
+on the server was rewritten.
+
+Two things make the change safe on devices that have not caught up:
+
+- **The record carries `facilityId` beside `sheetId`.** A device still on the
+  facility-bound build reads a binding it understands, rather than seeing an
+  empty one and re-binding on its own timestamp.
+- **A facility-only binding is held pending, not guessed at.** Whether it comes
+  from the server or out of this device's own storage, it resolves to that
+  facility's first surface by `ord` once the sheets are known. Every device
+  reaches the same answer from the same records, so the old row is left alone —
+  and `ensureBinding()` will not pick a different rink while one is pending.
+
+The name over the plan is the facility's. The sheet's name is appended only
+where that facility has more than one surface, so Conway still reads
+"Conway Arena" and not "Conway Arena - Main sheet".
 
 ---
 
