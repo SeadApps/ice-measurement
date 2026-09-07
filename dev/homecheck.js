@@ -217,6 +217,35 @@ const b = await chromium.launch();
     facilities: [{ id: 'f1', name: 'Conway', sheets: [{ id: 's1', name: 'Main', sessions: [] }] }] })));
   await p.reload(); await sleep(1500);
   ok('ice card falls back to the legacy blob', /1 sheet\b/.test((await p.textContent('#statIce')).trim()));
+
+  /* Reading is not migrating. Ice moves a device off the old single-blob key
+     on boot, and that is a write - so the launcher reads through Repo.read(),
+     which does neither. Swap it for Repo.load() and this device would be
+     migrated by a page that is supposed to be incapable of writing. */
+  const made = await p.evaluate(() => ['ice_v4_facilities','ice_v4_sheets','ice_v4_sessions']
+    .filter(k => localStorage.getItem(k) !== null));
+  ok('the launcher does not migrate the legacy blob', made.length === 0, JSON.stringify(made));
+  ok('and leaves the old key where it found it',
+     await p.evaluate(() => !!localStorage.getItem('ice_sheet_v3')));
+
+  /* The store's own contract, checked directly: the read path cannot write. */
+  const readOnly = await p.evaluate(async () => {
+    const before = JSON.stringify(Object.keys(localStorage).sort());
+    await Records.Repo.read();
+    return before === JSON.stringify(Object.keys(localStorage).sort());
+  });
+  ok('Repo.read() writes nothing at all', readOnly);
+
+  /* And savePrefs touches preferences only, never a record map. */
+  const prefsOnly = await p.evaluate(async () => {
+    await Records.Repo.savePrefs({ activeSheet: 'whatever' });
+    return { prefs: JSON.parse(localStorage.getItem('ice_v4_prefs') || '{}'),
+             recs: ['ice_v4_facilities','ice_v4_sheets','ice_v4_sessions']
+                     .filter(k => localStorage.getItem(k) !== null) };
+  });
+  ok('savePrefs writes preferences and no record map',
+     prefsOnly.prefs.activeSheet === 'whatever' && prefsOnly.recs.length === 0,
+     JSON.stringify(prefsOnly));
   await ctx.close();
 }
 

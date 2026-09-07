@@ -142,13 +142,10 @@ document.documentElement.setAttribute("data-theme",_t==="light"?"light":"dark");
 </div>
 
 <script src="sync.js"></script>
+<script src="records.js"></script>
 <script>
 /* Same storage wrapper both apps use: a host-provided store if one exists, else this browser. */
-const Store={
-  async get(k){ try{ if(window.storage&&window.storage.get){const r=await window.storage.get(k); return r?r.value:null;} }catch(e){}
-                try{ return localStorage.getItem(k); }catch(e){ return null; } },
-  async set(k,v){ try{ if(window.storage&&window.storage.set){ await window.storage.set(k,v); return; } }catch(e){}
-                  try{ localStorage.setItem(k,v); }catch(e){} }};
+const Store = Records.Store;      // the same wrapper all three pages had a copy of
 
 /* ---------- theme ---------- */
 const th={light:document.getElementById('thLight'), dark:document.getElementById('thDark')};
@@ -242,45 +239,29 @@ async function glassStat(){
    the rink is picked here and the tool second. These are the same v4 records
    the Ice card reads.
 
-   The only thing written is `ice_v4_prefs`, which is device-local and
-   deliberately never synced - which sheet you are looking at is exactly the
-   fact that should not drag another device's view around. No synced record is
-   touched, so the rule keeping this page out of the sent-map still holds. */
-const PREFS = 'ice_v4_prefs';
-const byOrd = (a, b) => (a.ord||0) - (b.ord||0) || String(a.id).localeCompare(String(b.id));
-
+   The only thing written is `ice_v4_prefs`, and it goes through
+   Repo.savePrefs(), which touches nothing else. The join and the overdue rule
+   are the store's, not a second copy here that only a comment kept in step -
+   Repo.read() neither writes nor migrates, so this page cannot write a synced
+   record by accident. The rule keeping it out of the sent-map is now a
+   property of what it is able to call. */
 async function fleetRows(){
-  const [fac, sh, se, prefs] = await Promise.all(
-    ['ice_v4_facilities','ice_v4_sheets','ice_v4_sessions', PREFS].map(readJSON));
-  const facs = liveRecords(fac).sort(byOrd);
-  const sheets = liveRecords(sh).sort(byOrd);
-  const sessions = liveRecords(se);
-  const od = (prefs && prefs.overdueDays != null) ? prefs.overdueDays : 7;
+  const st = await Records.Repo.read();
+  if(!st) return { rows: [], prefs: {}, sessions: [] };
   const rows = [];
-  facs.forEach(f => sheets.filter(s => s.facilityId === f.id).forEach(s => {
-    /* Ice flags a sheet from its last round that actually has readings in it;
-       an empty session is a sheet nobody has been to yet. The same rule has to
-       apply here or the two screens would disagree about what is overdue. */
-    const withData = sessions
-      .filter(x => x.sheetId === s.id && x.data && Object.keys(x.data).length)
-      .sort((a, b) => new Date(b.date) - new Date(a.date));
-    const last = withData[0] || null;
-    const days = last ? Math.floor((Date.now() - new Date(last.date)) / 86400000) : null;
-    rows.push({ f: f, s: s, last: last, over: days != null && days > od });
+  st.facilities.forEach(f => (f.sheets || []).forEach(s => {
+    const last = Records.lastRound(st.sessions, s.id);
+    rows.push({ f: f, s: s, last: last, over: Records.isOverdue(last, st.prefs.overdueDays) });
   }));
-  return { rows: rows, prefs: prefs || {}, sessions: sessions };
+  return { rows: rows, prefs: st.prefs, sessions: st.sessions };
 }
 
 async function selectSheet(fid, sid, sessions){
-  /* Read, set, write back: every other preference on this device - theme,
-     units, which screen Ice was on - lives in the same object. */
-  const prefs = (await readJSON(PREFS)) || {};
-  prefs.activeFacility = fid;
-  prefs.activeSheet = sid;
-  const newest = sessions.filter(x => x.sheetId === sid)
+  const newest = sessions.filter(x => x && !x.deleted && x.sheetId === sid)
                          .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
-  if(newest) prefs.activeSession = newest.id;   // Ice repairs this itself if a sheet has none
-  await Store.set(PREFS, JSON.stringify(prefs));
+  const patch = { activeFacility: fid, activeSheet: sid };
+  if(newest) patch.activeSession = newest.id;   // Ice repairs this itself if a sheet has none
+  await Records.Repo.savePrefs(patch);
   await paintAll();
 }
 

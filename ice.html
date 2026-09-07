@@ -540,6 +540,7 @@
 <div id="printRoot"></div>
 
 <script src="sync.js"></script>
+<script src="records.js"></script>
 <script>
 "use strict";
 /* ---------- geometry (per-sheet rink size) ---------- */
@@ -636,109 +637,12 @@ const data=()=>session().data, notes=()=>session().notes;
 function baselineSession(){const sh=sheet();if(compareId){const s=sh.sessions.find(s=>s.id===compareId);if(s)return s;}
   const ord=[...sh.sessions].sort((a,b)=>new Date(b.date)-new Date(a.date));const ai=ord.findIndex(s=>s.id===session().id);return ord[ai+1]||null;}
 
-/* ---------- persistence ---------- */
-const Store={async get(k){try{if(window.storage&&window.storage.get){const r=await window.storage.get(k);return r?r.value:null;}}catch(e){}try{return localStorage.getItem(k);}catch(e){return null;}},
-  async set(k,v){try{if(window.storage&&window.storage.set){await window.storage.set(k,v);return;}}catch(e){}try{localStorage.setItem(k,v);}catch(e){}}};
-
-/* ---------- record store (v4) ----------------------------------------------
-   Everything used to live under one key, so every save rewrote the entire app.
-   That is fine for one device and fatal for two: whoever saved last silently
-   replaced the other's work. State is now split into per-record maps, each
-   record carrying its own updatedAt, so two copies can be merged record by
-   record. The in-memory `state` shape is unchanged — only how it reaches disk.
-   Device preferences (theme, units, which sheet you were last looking at) stay
-   out of the shared set so one device can't move another's view. */
-const K={fac:"ice_v4_facilities",sh:"ice_v4_sheets",se:"ice_v4_sessions",prefs:"ice_v4_prefs",legacy:"ice_sheet_v3"};
-const nowISO=()=>new Date().toISOString();
-const PREF_KEYS=["theme","unit","lastBackup","contourIdx","contoursOn","smoothIdx","overdueDays",
-                 "activeFacility","activeSheet","activeSession","screen","lastView"];
-let SNAP={fac:{},sh:{},se:{}};   // what we last wrote, so we only re-stamp what actually changed
-
-function decompose(st){
-  const fac={},sh={},se={};
-  (st.facilities||[]).forEach((f,fi)=>{
-    fac[f.id]={id:f.id,name:f.name,settings:f.settings,ord:fi};
-    (f.sheets||[]).forEach((x,si)=>{
-      sh[x.id]={id:x.id,facilityId:f.id,name:x.name,size:x.size,ord:si};
-      (x.sessions||[]).forEach((z,zi)=>{ se[z.id]=Object.assign({},z,{sheetId:x.id,ord:zi}); });
-    });
-  });
-  return {fac,sh,se};
-}
-const bodyOf=r=>{const c=Object.assign({},r);delete c.updatedAt;delete c.deleted;return JSON.stringify(c);};
-
-/* Stamp only what changed, and leave a tombstone for anything removed, so a
-   delete on one device isn't undone by a merge from another. */
-function stampChanges(next,prev){
-  const out={},t=nowISO();
-  for(const id in next){
-    const p=prev[id];
-    out[id]=(p&&!p.deleted&&bodyOf(p)===bodyOf(next[id]))
-      ? Object.assign({},next[id],{updatedAt:p.updatedAt||t})
-      : Object.assign({},next[id],{updatedAt:t});
-  }
-  for(const id in prev){ if(!(id in next)) out[id]=prev[id].deleted?prev[id]:{id,deleted:true,updatedAt:t}; }
-  return out;
-}
-function reassemble(fac,sh,se){
-  const live=o=>Object.values(o).filter(r=>r&&!r.deleted);
-  const byOrd=(a,b)=>(a.ord||0)-(b.ord||0)||String(a.id).localeCompare(String(b.id));
-  return live(fac).sort(byOrd).map(f=>Object.assign({},f,{
-    sheets:live(sh).filter(x=>x.facilityId===f.id).sort(byOrd).map(x=>Object.assign({},x,{
-      sessions:live(se).filter(z=>z.sheetId===x.id).sort(byOrd)
-    }))
-  }));
-}
-const Repo={
-  async save(st){
-    const d=decompose(st);
-    SNAP={fac:stampChanges(d.fac,SNAP.fac),sh:stampChanges(d.sh,SNAP.sh),se:stampChanges(d.se,SNAP.se)};
-    const prefs={};PREF_KEYS.forEach(k=>prefs[k]=st[k]);
-    await Promise.all([Store.set(K.fac,JSON.stringify(SNAP.fac)),Store.set(K.sh,JSON.stringify(SNAP.sh)),
-                       Store.set(K.se,JSON.stringify(SNAP.se)),Store.set(K.prefs,JSON.stringify(prefs))]);
-  },
-  async load(){
-    const rd=async k=>{try{return JSON.parse(await Store.get(k)||"null");}catch(e){return null;}};
-    let [fac,sh,se,prefs]=await Promise.all([rd(K.fac),rd(K.sh),rd(K.se),rd(K.prefs)]);
-    if(fac&&sh&&se){
-      SNAP={fac,sh,se};
-      const st=Object.assign({},prefs||{},{facilities:reassemble(fac,sh,se)});
-      if(st.facilities.length)return st;
-    }
-    const legacy=await rd(K.legacy);          // one-time move off the single blob
-    if(legacy&&Array.isArray(legacy.facilities)&&legacy.facilities.length){
-      await this.save(legacy);                // the old key is left untouched as a fallback
-      return legacy;
-    }
-    return null;
-  },
-  /* Fold another copy in, newest wins per record. Readings inside a round are
-     merged point by point, so two people logging different spots in the same
-     round both keep their work. */
-  merge(inc){
-    let taken=0;
-    const fold=(dst,src,isSession)=>{
-      for(const id in src){
-        const a=dst[id],b=src[id];
-        if(!a){dst[id]=b;taken++;continue;}
-        const newer=(b.updatedAt||"")>(a.updatedAt||"");
-        if(isSession&&!a.deleted&&!b.deleted){
-          const merged=Object.assign({},newer?b:a);
-          merged.data =Object.assign({},newer?a.data :b.data ,newer?b.data :a.data );
-          merged.notes=Object.assign({},newer?a.notes:b.notes,newer?b.notes:a.notes);
-          merged.updatedAt=newer?b.updatedAt:a.updatedAt;
-          if(JSON.stringify(merged)!==JSON.stringify(a)){dst[id]=merged;taken++;}
-        }else if(newer){dst[id]=b;taken++;}
-      }
-    };
-    fold(SNAP.fac,inc.facilities||{},false);
-    fold(SNAP.sh ,inc.sheets    ||{},false);
-    fold(SNAP.se ,inc.sessions  ||{},true);
-    return {taken,facilities:reassemble(SNAP.fac,SNAP.sh,SNAP.se)};
-  },
-  snapshot(){return {format:"rink-ice-v4",exportedAt:nowISO(),
-    facilities:SNAP.fac,sheets:SNAP.sh,sessions:SNAP.se};}
-};
+/* ---------- persistence ----------
+   The record store moved to records.js, which the launcher shares. What that
+   buys is one copy of the merge rule and one copy of "overdue", instead of
+   this file's and a second in the launcher that only a comment kept in step.
+   ARCHITECTURE.md still explains the model; `state` here is unchanged. */
+const { Store, Repo, decompose, nowISO } = Records;
 
 const SYNC=(typeof Sync!=="undefined")?Sync:null;   // absent if sync.js failed to load; the app still works locally
 let saveTimer=null;const persist=()=>{clearTimeout(saveTimer);
@@ -1258,7 +1162,7 @@ boot().then(()=>{
   if(!SYNC) return;
   SYNC.attach({
     kinds:["facility","sheet","session"],
-    collect:()=>({facility:SNAP.fac, sheet:SNAP.sh, session:SNAP.se}),
+    collect:()=>{const m=Repo.maps();return {facility:m.fac, sheet:m.sh, session:m.se};},
     apply:(incoming)=>{
       const res=Repo.merge({facilities:incoming.facility||{}, sheets:incoming.sheet||{}, sessions:incoming.session||{}});
       if(!res.taken) return 0;

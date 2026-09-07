@@ -8,12 +8,43 @@ index.html    launcher — gated; cards read this device's records, never the ne
 ice.html      Ice Manager  — thickness rounds, contour map, trends (multi-facility)
 glass.html    Glass Manager — 127 rink glass panels, condition record
 sync.js       shared: Supabase auth, pull/push, the access gate, the status pill
+records.js    shared: the v4 record store — decompose, merge, reassemble, prefs
 sw.js         service worker — offline + cache strategy
 manifest.json icon-192.png icon-512.png
 .github/workflows/keepalive.yml   pings Supabase so the free tier never sleeps
 ```
 
-Both apps are self-contained single files. `sync.js` is the only shared code.
+Both apps are single files. `sync.js` and `records.js` are the shared code —
+the network, and the store.
+
+---
+
+## Where the store lives
+
+`records.js`. It was inside `ice.html`, which was fine while Ice was the only
+page holding facilities. It came out when the launcher needed the same records
+— and it came out because duplication had already appeared: the launcher had
+re-implemented the facility/sheet/session join and Ice's overdue rule, under a
+comment saying it had to match. A comment is not a compiler.
+
+**What each page may do is the API, not a convention.** The store draws the
+line that ARCHITECTURE.md used to draw in prose:
+
+| call | what it does |
+|---|---|
+| `Repo.read()` | reads and joins. Never writes, never migrates. |
+| `Repo.load()` | what Ice boots on: also migrates off `ice_sheet_v3`, which is a write. |
+| `Repo.savePrefs(patch)` | device preferences only — never a synced record. |
+| `Repo.save(state)` | the whole state, records included. |
+| `Repo.maps()` | the per-kind maps as last written: what sync collects. |
+
+The launcher uses the first three. That it cannot write a synced record by
+accident is now a property of what it is able to call rather than of somebody
+remembering the rule — and `homecheck` asserts it directly, including that
+opening the launcher on a device holding only the old blob does not migrate it.
+
+`Records.Store` is the storage wrapper all three pages had their own identical
+copy of.
 
 ---
 
@@ -188,7 +219,7 @@ node dev/fake-supabase.js &
 node dev/synctest.js       # 20 checks: sign-in, two devices, offline, paused
 node dev/conflicttest.js   # 10 checks: no churn, contested edits, retries
 node dev/e2e.js            # 14 checks: legacy migration, backup merge
-node dev/homecheck.js      # 48 checks: the gate, the fleet, card figures, a rotated code
+node dev/homecheck.js      # 52 checks: the gate, the fleet, card figures, a rotated code
 node dev/cursortest.js     #  6 checks: one pull cursor per app, not per device
 node dev/facilitytest.js   # 27 checks: facilities in Glass, ids scoped without a migration,
                            #            and the glass bound to a sheet rather than a building
@@ -223,17 +254,19 @@ are *at* a rink doing work there, not hopping between arenas mid-task. It shows
 the fleet Ice's home screen shows — every live sheet, when it was last walked,
 and whether that is overdue.
 
-**It still never pulls, and writes no synced record.** The one thing it writes
-is `ice_v4_prefs`, which is device-local and excluded from sync by design:
-which sheet you are looking at is exactly the fact that should not drag another
-device's view around. Ice then opens on that sheet because it already restores
-from those preferences. The write is read-modify-write, because theme, units and
-which screen Ice was on live in the same object.
+**It still never pulls, and writes no synced record.** It reads through
+`Repo.read()` and writes through `Repo.savePrefs()`, neither of which can
+touch one. What it writes is `ice_v4_prefs`, device-local and excluded from
+sync by design: which sheet you are looking at is exactly the fact that should
+not drag another device's view around. Ice then opens on that sheet because it
+already restores from those preferences.
 
-**Overdue is Ice's rule, not a second one.** The last session that actually has
-readings in it, older than `overdueDays` — 7 by default, and read from those
-same preferences. An empty session is a sheet nobody has been to yet. Two
-screens computing this differently would disagree about what is behind.
+**Overdue is Ice's rule, not a second one.** `Records.lastRound()` and
+`Records.isOverdue()` — the last session that actually has readings in it,
+older than `overdueDays` (7 by default, read from those same preferences). An
+empty session is a sheet nobody has been to yet. Both screens call the same two
+functions, so they cannot drift into disagreeing about what is behind; before
+the store came out they were two copies held together by a comment.
 
 **One sheet is not a choice.** The section hides itself below two, because a
 mandatory "choose where you are" step for a one-rink operation is friction
