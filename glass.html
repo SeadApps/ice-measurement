@@ -940,6 +940,18 @@ function tryLayout(spec){
   try { return spec ? layoutFromSpec(spec) : null; } catch(e){ return null; }
 }
 
+/* A piece count per rink, for the launcher. That page reads local storage and
+   never loads a layout, so without this the only figure it could show was
+   Conway's 127, written into its markup and wrong for every other rink. */
+function GLASS_COUNTS(){
+  const out = {};
+  for(const k in LAYOUTS){
+    if(k.indexOf('__') === 0) continue;
+    out[k] = ((LAYOUTS[k] && LAYOUTS[k].panels) || []).filter(p => p.kind === 'glass').length;
+  }
+  return out;
+}
+
 /* Everything except Conway, whose layout is compiled into this file. */
 function BUILT_SPECS(){
   const out = {};
@@ -1031,6 +1043,7 @@ function ensureBinding(){
 const SYNC=(typeof Sync!=="undefined")?Sync:null;   // absent if sync.js failed to load; the page still works locally
 const snapshot = () => JSON.stringify({records, who, boundSheetId, pendingFacilityId, bindingAt,
                                        activeBucket, names: FACILITY_NAMES, at: LAYOUT_AT,
+                                       counts: GLASS_COUNTS(),
                                        specs: BUILT_SPECS(), built: BUILT_DRAWN()});
 function store(){ Store.set(KEY, snapshot()); say('Saved'); if(SYNC) SYNC.nudge(); }
 
