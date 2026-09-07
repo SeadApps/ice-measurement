@@ -877,6 +877,7 @@ let sheets = {};              // sheetId -> {id,facilityId,name,ord} - the Ice a
 let boundSheetId = null;      // which ice surface the legacy bucket is the glass for
 let pendingFacilityId = null; // a pre-sheet binding, waiting for that facility's sheets
 let FACILITY_NAMES = {};      // names for rinks built here, before Ice has a record for them
+let LAYOUT_AT = {};           // bucket -> the layout's updatedAt, so layouts merge newest-wins
 let bindingAt = '';           // its updatedAt, so the binding merges newest-wins
 let activeBucket = LEGACY;
 
@@ -915,10 +916,49 @@ function facilityName(bucket){
   return (f && f.name) || FACILITY_NAMES[bucket]
       || (bucket === LEGACY ? 'Conway Arena' : 'Unnamed facility');
 }
+/* A built rink is stored and sent as the walk that made it, not as the drawing.
+   The generated layout is around 60KB - 127 panels each carrying an SVG path -
+   and the spec that produced it is around 2KB. generateLayout() is
+   deterministic, so every device redraws the same rink from it, and a layout
+   can be redrawn if the drawing conventions ever change. */
+function layoutFromSpec(spec){
+  const lay = generateLayout(spec);
+  const n = lay.panels.filter(x => x.kind === 'glass').length;
+  lay.edges = {};                       // stretches are named individually, not by edge
+  lay.copy = {
+    lede: ' \u00b7 ' + n + ' pieces in running order. Click any panel on the plan or in the'
+        + ' schedule to record its condition.',
+    planNote: STARTS[spec.start] ? 'walked from ' + STARTS[spec.start].toLowerCase() : '',
+    footer: n + ' pieces \u00b7 glass ' + spec.glassHeight + '\u2033 high \u00b7 measurements as recorded'
+  };
+  lay.spec = spec;                      // kept, so this rink can be sent on
+  return lay;
+}
+/* A spec off the wire or out of storage is not this device's to trust. One
+   malformed record must not take the whole pull down with it. */
+function tryLayout(spec){
+  try { return spec ? layoutFromSpec(spec) : null; } catch(e){ return null; }
+}
+
 /* Everything except Conway, whose layout is compiled into this file. */
-function BUILT_LAYOUTS(){
+function BUILT_SPECS(){
   const out = {};
-  for(const k in LAYOUTS) if(k !== LEGACY && k.indexOf('__') !== 0) out[k] = LAYOUTS[k];
+  for(const k in LAYOUTS){
+    if(k === LEGACY || k.indexOf('__') === 0) continue;
+    if(LAYOUTS[k] && LAYOUTS[k].spec) out[k] = LAYOUTS[k].spec;
+  }
+  return out;
+}
+/* Rinks built before the walk was kept have nothing to redraw from. They are
+   written back exactly as they are, so a save cannot drop them - but there is
+   no spec to send, so they stay on the device that made them until it is
+   walked again. */
+function BUILT_DRAWN(){
+  const out = {};
+  for(const k in LAYOUTS){
+    if(k === LEGACY || k.indexOf('__') === 0) continue;
+    if(LAYOUTS[k] && !LAYOUTS[k].spec) out[k] = LAYOUTS[k];
+  }
   return out;
 }
 function paintFacility(){
@@ -990,7 +1030,8 @@ function ensureBinding(){
 
 const SYNC=(typeof Sync!=="undefined")?Sync:null;   // absent if sync.js failed to load; the page still works locally
 const snapshot = () => JSON.stringify({records, who, boundSheetId, pendingFacilityId, bindingAt,
-                                       activeBucket, names: FACILITY_NAMES, built: BUILT_LAYOUTS()});
+                                       activeBucket, names: FACILITY_NAMES, at: LAYOUT_AT,
+                                       specs: BUILT_SPECS(), built: BUILT_DRAWN()});
 function store(){ Store.set(KEY, snapshot()); say('Saved'); if(SYNC) SYNC.nudge(); }
 
 async function restore(){
@@ -1007,8 +1048,15 @@ async function restore(){
     FACILITY_NAMES = saved.names || {};
     /* Layouts built on this device come back with it. Conway's is compiled in,
        so it is never stored and never overwritten from storage. */
+    LAYOUT_AT = saved.at || {};
+    const specs = saved.specs || {};
+    for(const k in specs){
+      if(k === LEGACY) continue;
+      const lay = tryLayout(specs[k]);
+      if(lay) LAYOUTS[k] = lay;
+    }
     const built = saved.built || {};
-    for(const k in built) if(k !== LEGACY) LAYOUTS[k] = built[k];
+    for(const k in built) if(k !== LEGACY && !LAYOUTS[k]) LAYOUTS[k] = built[k];
     if(!LAYOUTS[activeBucket]) activeBucket = LEGACY;
   } else {
     let v1 = null;
@@ -1177,6 +1225,7 @@ function bldJointState(t){
 function bldSpec(){
   const w = bldWalls();
   return { L: BLD.L, W: BLD.W, R: bldR(), origin: w.origin, glassHeight: BLD.height,
+    start: BLD.start,
     sections: BLD.walls.map((x, i) => ({ key: 'W' + (i+1), name: x.name,
       items: x.items.map(it => ({
         kind: it.kind === 'gate' || it.kind === 'door' ? 'glass' : it.kind,
@@ -1391,16 +1440,13 @@ function bldClose(){ $b('builder').hidden = true; }
 
 function bldSave(){
   const bucket = 'r' + Math.random().toString(36).slice(2, 9);
-  const lay = BLD.built, n = lay.panels.filter(x => x.kind === 'glass').length;
-  lay.edges = {};                       // stretches are named individually, not by edge
-  lay.copy = {
-    lede: ' \u00b7 ' + n + ' pieces in running order. Click any panel on the plan or in the'
-        + ' schedule to record its condition.',
-    planNote: 'walked from ' + STARTS[BLD.start].toLowerCase(),
-    footer: n + ' pieces \u00b7 glass ' + BLD.height + '\u2033 high \u00b7 measurements as recorded'
-  };
+  /* Rebuilt from the spec rather than kept from the preview, so what is saved
+     is exactly what the walk produces - the same thing every other device will
+     draw from the record. */
+  const lay = layoutFromSpec(bldSpec()), n = lay.panels.filter(x => x.kind === 'glass').length;
   LAYOUTS[bucket] = lay;
   FACILITY_NAMES[bucket] = BLD.name.trim();
+  LAYOUT_AT[bucket] = nowISO();
   setBucket(bucket);                    // records, layout and `state`, together
   store();
   bldClose();
@@ -1427,7 +1473,7 @@ function bldSave(){
     /* facility and sheet are pulled, never pushed - the Ice app owns those
        records, and collect() deliberately omits them so nothing here can
        restamp one. */
-    kinds:['facility','sheet','glass_panel','glass_binding'],
+    kinds:['facility','sheet','glass_panel','glass_binding','glass_layout'],
     collect:()=>{
       const panels={};
       for(const bucket in records){
@@ -1443,7 +1489,16 @@ function bldSave(){
         binding[LEGACY]={id:LEGACY, sheetId:boundSheetId,
                          facilityId:(sh&&sh.facilityId)||null, updatedAt:bindingAt};
       }
-      return {glass_panel:panels, glass_binding:binding};
+      /* The walk, not the drawing. Conway's layout is compiled into this file
+         and is never sent; a rink with no spec has nothing to send. */
+      const layouts={};
+      for(const k in LAYOUTS){
+        if(k===LEGACY || k.indexOf('__')===0) continue;
+        const lay=LAYOUTS[k];
+        if(!lay || !lay.spec) continue;
+        layouts[k]={id:k, name:FACILITY_NAMES[k]||'', spec:lay.spec, updatedAt:LAYOUT_AT[k]||''};
+      }
+      return {glass_panel:panels, glass_binding:binding, glass_layout:layouts};
     },
     apply:(incoming)=>{
       let taken=0;
@@ -1481,13 +1536,27 @@ function bldSave(){
         if(own.length){ boundSheetId=own[0].id; pendingFacilityId=null; taken++; }
       }
 
+      /* Layouts before panels, so a rink that arrives whole is drawable by the
+         time its condition records are read in. */
+      const lays=incoming.glass_layout||{};
+      for(const id in lays){
+        const v=lays[id];
+        if(v.deleted || id===LEGACY) continue;   // Conway's is compiled in; layouts are not removed
+        if(LAYOUT_AT[id] && (v.updatedAt||'') <= LAYOUT_AT[id]) continue;
+        const lay=tryLayout(v.spec);
+        if(!lay) continue;
+        LAYOUTS[id]=lay; LAYOUT_AT[id]=v.updatedAt||'';
+        if(v.name) FACILITY_NAMES[id]=v.name;
+        taken++;
+      }
+
       const inc=incoming.glass_panel||{};
       for(const rid in inc){
         const v=inc[rid];
         if(v.deleted) continue;                       // panels are never removed, only re-marked
         const at=splitId(rid);
-        /* Only the legacy bucket is this rink. A scoped id belongs to a
-           facility whose layout Glass cannot draw yet, so keep the record but
+        /* Only the legacy bucket is Conway. A scoped id belongs to another
+           rink, whose layout may not have arrived yet, so keep the record but
            do not try to match it against Conway's panel list. */
         if(at.bucket===LEGACY && !GLASS.some(p=>p.id===at.pid)) continue;
         const m=bucketOf(at.bucket), cur=m[at.pid];
