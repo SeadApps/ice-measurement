@@ -385,6 +385,8 @@ async function doAdd(){
   });
   closeAdd();
   await paintAll();
+  if(typeof Sync !== 'undefined') Sync.nudge();   // it should reach the other devices now
+
 }
 
 async function paintFleet(){
@@ -445,8 +447,38 @@ async function paintAll(){
    local data to show — nothing actually checked. Now it is checked. */
 (async function boot(){
   if(typeof Sync === 'undefined'){ await paintAll(); return; }  // sync.js failed to load
+
+  /* This page used to be read-only, and the reason was real: sync.js keeps one
+     sent-map per device, and a pull whose collect() cannot report what the
+     device holds leaves every pulled row looking unsent - so the next push
+     echoes them all back and the server restamps the lot.
+
+     What made that unavoidable was this page having no record store of its
+     own. It shares Ice's now, so this collect() is Ice's collect(), off the
+     same maps. The half of the rule about writing went when adding a rink
+     moved here; this is the other half.
+
+     Leaving it read-only had a plain cost: a rink added here never left the
+     device until somebody opened Ice, and never reached another device until
+     somebody opened Ice there too. */
+  await Records.Repo.load();    // hydrate the snapshot, so collect() can report it
+  Sync.attach({
+    kinds: ['facility', 'sheet', 'session'],
+    collect: () => { const m = Records.Repo.maps();
+                     return { facility: m.fac, sheet: m.sh, session: m.se }; },
+    apply: (incoming) => {
+      const res = Records.Repo.merge({ facilities: incoming.facility || {},
+                                       sheets: incoming.sheet || {},
+                                       sessions: incoming.session || {} });
+      if(!res.taken) return 0;
+      Records.Repo.persistMaps();
+      paintAll();
+      return res.taken;
+    }
+  });
+
   await Sync.start({title:'Arena Management System'});
-  await Sync.verify();          // catches a rotated code; re-gates without syncing
+  await Sync.verify();          // catches a rotated code even when nothing needed syncing
   const bar = document.querySelector('.home-bar');
   if(bar) bar.insertBefore(Sync.signOutEl(), bar.querySelector('.themeseg'));
   await paintAll();

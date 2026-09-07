@@ -38,6 +38,7 @@ line that ARCHITECTURE.md used to draw in prose:
 | `Repo.addSheet(opts)` | adds an ice surface, and a facility if it is a new site. |
 | `Repo.save(state)` | the whole state, records included. |
 | `Repo.maps()` | the per-kind maps as last written: what sync collects. |
+| `Repo.persistMaps()` | write those maps as they stand, for a page that merged records but holds no nested state to hand `save()`. |
 
 The launcher uses the first three. That it cannot write a synced record by
 accident is now a property of what it is able to call rather than of somebody
@@ -239,7 +240,7 @@ node dev/fake-supabase.js &
 node dev/synctest.js       # 20 checks: sign-in, two devices, offline, paused
 node dev/conflicttest.js   # 10 checks: no churn, contested edits, retries
 node dev/e2e.js            # 15 checks: legacy migration, backup merge, the scoped home screen
-node dev/homecheck.js      # 77 checks: the gate, the fleet, adding a rink, a rotated code
+node dev/homecheck.js      # 78 checks: the gate, the fleet, adding a rink, syncing, a rotated code
 node dev/cursortest.js     #  6 checks: one pull cursor per app, not per device
 node dev/facilitytest.js   # 32 checks: facilities in Glass, ids scoped without a migration,
                            #            and the glass bound to a sheet rather than a building
@@ -274,12 +275,26 @@ are *at* a rink doing work there, not hopping between arenas mid-task. It shows
 the fleet Ice's home screen shows — every live sheet, when it was last walked,
 and whether that is overdue.
 
-**It still never pulls, and writes no synced record.** It reads through
-`Repo.read()` and writes through `Repo.savePrefs()`, neither of which can
-touch one. What it writes is `ice_v4_prefs`, device-local and excluded from
-sync by design: which sheet you are looking at is exactly the fact that should
-not drag another device's view around. Ice then opens on that sheet because it
-already restores from those preferences.
+**It syncs, and that reverses the rule this page was built on.** It was
+read-only, and the reason was real: sync.js keeps one `rink_sync_sent` map per
+device, and a pull whose `collect()` cannot report what the device holds leaves
+every pulled row looking unsent — so the next push echoes them all back and the
+server restamps the lot, which is exactly the clobber the record store exists to
+prevent.
+
+What made that unavoidable was this page having no record store of its own. It
+shares Ice's now, so its `collect()` **is** Ice's, off the same maps, and pulled
+rows get marked as sent. `homecheck` guards the hazard directly: after the
+launcher pulls, an idle round must restamp nothing.
+
+The half of the rule about writing had already gone when adding a rink moved
+here. Keeping the other half had a plain cost that turned up in use: **a rink
+added on the launcher never left the device until somebody opened Ice, and never
+reached another device until somebody opened Ice there too.**
+
+Which sheet you are looking at is still `ice_v4_prefs` and still excluded from
+sync — that is a device's own view, not a shared fact. Ice opens on that sheet
+because it restores from those preferences.
 
 **Overdue is Ice's rule, not a second one.** `Records.lastRound()` and
 `Records.isOverdue()` — the last session that actually has readings in it,
