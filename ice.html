@@ -544,13 +544,7 @@
 <script>
 "use strict";
 /* ---------- geometry (per-sheet rink size) ---------- */
-const RINK_SIZES=[
-  {id:"nhl",   name:"NHL — 200 × 85 ft",      L:200, W:85,  corner:28},
-  {id:"intl",  name:"Olympic — 200 × 100 ft", L:200, W:100, corner:28},
-  {id:"hybrid",name:"Hybrid — 200 × 90 ft",   L:200, W:90,  corner:28},
-  {id:"studio",name:"Studio — 185 × 85 ft",   L:185, W:85,  corner:25}
-];
-const NHL_SIZE=()=>({...RINK_SIZES[0]});
+const { RINK_SIZES, NHL_SIZE } = Records;
 const MODES={full:{label:"Full",n:65},detailed:{label:"Detailed",n:39},moderate:{label:"Moderate",n:33},quick:{label:"Quick",n:19}};
 let L=200,W=85,CORNER=28;
 let GOAL1,GOAL2,FO_L,FO_R,BLUE1,BLUE2,CX,FO_T,FO_B,CY,LG_FO,L_FO_BL,R_BL_FO,R_FO_G,BC_L,BC_R,EDGE_B,EDGE_T;
@@ -611,7 +605,7 @@ function fmtDelta(d){if(isMM()){const m=mmOf(d);return (m>0?'+':m<0?'−':'±')+
 
 /* ---------- state ---------- */
 const KEY="ice_sheet_v3",V2="ice_sheet_v2",V1="ice_sheet_v1";
-const DEFAULT_EDGES=[0.6875,1.4375,1.5625,1.9375];
+const { DEFAULT_EDGES } = Records;
 let state=null,compareId=null;
 const css=getComputedStyle(document.documentElement);
 const BAND_META=[{key:"thin",c:"#d6453f",label:"Too thin"},{key:"low",c:"#e8b54a",label:"Thin"},{key:"ideal",c:"#eef4f6",label:"Ideal"},{key:"high",c:"#6aa9d6",label:"Thick"},{key:"thick",c:"#2c6aa3",label:"Too thick"}];
@@ -622,11 +616,9 @@ function buildBands(){const e=S().edges,lts=[e[0],e[1],e[2],e[3],Infinity];
   BANDS=BAND_META.map((m,i)=>({...m,lt:lts[i],color:m.c,rng:rngs[i]}));BAND_RGB=BANDS.map(b=>rgbOf(b.color));}
 const bandOf=v=>{for(const b of BANDS)if(v<b.lt)return b;return BANDS[BANDS.length-1];};
 
-const uid=()=>Math.random().toString(36).slice(2,9);
-const newSession=()=>({id:uid(),date:new Date().toISOString(),label:"",mode:"moderate",data:{},notes:{}});
-const newSheet=(n,size)=>({id:uid(),name:n||"Main sheet",size:size||NHL_SIZE(),sessions:[newSession()]});
-const defaultSettings=()=>({target:1.5,edges:[...DEFAULT_EDGES],tieAttention:true,floodBelow:1.25,shaveAbove:1.5625});
-const newFacility=n=>{const sh=newSheet();return{id:uid(),name:n||"Main facility",settings:defaultSettings(),sheets:[sh]};};
+/* Shapes come from the store, so a rink added on the launcher is
+   indistinguishable from one added here. */
+const { uid, newSession, newSheet, defaultSettings, newFacility } = Records;
 function freshState(){const f=newFacility();return{theme:"dark",unit:"in",lastBackup:null,contourIdx:2,contoursOn:true,smoothIdx:2,overdueDays:7,facilities:[f],activeFacility:f.id,activeSheet:f.sheets[0].id,activeSession:f.sheets[0].sessions[0].id};}
 
 const facility=()=>state.facilities.find(f=>f.id===state.activeFacility)||state.facilities[0];

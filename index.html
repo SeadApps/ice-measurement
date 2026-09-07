@@ -85,6 +85,29 @@
   .fl-badge.over{background:#3a2f16;color:#e8b54a}
   [data-theme="light"] .fl-badge.over{background:#faeed2;color:#a8760d}
   .fleetnote{margin:12px 0 0;font-family:var(--mono);font-size:11px;color:var(--ink-faint)}
+
+  /* Adding a rink. Kept in the bar rather than in the fleet, so it is still
+     reachable on a one-rink device where the fleet hides itself. */
+  .addbtn{appearance:none;font:inherit;font-size:12.5px;font-weight:600;background:var(--panel-2);
+    color:var(--ink-dim);border:1px solid var(--line);border-radius:9px;padding:8px 14px;cursor:pointer}
+  .addbtn:hover{border-color:#3a5b72;color:var(--ink)}
+  [data-theme="light"] .addbtn:hover{border-color:#9fb6c6}
+  .addbtn:focus-visible{outline:2px solid var(--frost);outline-offset:2px}
+  .addform{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;
+    display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+  .af{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--ink-dim)}
+  /* display:flex on a class outranks the browser's own [hidden]{display:none},
+     so the new-facility field showed even when an existing one was picked. */
+  .af[hidden]{display:none}
+  .af input,.af select{appearance:none;font:inherit;font-size:14px;background:var(--panel-2);
+    color:var(--ink);border:1px solid var(--line);border-radius:9px;padding:9px 11px;width:100%}
+  .af input:focus-visible,.af select:focus-visible{outline:2px solid var(--frost);outline-offset:-1px}
+  .afrow{grid-column:1/-1;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .afgo{appearance:none;font:inherit;font-size:13px;font-weight:700;background:var(--frost);color:#06222b;
+    border:0;border-radius:9px;padding:10px 18px;cursor:pointer}
+  .afgo:focus-visible{outline:2px solid var(--frost);outline-offset:2px}
+  .afnote{font-family:var(--mono);font-size:11px;color:var(--ink-faint)}
+  .afnote.bad{color:#e8b54a}
   @media (max-width:560px){
     .fl-row{grid-template-columns:1fr}
     .fl-meta{justify-content:flex-start}
@@ -105,10 +128,30 @@ document.documentElement.setAttribute("data-theme",_t==="light"?"light":"dark");
       <h1><span class="mark">[ &#9671; ]</span>Arena Management System</h1>
       <span class="sub">Tools for Facility Management</span>
     </div>
+    <button type="button" class="addbtn" id="addRink" hidden>+ Add a rink</button>
     <div class="themeseg" role="group" aria-label="Theme">
       <button type="button" id="thLight">Light</button><button type="button" id="thDark">Dark</button>
     </div>
   </div>
+
+  <section id="addWrap" hidden>
+    <span class="eyebrow">Add a rink</span>
+    <div class="addform">
+      <label class="af" for="arName"><span>Rink name</span>
+        <input id="arName" type="text" placeholder="Main sheet" autocomplete="off"></label>
+      <label class="af" for="arFac"><span>At</span>
+        <select id="arFac"></select></label>
+      <label class="af" for="arNewFac" id="arNewWrap" hidden><span>New facility name</span>
+        <input id="arNewFac" type="text" placeholder="Nashua Twin Rinks" autocomplete="off"></label>
+      <label class="af" for="arSize"><span>Ice size</span>
+        <select id="arSize"></select></label>
+      <div class="afrow">
+        <button type="button" class="afgo" id="arSave">Add rink</button>
+        <button type="button" class="addbtn" id="arCancel">Cancel</button>
+        <span class="afnote" id="arNote"></span>
+      </div>
+    </div>
+  </section>
 
   <section id="whereWrap" hidden>
     <span class="eyebrow">Where you are</span>
@@ -155,6 +198,17 @@ function applyTheme(t){
   th.light.setAttribute('aria-pressed', String(t==='light'));
   th.dark.setAttribute('aria-pressed',  String(t==='dark'));
 }
+document.getElementById('addRink').addEventListener('click', openAdd);
+document.getElementById('arCancel').addEventListener('click', closeAdd);
+document.getElementById('arSave').addEventListener('click', doAdd);
+document.getElementById('arFac').addEventListener('change', e => {
+  document.getElementById('arNewWrap').hidden = e.target.value !== '__new';
+  if(e.target.value === '__new') document.getElementById('arNewFac').focus();
+});
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape' && !document.getElementById('addWrap').hidden) closeAdd();
+});
+
 th.light.addEventListener('click', ()=>{applyTheme('light'); Store.set('rink_theme','light');});
 th.dark .addEventListener('click', ()=>{applyTheme('dark');  Store.set('rink_theme','dark');});
 applyTheme(document.documentElement.getAttribute('data-theme')==='light'?'light':'dark');
@@ -183,7 +237,10 @@ async function iceStat(){
   if(fac || sh || se){
     const facs = liveRecords(fac).length, sheets = liveRecords(sh).length;
     if(!facs && !sheets) return 'Nothing recorded on this device';
-    const latest = liveRecords(se).reduce((a, s) =>
+    /* A round is one somebody walked. Every new sheet is created with an
+        empty session, and counting it made this card contradict the fleet row
+        beside it about the very same sheet. Same predicate as the fleet now. */
+    const latest = liveRecords(se).filter(Records.hasReadings).reduce((a, s) =>
       (s.date && (!a || new Date(s.date) > new Date(a))) ? s.date : a, null);
     const when = latest ? ago(latest) : null;
     return '<b>' + sheets + '</b> sheet' + (sheets===1?'':'s') +
@@ -265,6 +322,71 @@ async function selectSheet(fid, sid, sessions){
   await paintAll();
 }
 
+/* ---------- adding a rink ----------
+   Adding a rink is adding an ice surface, so it writes a `facility` and a
+   `sheet` - the records Ice owns - rather than the Glass-only rink with a
+   local name the builder produces. That is the seam G3b left open.
+
+   This page still does not sync. The records sit here until Ice next opens and
+   pushes them, which is the same moment you would be opening it anyway to walk
+   the new sheet. Giving the launcher its own sync attachment is a separate
+   decision: the shared store now makes a faithful collect() possible, but the
+   rule that keeps this page out of the sent-map has not been revisited.
+
+   The write goes through Repo.addSheet(), which stamps against what was last
+   written. Doing that dance here instead would be one read() away from
+   restamping every record on the device. */
+async function fillAddForm(){
+  const st = await Records.Repo.read();
+  const facs = (st && st.facilities) || [];
+  const fac = document.getElementById('arFac');
+  fac.innerHTML = facs.map(f => '<option value="' + f.id + '"></option>').join('')
+                + '<option value="__new">+ New facility…</option>';
+  /* Names are somebody's typed input; set as text, never as markup. */
+  Array.prototype.forEach.call(fac.options, (o, i) => { if(facs[i]) o.textContent = facs[i].name; });
+  fac.value = facs.length ? ((st.prefs && st.prefs.activeFacility) || facs[0].id) : '__new';
+  if(!facs.some(f => f.id === fac.value)) fac.value = '__new';
+  document.getElementById('arNewWrap').hidden = fac.value !== '__new';
+
+  const size = document.getElementById('arSize');
+  size.innerHTML = Records.RINK_SIZES.map(r => '<option value="' + r.id + '"></option>').join('');
+  Array.prototype.forEach.call(size.options, (o, i) => { o.textContent = Records.RINK_SIZES[i].name; });
+  size.value = 'nhl';
+
+  document.getElementById('arName').value = '';
+  document.getElementById('arNewFac').value = '';
+  const note = document.getElementById('arNote');
+  note.textContent = ''; note.className = 'afnote';
+}
+
+async function openAdd(){
+  await fillAddForm();
+  document.getElementById('addWrap').hidden = false;
+  document.getElementById('arName').focus();
+}
+function closeAdd(){ document.getElementById('addWrap').hidden = true; }
+
+async function doAdd(){
+  const note = document.getElementById('arNote');
+  const facSel = document.getElementById('arFac').value;
+  const newFac = document.getElementById('arNewFac').value.trim();
+  if(facSel === '__new' && !newFac){
+    note.textContent = 'Name the facility first.'; note.className = 'afnote bad';
+    document.getElementById('arNewFac').focus();
+    return;
+  }
+  const sizeId = document.getElementById('arSize').value;
+  const size = Records.RINK_SIZES.find(r => r.id === sizeId);
+  await Records.Repo.addSheet({
+    facilityId: facSel === '__new' ? null : facSel,
+    facilityName: newFac,
+    name: document.getElementById('arName').value.trim(),
+    size: size ? Object.assign({}, size) : null
+  });
+  closeAdd();
+  await paintAll();
+}
+
 async function paintFleet(){
   const wrap = document.getElementById('whereWrap');
   const el = document.getElementById('fleet');
@@ -312,6 +434,8 @@ async function cardStats(){
 async function paintAll(){
   try{ await paintFleet(); }
   catch(e){ document.getElementById('whereWrap').hidden = true; }
+  /* Reachable only once the gate is passed, like everything else here. */
+  document.getElementById('addRink').hidden = false;
   await cardStats();
 }
 

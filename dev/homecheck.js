@@ -46,8 +46,9 @@ const V4 = {
                        s2: { id: 's2', facilityId: 'f1', name: 'Studio',     ord: 1, updatedAt: T },
                        s3: { id: 's3', facilityId: 'f2', name: 'Rink 1',     ord: 0, updatedAt: T },
                        sX: { id: 'sX', deleted: true, updatedAt: T } },
-  ice_v4_sessions:   { r1: { id: 'r1', sheetId: 's1', date: '2026-08-20T12:00:00.000Z', data: {}, notes: {}, updatedAt: T },
-                       r2: { id: 'r2', sheetId: 's1', date: '2026-09-03T12:00:00.000Z', data: {}, notes: {}, updatedAt: T },
+  ice_v4_sessions:   { r1: { id: 'r1', sheetId: 's1', date: '2026-08-20T12:00:00.000Z', data: {'0,0':1.5}, notes: {}, updatedAt: T },
+                       r2: { id: 'r2', sheetId: 's1', date: '2026-09-03T12:00:00.000Z', data: {'0,0':1.5}, notes: {}, updatedAt: T },
+                       r3: { id: 'r3', sheetId: 's2', date: '2026-09-05T12:00:00.000Z', data: {}, notes: {}, updatedAt: T },
                        rX: { id: 'rX', deleted: true, updatedAt: T } },
   glass_record_v1:   { who: 'Pete', panels: { '069': { status: 'plexi' }, '082': { status: 'replace' },
                                               '083': { status: 'replace' }, '001': { status: 'ok' } } }
@@ -103,6 +104,10 @@ const b = await chromium.launch();
   ok('ice card skips deleted sheets',      !/4 sheets/.test(ice), ice);
   ok('ice card dates the newest round',    /last round/.test(ice), ice);
   ok('glass card counts what is flagged',  /2 to replace/.test(glass) && /1 on plexi/.test(glass), glass);
+  /* r3 is newer than either real round, but nobody walked it — every new sheet
+     is created with an empty session like it. Counting those made this card
+     disagree with the fleet row beside it about the same sheet. */
+  ok('an empty session is not the last round', !/last round today/.test(ice), ice);
   await ctx.close();
 }
 
@@ -283,6 +288,138 @@ const b = await chromium.launch();
      (await (await fetch(B + '/__rows')).json()).length === before);
   ok('and it still has no cursor to advance',
      (await p.evaluate(() => localStorage.getItem('rink_sync_cursor'))) === null);
+  await ctx.close();
+}
+
+/* ---------------- adding a rink ---------------- */
+{
+  const { ctx, p } = await device(b);
+  await p.goto(B + '/index.html'); await seedSession(p);
+  /* Shaped the way Repo.save() writes them — ord on everything — so a
+     round-trip through the store is a no-op and any restamp below is real. */
+  await p.evaluate(t => {
+    localStorage.setItem('ice_v4_facilities', JSON.stringify({
+      f1:{id:'f1',name:'Conway Arena',ord:0,updatedAt:t} }));
+    localStorage.setItem('ice_v4_sheets', JSON.stringify({
+      s1:{id:'s1',facilityId:'f1',name:'Main sheet',ord:0,updatedAt:t} }));
+    localStorage.setItem('ice_v4_sessions', JSON.stringify({
+      r1:{id:'r1',sheetId:'s1',date:'2026-09-01T00:00:00.000Z',label:'',mode:'moderate',
+          data:{},notes:{},ord:0,updatedAt:t} }));
+    localStorage.setItem('ice_v4_prefs', JSON.stringify({theme:'dark',unit:'in',overdueDays:7}));
+  }, '2026-09-01T00:00:00.000Z');
+  await p.reload(); await sleep(1500);
+
+  const maps = () => p.evaluate(() => ({
+    fac: JSON.parse(localStorage.getItem('ice_v4_facilities') || '{}'),
+    sh:  JSON.parse(localStorage.getItem('ice_v4_sheets')     || '{}'),
+    se:  JSON.parse(localStorage.getItem('ice_v4_sessions')   || '{}'),
+    prefs: JSON.parse(localStorage.getItem('ice_v4_prefs')    || '{}') }));
+  const before = await maps();
+  const rowsBefore = (await (await fetch(B + '/__rows')).json()).length;
+
+  ok('the add control is offered once signed in',
+     !(await p.evaluate(() => document.getElementById('addRink').hidden)));
+  await p.click('#addRink'); await sleep(300);
+  ok('the form opens', await p.isVisible('#addWrap'));
+  const facOpts = await p.evaluate(() =>
+    [...document.getElementById('arFac').options].map(o => o.textContent));
+  /* A class with display:flex outranks the browser's [hidden] rule, so this
+     field stayed on screen next to an existing facility. */
+  ok('the new-facility field is out of the way until it is wanted',
+     !(await p.isVisible('#arNewWrap')));
+  ok('it offers the facilities this device knows, and a new one',
+     facOpts.length === 2 && facOpts[0] === 'Conway Arena' && /New facility/.test(facOpts[1]),
+     JSON.stringify(facOpts));
+
+  /* A second surface at the arena that already exists. */
+  await p.fill('#arName', 'Studio sheet');
+  await p.selectOption('#arSize', 'studio');
+  await p.click('#arSave'); await sleep(900);
+
+  const after = await maps();
+  const sheets = Object.values(after.sh);
+  const added = sheets.find(s => s.name === 'Studio sheet');
+  ok('a sheet record is written', sheets.length === 2 && !!added,
+     JSON.stringify(sheets.map(s => s.name)));
+  ok('under the facility that was chosen', added && added.facilityId === 'f1', JSON.stringify(added));
+  ok('at the ice size that was chosen', added && added.size && added.size.id === 'studio',
+     JSON.stringify(added && added.size));
+  /* Ice reaches straight for sheets[0].sessions[0] when it boots, so a sheet
+     with no round in it would take the app down rather than just look odd. */
+  ok('with a round to start from, which Ice needs on boot',
+     Object.values(after.se).filter(s => s.sheetId === added.id).length === 1,
+     JSON.stringify(Object.values(after.se).map(s => s.sheetId)));
+
+  /* The clobber this is one mistake away from: save() stamps against what was
+     last written, so a write built on read() would restamp the lot and make
+     this device look newest on every record. */
+  ok('nothing that already existed was restamped',
+     after.fac.f1.updatedAt === before.fac.f1.updatedAt
+     && after.sh.s1.updatedAt === before.sh.s1.updatedAt
+     && after.se.r1.updatedAt === before.se.r1.updatedAt,
+     JSON.stringify({f:after.fac.f1.updatedAt, s:after.sh.s1.updatedAt, r:after.se.r1.updatedAt}));
+
+  ok('the new rink is where you now are', after.prefs.activeSheet === added.id,
+     JSON.stringify(after.prefs));
+  ok('and the other preferences survived it', after.prefs.unit === 'in' && after.prefs.overdueDays === 7,
+     JSON.stringify(after.prefs));
+  ok('the fleet now lists both', (await p.$$('#fleet .fl-row')).length === 2);
+
+  /* A new site: the facility and the sheet together. */
+  await p.click('#addRink'); await sleep(300);
+  await p.selectOption('#arFac', '__new'); await sleep(150);
+  ok('choosing a new site asks for its name', await p.isVisible('#arNewWrap'));
+  await p.fill('#arName', 'East sheet');
+  await p.click('#arSave'); await sleep(500);
+  ok('a new facility with no name is refused', await p.isVisible('#addWrap'));
+  ok('and says what is missing', /name the facility/i.test(await p.textContent('#arNote')),
+     await p.textContent('#arNote'));
+  await p.fill('#arNewFac', 'Nashua Twin Rinks');
+  await p.click('#arSave'); await sleep(900);
+
+  const two = await maps();
+  const newFac = Object.values(two.fac).find(f => f.name === 'Nashua Twin Rinks');
+  ok('a new site writes a facility as well', !!newFac,
+     JSON.stringify(Object.values(two.fac).map(f => f.name)));
+  ok('with the sheet under it',
+     Object.values(two.sh).some(s => s.name === 'East sheet' && s.facilityId === newFac.id));
+  /* Indistinguishable from one Ice would have made, or Ice repairs it on read
+     and the repair is what syncs outward. */
+  ok('carrying the settings Ice gives a facility',
+     !!(newFac && newFac.settings && Array.isArray(newFac.settings.edges)), JSON.stringify(newFac));
+
+  ok('and still nothing on the server, because this page does not sync',
+     (await (await fetch(B + '/__rows')).json()).length === rowsBefore);
+  await ctx.close();
+}
+
+/* The seam G3b left: a rink added here has to reach the other devices, and it
+   does it the way everything else does — Ice pushes it next time it opens. */
+{
+  const { ctx, p } = await device(b);
+  const errs = [];
+  p.on('pageerror', e => errs.push(String(e).split('\n')[0]));
+  await p.goto(B + '/index.html'); await signInAtGate(p); await sleep(1500);
+
+  await p.click('#addRink'); await sleep(300);
+  await p.selectOption('#arFac', '__new'); await sleep(150);
+  await p.fill('#arNewFac', 'Laconia Ice');
+  await p.fill('#arName', 'Rink 1');
+  await p.click('#arSave'); await sleep(900);
+  const mine = await p.evaluate(() =>
+    Object.values(JSON.parse(localStorage.getItem('ice_v4_sheets') || '{}'))
+      .find(s => s.name === 'Rink 1'));
+  ok('the rink was created on the launcher', !!mine, JSON.stringify(mine));
+
+  await p.goto(B + '/ice.html'); await sleep(4000);
+  const rows = await (await fetch(B + '/__rows')).json();
+  ok('opening Ice pushes the facility up', rows.some(r => r.kind === 'facility' && r.body.name === 'Laconia Ice'),
+     JSON.stringify(rows.filter(r => r.kind === 'facility').map(r => r.body.name)));
+  ok('and the sheet with it', rows.some(r => r.kind === 'sheet' && r.id === mine.id));
+  ok('and the round it was given', rows.some(r => r.kind === 'session' && r.body.sheetId === mine.id));
+  /* If the sheet had arrived with no session, Ice would have thrown here
+     rather than merely looked wrong. */
+  ok('Ice opened on it without throwing', errs.length === 0, JSON.stringify(errs.slice(0, 3)));
   await ctx.close();
 }
 

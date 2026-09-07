@@ -35,6 +35,7 @@ line that ARCHITECTURE.md used to draw in prose:
 | `Repo.read()` | reads and joins. Never writes, never migrates. |
 | `Repo.load()` | what Ice boots on: also migrates off `ice_sheet_v3`, which is a write. |
 | `Repo.savePrefs(patch)` | device preferences only — never a synced record. |
+| `Repo.addSheet(opts)` | adds an ice surface, and a facility if it is a new site. |
 | `Repo.save(state)` | the whole state, records included. |
 | `Repo.maps()` | the per-kind maps as last written: what sync collects. |
 
@@ -44,7 +45,26 @@ remembering the rule — and `homecheck` asserts it directly, including that
 opening the launcher on a device holding only the old blob does not migrate it.
 
 `Records.Store` is the storage wrapper all three pages had their own identical
-copy of.
+copy of, and the constructors — `newSheet`, `newFacility`, `RINK_SIZES`,
+`defaultSettings` — are in here for the same reason: a sheet the launcher made
+has to be indistinguishable from one Ice made.
+
+**`addSheet()` is a method rather than something the page assembles**, and the
+reason is `save()`. It stamps against the snapshot of what was last written,
+so a write built on `read()` — which deliberately leaves that snapshot empty —
+would hand every record on the device a fresh `updatedAt` and make it look
+newest on all of them. That is the clobber the record store exists to prevent,
+and nothing on screen would show it until another device lost work. A page
+cannot get the sequence wrong if it never performs it.
+
+The other trap it closes: **a sheet must be created with a session in it.** Ice
+reaches straight for `sheets[0].sessions[0]` when it boots, so a sheet with no
+round would take the app down rather than merely look odd.
+
+**A round is one somebody walked** — `Records.hasReadings()`. Every new sheet
+is created with an empty session, and counting those made the launcher's Ice
+card read "last round today" beside a fleet row saying "no rounds yet" about the
+same sheet.
 
 ---
 
@@ -219,7 +239,7 @@ node dev/fake-supabase.js &
 node dev/synctest.js       # 20 checks: sign-in, two devices, offline, paused
 node dev/conflicttest.js   # 10 checks: no churn, contested edits, retries
 node dev/e2e.js            # 14 checks: legacy migration, backup merge
-node dev/homecheck.js      # 52 checks: the gate, the fleet, card figures, a rotated code
+node dev/homecheck.js      # 77 checks: the gate, the fleet, adding a rink, a rotated code
 node dev/cursortest.js     #  6 checks: one pull cursor per app, not per device
 node dev/facilitytest.js   # 27 checks: facilities in Glass, ids scoped without a migration,
                            #            and the glass bound to a sheet rather than a building
@@ -277,6 +297,17 @@ figures; the fleet is worse, because it names every facility outright.
 
 **Where you are and how the sheet is doing are two chips, not one.** They were
 one, and standing on an overdue rink was then the thing that hid it was overdue.
+
+**Adding a rink is adding an ice surface.** It writes a `facility` and a
+`sheet` — the records Ice owns — rather than the Glass-only rink with a local
+name the builder produces. The control sits in the bar rather than in the fleet,
+so it is still reachable on a one-rink device where the fleet hides itself.
+
+The page still does not sync. Those records sit here until Ice next opens and
+pushes them, which is the same moment you would be opening it anyway to walk the
+new sheet. Giving the launcher its own sync attachment is a separate decision:
+the shared store now makes a faithful `collect()` possible, but the rule that
+keeps this page out of the sent-map has not been revisited.
 
 The Glass card no longer claims 127 pieces whatever rink you have — that is
 Conway's figure and it was written into this page. Glass writes a piece count
@@ -402,8 +433,9 @@ where that facility has more than one surface, so Conway still reads
   attribution without individual logins.
 - **No realtime.** Sync happens on open and on focus. Supabase realtime would
   make the desktop update while you watch; not needed so far.
-- **A built rink is not an ice surface yet.** The builder writes a Glass-only
-  rink — a layout and a local name, with no `facility` or `sheet` record
-  behind it, so Ice knows nothing about it and its glass hangs off a bucket id
-  rather than a sheet. Adding a rink is really adding an ice surface and should
-  write those records too, which belongs on the launcher rather than in Glass.
+- **The two ways to add a rink do not meet yet.** The launcher adds an ice
+  surface — a `facility` and a `sheet` — but no glass. Glass's builder walks a
+  layout but writes no facility or sheet, so its bucket still hangs off an id of
+  its own rather than a surface. Joining them is what would let a rink added in
+  one place be complete in the other: the launcher's new sheet offering to walk
+  its glass, and the builder attaching its layout to the surface you are on.
