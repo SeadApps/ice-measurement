@@ -55,6 +55,29 @@ ok('home renders after reload',     /fleet overview/i.test(body));
 await p.click('#thLight'); await p.waitForTimeout(400);
 ok('theme still saves',             (await p.evaluate(()=>localStorage.getItem('rink_theme')))==='light');
 
+/* ---------------- the switcher, on a tablet ---------------- */
+
+/* The Ice/Glass switcher used to be hidden below 1180px - exactly the width
+   you are on when you are standing in the rink whose glass you want. */
+await p.setViewportSize({width:900, height:800});
+await p.waitForTimeout(400);
+if(await p.isVisible('.fl-row')) { await p.click('.fl-row'); await p.waitForTimeout(700); }
+ok('the workspace is open', await p.evaluate(()=>state.screen==='work'));
+ok('the switcher is there at tablet width',
+   await p.evaluate(()=>{const s=document.querySelector('.app .appsw');
+     return !!s && getComputedStyle(s).display!=='none';}));
+ok('and Glass is one click away',
+   await p.evaluate(()=>!!document.querySelector('.app .appsw a[href="glass.html"]')));
+/* The bar loses a button rather than the route home: Ice's own entry in the
+   switcher was a link to the page you are already on. */
+ok('the hamburger is gone',
+   await p.evaluate(()=>!document.querySelector('#app .iconbtn[title="Home"]')));
+await p.click('#homeBtn'); await p.waitForTimeout(500);
+ok('its own name in the switcher goes back to the sheets',
+   await p.evaluate(()=>state.screen==='home'));
+ok('without leaving the app', /ice\.html/.test(p.url()), p.url());
+await p.setViewportSize({width:1280, height:900});
+
 console.log('\nerrors:', errs.length?errs.slice(0,5):'none');
 console.log('\n  '+pass+' passed, '+fail+' failed');
 await b.close();

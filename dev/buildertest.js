@@ -321,6 +321,43 @@ await p.evaluate(() => document.querySelectorAll('.sync-gate').forEach(e => e.re
 ok('and Glass opens on that surface next time',
    (await p.evaluate(() => activeBucket)) === 'sb');
 
+/* ---------------- and which way round it is drawn ---------------- */
+
+/* Step 4 is where you are already holding the drawing up against the room. */
+await p.click('#addRink'); await sleep(500);
+await p.evaluate(() => {
+  BLD.L = 185; BLD.W = 85; BLD.Rft = 28; BLD.Rin = 0; BLD.height = 72;
+  BLD.start = 'end'; BLD.walls = []; BLD.wi = 0; BLD.step = 4;
+  bldEnsureWalls();
+  const spans = bldWalls().spans;
+  BLD.walls.forEach((w, i) => {
+    const count = Math.max(1, Math.round(spans[i] * 12 / 48));
+    const each = Math.floor(spans[i] * 12 / count);
+    w.items = Array.from({ length: count },
+      () => ({ kind: 'glass', width_in: each, label: null, height_in: null }));
+  });
+  bldRender();
+});
+await sleep(400);
+ok('the check step offers turn and mirror',
+   (await p.$$('#bOrient button')).length === 2);
+const drawnBefore = await p.evaluate(() =>
+  (document.querySelector('#bldPlan .pnl') || {}).getAttribute
+    ? document.querySelector('#bldPlan .pnl').getAttribute('d') : '');
+await p.click('#bOrient button[data-o="flip"]'); await sleep(500);
+const drawnAfter = await p.evaluate(() =>
+  document.querySelector('#bldPlan .pnl').getAttribute('d'));
+ok('mirroring redraws the preview', !!drawnBefore && drawnAfter !== drawnBefore);
+ok('and the button says it is on',
+   (await p.getAttribute('#bOrient button[data-o="flip"]', 'aria-pressed')) === 'true');
+
+/* It has to be in the spec, or the rink arrives on the next device facing the
+   way the builder was not holding it. */
+const facedBucket = await p.evaluate(async () => { BLD.name = 'Faced rink'; await bldSave(); return activeBucket; });
+await sleep(400);
+ok('the walk records which way round it is',
+   await p.evaluate(k => LAYOUTS[k].spec.flip === true, facedBucket));
+
 ok('nothing threw throughout', errs.length === 0, JSON.stringify(errs.slice(0, 3)));
 
 console.log('\n  ' + pass + ' passed, ' + fail + ' failed');
