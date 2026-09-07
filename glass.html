@@ -249,6 +249,8 @@ footer{font-size:12.5px;color:var(--ink-3);text-align:center;font-family:var(--m
   .bld-body p.note{margin:0 0 16px;font-size:13px;color:var(--ink-2);line-height:1.55;max-width:62ch}
   .bld-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
   .bld-f{display:flex;flex-direction:column;gap:5px}
+  /* display:flex on a class outranks the browser's own [hidden]{display:none}. */
+  .bld-f[hidden]{display:none}
   .bld-f label{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
   .bld-f input,.bld-f select{font:inherit;font-size:16px;height:46px;padding:0 12px;border-radius:9px;
     border:1px solid var(--line);background:var(--surface-2);color:var(--ink);width:100%}
@@ -896,17 +898,20 @@ function splitId(rid){
   return i < 0 ? { bucket: LEGACY, pid: String(rid) }
                : { bucket: rid.slice(0, i), pid: rid.slice(i + 1) };
 }
-/* A bound sheet names its facility. The sheet's own name is appended only
-   where that facility has more than one surface, so a one-rink operation still
-   reads "Conway Arena" and not "Conway Arena - Main sheet". */
+/* A surface names its facility. The sheet's own name is appended only where
+   that facility has more than one surface, so a one-rink operation still reads
+   "Conway Arena" and not "Conway Arena - Main sheet". */
+function nameForSheet(sid){
+  const sh = sheets[sid], bf = sh && facilities[sh.facilityId];
+  if(!(bf && bf.name)) return null;
+  const many = Object.keys(sheets).filter(k => sheets[k].facilityId === bf.id).length > 1;
+  return (many && sh.name) ? bf.name + ' - ' + sh.name : bf.name;
+}
+/* Conway reaches its surface through the binding; every rink walked since is
+   keyed by the surface itself, so the bucket is the sheet id. */
 function facilityName(bucket){
-  if(bucket === LEGACY){
-    const sh = sheets[boundSheetId], bf = sh && facilities[sh.facilityId];
-    if(bf && bf.name){
-      const many = Object.keys(sheets).filter(k => sheets[k].facilityId === bf.id).length > 1;
-      return (many && sh.name) ? bf.name + ' - ' + sh.name : bf.name;
-    }
-  }
+  const viaSheet = nameForSheet(bucket === LEGACY ? boundSheetId : bucket);
+  if(viaSheet) return viaSheet;
   const f = facilities[bucket];
   /* A rink built here has no facility record until somebody adds one in the
      Ice app, so it carries the name it was given at the boards. */
@@ -1002,12 +1007,20 @@ function fillRinks(){
   sel.hidden = keys.length < 2;
 }
 
-function switchRink(b){
+async function switchRink(b){
   if(!LAYOUTS[b] || b === activeBucket) return;
   setBucket(b);                         // records, layout and `state`, together
   /* Written straight out rather than through store(), which would also nudge
      sync and claim a save. Looking at a different rink changes no record. */
   Store.set(KEY, snapshot());
+  /* Which rink you are at is one fact, not one per app. Moving it here moves
+     it for the launcher and for Ice too. */
+  const sid = (b === LEGACY) ? boundSheetId : b;
+  if(sid){
+    const patch = {activeSheet: sid}, sh = sheets[sid];
+    if(sh && sh.facilityId) patch.activeFacility = sh.facilityId;
+    await Records.Repo.savePrefs(patch);
+  }
   buildPlan(); rail(); totals(); table(); detail(); paint(); paintFacility();
   say('Showing ' + facilityName(b) + '.');
 }
@@ -1035,6 +1048,25 @@ function ensureBinding(){
   if(!sh) return false;
   boundSheetId = sh.id; bindingAt = new Date().toISOString();
   return true;
+}
+
+let launcherSheet = null;     // which surface the launcher says you are standing in
+
+/* The facilities and sheets Ice and the launcher keep. Read from this device
+   rather than waited for over sync: a surface added on the launcher a moment
+   ago is in local storage long before it has been near the server, and a
+   builder that could not see it would be no join at all. */
+async function loadSurfaces(){
+  const st = await Records.Repo.read();
+  if(!st) return null;
+  (st.facilities || []).forEach(f => {
+    facilities[f.id] = {id:f.id, name:f.name, ord:f.ord};
+    (f.sheets || []).forEach(s => {
+      sheets[s.id] = {id:s.id, facilityId:f.id, name:s.name, ord:s.ord};
+    });
+  });
+  launcherSheet = (st.prefs && st.prefs.activeSheet) || null;
+  return st;
 }
 
 const SYNC=(typeof Sync!=="undefined")?Sync:null;   // absent if sync.js failed to load; the page still works locally
@@ -1175,7 +1207,8 @@ th.dark.addEventListener('click',  ()=>setTheme('dark'));
 const BLD = {
   step: 1, name: '', L: 200, W: 85, Rft: 27, Rin: 2,
   height: 75, vary: false, thickness: '1/2"',
-  start: 'centre', walls: [], wi: 0, built: null
+  start: 'centre', walls: [], wi: 0, built: null,
+  sheet: '__new'          // the surface being walked, or a new one
 };
 const THICKNESSES = ['1/2"', '5/8"'];
 /* Where the walk begins. The centre red line is the default because every
@@ -1245,8 +1278,29 @@ function bldSpec(){
         thickness: x.thickness || BLD.thickness, height_in: it.height_in || null })) })) };
 }
 
+/* Surfaces this device knows that have no glass on them yet. One that already
+   has glass is switched to, not walked again. */
+function bldFreeSheets(){
+  return Object.keys(sheets).map(k => sheets[k])
+    .filter(s => s && !LAYOUTS[s.id] && s.id !== boundSheetId)
+    .sort((a,b) => (a.ord||0)-(b.ord||0) || String(a.id).localeCompare(String(b.id)));
+}
+const bldSheetLabel = s => {
+  const f = facilities[s.facilityId];
+  return (f && f.name ? f.name + ' \u2014 ' : '') + (s.name || 'Sheet');
+};
 function bldStep1(){
   return '<h3>The sheet</h3>'
+  + '<p class="note">Glass belongs to an ice surface. Pick the one you are standing in &mdash; or'
+  + ' add it, which writes the same facility and sheet the launcher would.</p>'
+  + '<div class="bld-f"><label for="bSheet">Which surface is this?</label><select id="bSheet">'
+  + bldFreeSheets().map(s => '<option value="' + esc(s.id) + '"'
+      + (BLD.sheet === s.id ? ' selected' : '') + '>' + esc(bldSheetLabel(s)) + '</option>').join('')
+  + '<option value="__new"' + (BLD.sheet === '__new' ? ' selected' : '')
+  + '>+ A surface not in the system yet</option></select></div>'
+  + '<div class="bld-f" id="bNewWrap"' + (BLD.sheet === '__new' ? '' : ' hidden') + '>'
+  + '<label for="bName">What is this rink called?</label>'
+  + '<input id="bName" type="text" placeholder="e.g. Rink 2" value="' + esc(BLD.name) + '"></div>'
   + '<p class="note">Measure the ice, not the boards. The corner radius is 27&#8242; 2&#8243; on'
   + ' rinks built to the usual template &mdash; change it only if you know yours differs.</p>'
   + '<div class="bld-grid">'
@@ -1254,9 +1308,7 @@ function bldStep1(){
   + '<div class="bld-f"><label for="bW">Width (feet)</label><input id="bW" type="number" inputmode="decimal" step="0.5" value="' + BLD.W + '"></div>'
   + '<div class="bld-f"><label for="bRf">Corner radius (ft)</label><input id="bRf" type="number" inputmode="decimal" step="1" value="' + BLD.Rft + '"></div>'
   + '<div class="bld-f"><label for="bRi">and inches</label><input id="bRi" type="number" inputmode="decimal" step="0.5" value="' + BLD.Rin + '"></div>'
-  + '</div><div class="bld-readout" id="bRead"></div>'
-  + '<div class="bld-f" style="margin-top:4px"><label for="bName">What is this rink called?</label>'
-  + '<input id="bName" type="text" placeholder="e.g. Nashua Arena &mdash; Rink 2" value="' + esc(BLD.name) + '"></div>';
+  + '</div><div class="bld-readout" id="bRead"></div>';
 }
 function bldStep1Read(){
   const R = bldR();
@@ -1368,6 +1420,11 @@ function bldRender(){
     };
     ['bL','bW','bRf','bRi'].forEach(id => $b(id).addEventListener('input', upd));
     $b('bName').addEventListener('input', e => { BLD.name = e.target.value; });
+    $b('bSheet').addEventListener('change', e => {
+      BLD.sheet = e.target.value;
+      $b('bNewWrap').hidden = BLD.sheet !== '__new';
+      if(BLD.sheet === '__new') $b('bName').focus();
+    });
     upd();
   }
   if(BLD.step === 2){
@@ -1420,7 +1477,8 @@ function bldValidate(){
     const R = bldR();
     if(!(BLD.L > 0 && BLD.W > 0)) return 'Give the sheet a length and a width.';
     if(!(BLD.L > 2*R && BLD.W > 2*R)) return 'That corner radius is too big for a sheet this size.';
-    if(!BLD.name.trim()) return 'Give the rink a name so it can be told apart.';
+    if(BLD.sheet === '__new' && !BLD.name.trim())
+      return 'Give the rink a name so it can be told apart.';
   }
   if(BLD.step === 2 && !(BLD.height > 0)) return 'Give the glass a height.';
   if(BLD.step === 3){
@@ -1431,31 +1489,55 @@ function bldValidate(){
   }
   return null;
 }
-function bldNext(){
+async function bldNext(){
   const err = bldValidate();
   if(err){ bldSay(err, true); return; }
   if(BLD.step === 3 && BLD.wi < BLD.walls.length - 1){ BLD.wi++; bldRender(); return; }
-  if(BLD.step === 4){ bldSave(); return; }
+  if(BLD.step === 4){ await bldSave(); return; }
   BLD.step++; bldRender();
 }
 function bldBack(){
   if(BLD.step === 3 && BLD.wi > 0){ BLD.wi--; bldRender(); return; }
   if(BLD.step > 1){ BLD.step--; bldRender(); }
 }
-function bldOpen(){
+async function bldOpen(){
+  /* Re-read first: a surface added on the launcher since this page loaded is
+     exactly the one somebody is about to walk. */
+  await loadSurfaces();
+  const free = bldFreeSheets();
   BLD.step = 1; BLD.wi = 0; BLD.walls = []; BLD.name = ''; BLD.built = null;
+  /* Default to where the launcher says you are, when that surface has no glass
+     yet - which is the reason you would be opening this at all. */
+  BLD.sheet = (launcherSheet && free.some(s => s.id === launcherSheet)) ? launcherSheet
+            : free.length ? free[0].id : '__new';
   $b('builder').hidden = false; bldRender();
 }
 function bldClose(){ $b('builder').hidden = true; }
 
-function bldSave(){
-  const bucket = 'r' + Math.random().toString(36).slice(2, 9);
+/* The bucket is the sheet id. That is the join: a rink walked here and a rink
+   added on the launcher are the same ice surface, so its glass, its rounds and
+   its schedule all hang off one record rather than two ideas of a rink. */
+async function bldSave(){
+  let bucket = BLD.sheet;
+  if(bucket === '__new'){
+    /* Adding a rink is adding an ice surface, so it goes through the same
+       method the launcher uses and writes the same facility and sheet. */
+    const st = await Records.Repo.read();
+    const made = await Records.Repo.addSheet({
+      facilityId: (st && st.prefs && st.prefs.activeFacility) || null,
+      facilityName: BLD.name.trim(),
+      name: BLD.name.trim(),
+      size: {id:'custom', name:'Custom', L:BLD.L, W:BLD.W, corner:Math.round(bldR())}
+    });
+    bucket = made.sheetId;
+    FACILITY_NAMES[bucket] = BLD.name.trim();   // until the records are read back
+    await loadSurfaces();
+  }
   /* Rebuilt from the spec rather than kept from the preview, so what is saved
      is exactly what the walk produces - the same thing every other device will
      draw from the record. */
   const lay = layoutFromSpec(bldSpec()), n = lay.panels.filter(x => x.kind === 'glass').length;
   LAYOUTS[bucket] = lay;
-  FACILITY_NAMES[bucket] = BLD.name.trim();
   LAYOUT_AT[bucket] = nowISO();
   setBucket(bucket);                    // records, layout and `state`, together
   store();
@@ -1467,6 +1549,21 @@ function bldSave(){
 (async function boot(){
   applyTheme(document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark');
   await restore();
+  const st = await loadSurfaces();
+  /* The launcher says which rink you are at, so open on it. Only where this
+     device actually has that surface's glass - otherwise stay put rather than
+     show an empty plan for a rink nobody has walked. */
+  const want = st && st.prefs && st.prefs.activeSheet;
+  /* Glass's own switcher writes this same preference, so the two normally
+     agree. They cannot agree about Conway on a device that has never synced -
+     nothing there names Conway's surface - so a stored choice of it stands
+     rather than being pulled off it on every reload. */
+  const conwayUnmapped = (activeBucket === LEGACY && !boundSheetId);
+  if(want && !conwayUnmapped){
+    if(LAYOUTS[want]) activeBucket = want;
+    else if(boundSheetId && want === boundSheetId) activeBucket = LEGACY;
+  }
+  setBucket(activeBucket);
   buildPlan(); rail(); totals(); table(); detail(); paint(); paintFacility();
 
   document.getElementById('addRink').addEventListener('click', bldOpen);

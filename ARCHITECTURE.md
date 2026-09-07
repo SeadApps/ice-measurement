@@ -433,9 +433,14 @@ where that facility has more than one surface, so Conway still reads
   attribution without individual logins.
 - **No realtime.** Sync happens on open and on focus. Supabase realtime would
   make the desktop update while you watch; not needed so far.
-- **The two ways to add a rink do not meet yet.** The launcher adds an ice
-  surface — a `facility` and a `sheet` — but no glass. Glass's builder walks a
-  layout but writes no facility or sheet, so its bucket still hangs off an id of
-  its own rather than a surface. Joining them is what would let a rink added in
-  one place be complete in the other: the launcher's new sheet offering to walk
-  its glass, and the builder attaching its layout to the surface you are on.
+- **A fresh device invents a facility.** Ice falls back to `freshState()` when
+  it has no records, and that fabricated "Main facility" is persisted and pushed
+  before the first pull delivers the real ones — so every new device adds a
+  phantom rink to the shared list. It also leaves that device pointed at its own
+  invention, since `apply()` only repoints `activeFacility` when `facility()`
+  is falsy and it never is. That is why `facilitytest` now pins the active
+  facility before adding a sheet: without it, which facility wins comes down to
+  how two random ids sort. Pre-dates all of the launcher work.
+- **A surface added on the launcher has no glass until somebody walks it.** That
+  is the intended shape — glass comes off a tape measure, not a form — but the
+  launcher does not yet say which of its rinks have none.

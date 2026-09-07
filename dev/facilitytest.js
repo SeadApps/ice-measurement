@@ -185,10 +185,16 @@ await M.ctx.close();
    an arena with two sheets has two sets of glass. */
 const I2 = await device(b);
 await I2.p.goto(B + '/ice.html'); await signIn(I2.p);
+/* Pinned to Conway rather than left to whichever facility happened to be
+   active. A device opening Ice for the first time invents a "Main facility" of
+   its own and pushes it before sync delivers the real one, so which of the two
+   is active comes down to how two random ids happen to sort. */
+await I2.p.evaluate(fid => { state.activeFacility = fid; persist(); }, facRow.id);
 await I2.p.evaluate(() => { facility().sheets.push(newSheet('Olympic sheet')); persist(); });
 await sleep(4000);
-const sheetIds = (await rows()).filter(r => r.kind === 'sheet').map(r => r.id);
-ok('Ice put a second sheet on the server', sheetIds.length === 2, JSON.stringify(sheetIds));
+const conwaySheets = (await rows()).filter(r => r.kind === 'sheet' && r.body.facilityId === facRow.id);
+ok('Ice put a second sheet under Conway', conwaySheets.length === 2,
+   JSON.stringify(conwaySheets.map(r => r.body.name)));
 await I2.ctx.close();
 
 const P = await device(b);
