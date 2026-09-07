@@ -240,9 +240,14 @@ footer{font-size:12.5px;color:var(--ink-3);text-align:center;font-family:var(--m
     color:var(--ink-2);border:1px solid var(--line);border-radius:8px;padding:8px 14px;cursor:pointer}
   /* The picker takes the auto margin while it is shown and hands it back to the
      add button on a device that only has the one rink. */
-  .rinkpick{margin-left:auto;appearance:none;font:inherit;font-size:13px;background:var(--surface);
+  .rinkwrap{margin-left:auto;display:inline-flex;align-items:center;gap:6px}
+  .rinkwrap:not([hidden])+.bld-x{margin-left:8px}
+  .rinkpick{appearance:none;font:inherit;font-size:13px;background:var(--surface);
     color:var(--ink-2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer}
-  .rinkpick:not([hidden])+.bld-x{margin-left:8px}
+  .rinkdel{appearance:none;font:inherit;font-size:15px;line-height:1;background:var(--surface);
+    color:var(--ink-3);border:1px solid var(--line);border-radius:8px;padding:7px 11px;cursor:pointer}
+  .rinkdel:hover{color:var(--replace);border-color:var(--replace)}
+  .rinkdel:focus-visible,.rinkpick:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   .bld-steps{display:flex;gap:6px;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;
     text-transform:uppercase}
   .bld-steps span{flex:1;padding:7px 8px;text-align:center;border-radius:7px;background:var(--surface);
@@ -319,7 +324,11 @@ document.documentElement.setAttribute("data-theme",_t==="light"?"light":"dark");
     <a href="ice.html">Ice</a>
     <a href="glass.html" aria-current="page">Glass</a>
   </nav>
-  <select class="rinkpick" id="rinkPick" aria-label="Rink" hidden></select>
+  <span class="rinkwrap" id="rinkWrap" hidden>
+    <select class="rinkpick" id="rinkPick" aria-label="Rink" hidden></select>
+    <button type="button" class="rinkdel" id="rinkDel" hidden
+            title="Remove this rink's glass" aria-label="Remove this rink's glass">&times;</button>
+  </span>
   <button type="button" class="bld-x" id="addRink">+ Add a rink</button>
   <div class="themeseg" role="group" aria-label="Theme">
     <button type="button" id="thLight">Light</button><button type="button" id="thDark">Dark</button>
@@ -1068,10 +1077,24 @@ function paintNotes(){
 
 /* The way back off a rink the builder just made. Before this, bldSave() moved
    you to the new rink and nothing could move you off it. */
+/* Which facility a bucket's glass belongs to. Conway reaches its surface
+   through the binding; everything walked since is keyed by the surface. */
+function facilityOfBucket(k){
+  const sh = sheets[k === LEGACY ? boundSheetId : k];
+  return sh ? sh.facilityId : null;
+}
 function fillRinks(){
   const sel = document.getElementById('rinkPick');
   if(!sel) return;
-  const keys = Object.keys(LAYOUTS).filter(k => k.indexOf('__') !== 0);
+  let keys = Object.keys(LAYOUTS).filter(k => k.indexOf('__') !== 0);
+  /* The launcher says which facility you are at, so offer that facility's
+     surfaces rather than every rink this device has ever held. A bucket whose
+     facility is unknown is left in - hiding something you cannot classify is
+     worse than showing it - and so is whatever is on screen. */
+  if(launcherFacility){
+    keys = keys.filter(k => k === activeBucket
+      || facilityOfBucket(k) === null || facilityOfBucket(k) === launcherFacility);
+  }
   keys.sort((a, b) => a === LEGACY ? -1 : b === LEGACY ? 1
                     : facilityName(a).localeCompare(facilityName(b)));
   sel.innerHTML = keys.map(k => '<option value="' + esc(k) + '"'
@@ -1079,6 +1102,35 @@ function fillRinks(){
   /* One rink is not a choice. A mandatory picker for a one-rink operation is
      friction wearing the costume of structure. */
   sel.hidden = keys.length < 2;
+  const wrap = document.getElementById('rinkWrap'), del = document.getElementById('rinkDel');
+  if(wrap) wrap.hidden = sel.hidden;
+  /* Conway's layout is compiled into this file rather than walked, so there is
+     nothing to take off. */
+  if(del) del.hidden = (activeBucket === LEGACY);
+}
+
+/* Glass walked by mistake had no way off the device: the picker listed it for
+   ever and there was nothing to press. Conway is not removable - its layout is
+   compiled into this file, not something anybody built. */
+async function deleteRink(bucket){
+  if(bucket === LEGACY || !LAYOUTS[bucket]) return;
+  const name = facilityName(bucket);
+  if(!confirm('Remove the glass walked for "' + name + '"?\n\n'
+    + 'The panel run and anything recorded against it go with it, on every device.\n\n'
+    + 'The ice surface itself stays - delete that in Ice if you want it gone too.')) return;
+  /* Tombstoned rather than quietly dropped. The layout has been on the server,
+     so the other devices have to be told it is gone; forgetting it here would
+     just mean the next pull brought it back. */
+  const t = nowISO();
+  LAYOUT_GONE[bucket] = t;
+  LAYOUT_AT[bucket] = t;                 // so an older copy cannot re-add it
+  const m = records[bucket] || {};
+  for(const pid in m) m[pid] = {deleted:true, updatedAt:t};
+  delete LAYOUTS[bucket];
+  setBucket(LEGACY);
+  store();
+  buildPlan(); rail(); totals(); table(); detail(); paint(); paintFacility();
+  say('Removed ' + name + '.');
 }
 
 async function switchRink(b){
@@ -1125,6 +1177,8 @@ function ensureBinding(){
 }
 
 let launcherSheet = null;     // which surface the launcher says you are standing in
+let launcherFacility = null;  // and which facility that surface is at
+let LAYOUT_GONE = {};         // bucket -> updatedAt, for glass that has been removed
 
 /* The facilities and sheets Ice and the launcher keep. Read from this device
    rather than waited for over sync: a surface added on the launcher a moment
@@ -1140,12 +1194,13 @@ async function loadSurfaces(){
     });
   });
   launcherSheet = (st.prefs && st.prefs.activeSheet) || null;
+  launcherFacility = (st.prefs && st.prefs.activeFacility) || null;
   return st;
 }
 
 const SYNC=(typeof Sync!=="undefined")?Sync:null;   // absent if sync.js failed to load; the page still works locally
 const snapshot = () => JSON.stringify({records, who, boundSheetId, pendingFacilityId, bindingAt,
-                                       activeBucket, names: FACILITY_NAMES, at: LAYOUT_AT,
+                                       activeBucket, names: FACILITY_NAMES, at: LAYOUT_AT, gone: LAYOUT_GONE,
                                        counts: GLASS_COUNTS(),
                                        specs: BUILT_SPECS(), built: BUILT_DRAWN()});
 function store(){ Store.set(KEY, snapshot()); say('Saved'); if(SYNC) SYNC.nudge(); }
@@ -1165,6 +1220,7 @@ async function restore(){
     /* Layouts built on this device come back with it. Conway's is compiled in,
        so it is never stored and never overwritten from storage. */
     LAYOUT_AT = saved.at || {};
+    LAYOUT_GONE = saved.gone || {};
     const specs = saved.specs || {};
     for(const k in specs){
       if(k === LEGACY) continue;
@@ -1664,6 +1720,7 @@ async function bldSave(){
 
   document.getElementById('addRink').addEventListener('click', bldOpen);
   document.getElementById('rinkPick').addEventListener('change', e => switchRink(e.target.value));
+  document.getElementById('rinkDel').addEventListener('click', () => deleteRink(activeBucket));
   document.getElementById('bldNext').addEventListener('click', bldNext);
   document.getElementById('bldBack').addEventListener('click', bldBack);
   document.getElementById('bldClose').addEventListener('click', bldClose);
@@ -1704,6 +1761,9 @@ async function bldSave(){
         if(!lay || !lay.spec) continue;
         layouts[k]={id:k, name:FACILITY_NAMES[k]||'', spec:lay.spec, updatedAt:LAYOUT_AT[k]||''};
       }
+      /* Removals travel as tombstones. Dropping one quietly would only mean
+         the next pull handed it back. */
+      for(const k in LAYOUT_GONE) layouts[k]={id:k, deleted:true, updatedAt:LAYOUT_GONE[k]};
       return {glass_panel:panels, glass_binding:binding, glass_layout:layouts};
     },
     apply:(incoming)=>{
@@ -1747,11 +1807,19 @@ async function bldSave(){
       const lays=incoming.glass_layout||{};
       for(const id in lays){
         const v=lays[id];
-        if(v.deleted || id===LEGACY) continue;   // Conway's is compiled in; layouts are not removed
+        if(id===LEGACY) continue;                // Conway's is compiled in
         if(LAYOUT_AT[id] && (v.updatedAt||'') <= LAYOUT_AT[id]) continue;
+        if(v.deleted){
+          /* Somebody took this rink's glass off. Do the same here, and record
+             when, so an older copy of the layout cannot put it back. */
+          delete LAYOUTS[id]; delete records[id];
+          LAYOUT_GONE[id]=v.updatedAt||''; LAYOUT_AT[id]=v.updatedAt||'';
+          if(activeBucket===id) setBucket(LEGACY);
+          taken++; continue;
+        }
         const lay=tryLayout(v.spec);
         if(!lay) continue;
-        LAYOUTS[id]=lay; LAYOUT_AT[id]=v.updatedAt||'';
+        LAYOUTS[id]=lay; LAYOUT_AT[id]=v.updatedAt||''; delete LAYOUT_GONE[id];
         if(v.name) FACILITY_NAMES[id]=v.name;
         taken++;
       }
@@ -1759,8 +1827,13 @@ async function bldSave(){
       const inc=incoming.glass_panel||{};
       for(const rid in inc){
         const v=inc[rid];
-        if(v.deleted) continue;                       // panels are never removed, only re-marked
         const at=splitId(rid);
+        if(v.deleted){
+          /* Conway's are never removed, only re-marked. A scoped tombstone only
+             happens when that rink's glass was taken off altogether. */
+          if(at.bucket!==LEGACY && records[at.bucket]) delete records[at.bucket][at.pid];
+          continue;
+        }
         /* Only the legacy bucket is Conway. A scoped id belongs to another
            rink, whose layout may not have arrived yet, so keep the record but
            do not try to match it against Conway's panel list. */

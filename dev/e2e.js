@@ -90,15 +90,28 @@ ok('device B starts on its own data', before.includes('Main facility') && !befor
 await pb.click('#gearHome'); await pb.waitForTimeout(500);
 await pb.setInputFiles('#backupFile', file);
 await pb.waitForTimeout(1800);
-const after=await pb.textContent('body');
-ok("A's facility arrives on B",       after.includes('Conway Arena'));
-ok('B keeps its own facility too',    after.includes('Main facility'));
+/* Both names used to appear on the home screen, because it listed every
+   facility. It is scoped to the one you are at now - the launcher says which -
+   so the merge is checked where every facility is still managed. */
+await pb.click('#gearHome'); await pb.waitForTimeout(500);
+const managed=await pb.evaluate(()=>[...document.querySelectorAll('#facManage input')].map(i=>i.value));
+ok("A's facility arrives on B",       managed.includes('Conway Arena'), JSON.stringify(managed));
+ok('B keeps its own facility too',    managed.includes('Main facility'), JSON.stringify(managed));
+await pb.click('#scrimClose').catch(()=>{}); await pb.waitForTimeout(300);
 const n=await pb.evaluate(()=>Object.values(JSON.parse(localStorage.getItem('ice_v4_sessions')||'{}')).filter(r=>!r.deleted).length);
 ok('B holds both sets of rounds ('+n+')', n===3);
 
 await pb.reload(); await pb.waitForTimeout(1400);
-const rl=await pb.textContent('body');
-ok('merge survives a reload on B',    rl.includes('Conway Arena') && rl.includes('Main facility'));
+const kept=await pb.evaluate(()=>state.facilities.map(f=>f.name));
+ok('merge survives a reload on B',    kept.includes('Conway Arena') && kept.includes('Main facility'),
+   JSON.stringify(kept));
+
+/* And the scoping itself: this screen is the rink you are standing in. */
+const scoped=await pb.evaluate(()=>({
+  shown:[...document.querySelectorAll('#fleet .fl-fname')].map(e=>e.textContent),
+  active:facility().name }));
+ok('the home screen shows only the facility you are at',
+   scoped.shown.length===1 && scoped.shown[0]===scoped.active, JSON.stringify(scoped));
 
 console.log('\nerrors:', errs.length?errs.slice(0,6):'none');
 console.log('\n  '+pass+' passed, '+fail+' failed');

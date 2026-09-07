@@ -938,8 +938,10 @@ function sessStatsFor(s,f){const vals=Object.values(s.data).map(l=>decOf.get(l))
   const avg=vals.reduce((a,b)=>a+b,0)/vals.length,e=(f.settings&&f.settings.edges)||DEFAULT_EDGES;
   const fb=(f.settings&&f.settings.tieAttention)?e[1]:((f.settings&&f.settings.floodBelow!=null)?f.settings.floodBelow:e[1]);
   return{avg,flood:vals.filter(v=>v<fb).length,n:vals.length};}
+/* The launcher is where you say which rink you are at, and it holds the view
+   across every facility. This screen is the one you are standing in. */
 function buildFleet(){const el=$("fleet");el.innerHTML="";let nSheets=0,nOver=0;const now=Date.now(),od=state.overdueDays??7;
-  state.facilities.forEach(f=>{const grp=document.createElement("div");grp.className="fl-fac";
+  [facility()].filter(Boolean).forEach(f=>{const grp=document.createElement("div");grp.className="fl-fac";
     const h=document.createElement("div");h.className="fl-fname";h.textContent=f.name;grp.appendChild(h);
     const rows=document.createElement("div");rows.className="fl-rows";
     f.sheets.forEach(sh=>{nSheets++;
@@ -956,10 +958,19 @@ function buildFleet(){const el=$("fleet");el.innerHTML="";let nSheets=0,nOver=0;
       row.addEventListener("click",()=>{state.activeFacility=f.id;state.activeSheet=sh.id;state.activeSession=[...sh.sessions].sort((a,b)=>new Date(b.date)-new Date(a.date))[0].id;enterWork("map");});
       rows.appendChild(row);});
     grp.appendChild(rows);el.appendChild(grp);});
-  $("fleetSummary").textContent=`${state.facilities.length} ${state.facilities.length===1?"facility":"facilities"} · ${nSheets} sheet${nSheets===1?"":"s"}${nOver?" · "+nOver+" overdue":""}`;}
+  $("fleetSummary").textContent=`${nSheets} sheet${nSheets===1?"":"s"}${nOver?" · "+nOver+" overdue":""}`;}
 function buildHome(){buildBands();buildFleet();updateBackupBanner();
   // facilities
-  const fl=$("facList");fl.innerHTML="";state.facilities.forEach(f=>{const b=document.createElement("button");b.className="fac"+(f.id===state.activeFacility?" active":"");b.innerHTML=`<span class="pin"></span>${f.name}`;b.addEventListener("click",()=>{state.activeFacility=f.id;const sh=facility().sheets[0];state.activeSheet=sh.id;state.activeSession=[...sh.sessions].sort((a,b)=>new Date(b.date)-new Date(a.date))[0].id;buildBands();buildHome();persist();});fl.appendChild(b);});
+  /* Where you are is one fact, and the launcher owns it. Showing every
+     facility here was a second way to set it, and the two could disagree. */
+  const fl=$("facList");fl.innerHTML="";
+  const cur=facility();
+  if(cur){const b=document.createElement("div");b.className="fac active";
+    b.innerHTML=`<span class="pin"></span>${cur.name}`;fl.appendChild(b);}
+  const other=document.createElement("a");other.className="fac-elsewhere";
+  other.href="index.html";
+  other.textContent=state.facilities.length>1?"At a different rink? →":"All apps →";
+  fl.appendChild(other);
   const fa=document.createElement("button");fa.className="fac add";fa.textContent="+ Add facility";fa.addEventListener("click",addFacility);fl.appendChild(fa);
   // sheets
   $("sheetsLbl").textContent="Sheets at "+facility().name;
