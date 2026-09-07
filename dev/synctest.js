@@ -1,6 +1,9 @@
 const {chromium}=require('playwright');
 const B='http://localhost:8200';
-const ok=(n,c,x)=>console.log((c?'  PASS  ':'  FAIL  ')+n+(x&&!c?'   ['+x+']':''));
+/* Counted, so the exit code can tell a runner whether this passed. A suite
+   that printed FAIL and still exited 0 is one nobody notices. */
+let pass=0, fail=0;
+const ok=(n,c,x)=>{c?pass++:fail++;console.log((c?'  PASS  ':'  FAIL  ')+n+(x&&!c?'   ['+x+']':''));};
 const CFG={url:B, anon:'test', email:'operations@conwayarena.local'};
 
 async function device(browser, name){
@@ -116,4 +119,6 @@ ok('no second sign-in after a reload', !(await G1.p.isVisible('.sync-gate')));
 const all=await rows();
 console.log('\n  server holds '+all.length+' records: '+
   JSON.stringify(all.reduce((a,r)=>{a[r.kind]=(a[r.kind]||0)+1;return a;},{})));
-await b.close();})();
+console.log('\n  '+pass+' passed, '+fail+' failed');
+await b.close();
+process.exit(fail?1:0);})();

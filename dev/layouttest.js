@@ -104,6 +104,78 @@ const back = await p.evaluate(() => {
 ok('switching back restores Conway', back.viewBox === '-118 -60 236 120' && back.panels === 127, JSON.stringify(back));
 ok('and its glass height', back.height.indexOf('75') >= 0, back.height);
 
+/* ---------------- notes on the glass come off ---------------- */
+
+/* Labels and tags lived in the layout with nothing able to edit them, so a
+   panel replaced last month still read "Cracked" and the only fix was editing
+   the file. */
+const noted = await p.evaluate(() => {
+  activeBucket = 'legacy'; useLayout('legacy');
+  buildPlan(); table(); detail(); paint(); paintFacility();
+  select('082');
+  return { label: document.getElementById('plabel').value,
+           tag: document.getElementById('ptag').value,
+           chips: document.querySelectorAll('#tb .tagchip').length };
+});
+ok('a panel shows the label the survey gave it', noted.label === 'Cracked', noted.label);
+ok('and the kind of note it is', noted.tag === 'damage', noted.tag);
+
+const relabelled = await p.evaluate(() => {
+  set('082', { label: 'Replaced Sept 2026', tag: '' });
+  buildPlan(); paint(); table(); detail(); paintNotes();
+  return { label: document.getElementById('plabel').value,
+           tag: document.getElementById('ptag').value,
+           chips: [...document.querySelectorAll('#tb .tagchip')].map(c => c.textContent),
+           title: (document.querySelector('#pnl-082 title') || {}).textContent || '' };
+});
+ok('it can be relabelled', relabelled.label === 'Replaced Sept 2026', relabelled.label);
+/* The word "Cracked" also sits in 082's condition note, so this has to look
+   at the chip rather than the row text. */
+ok('the schedule follows', relabelled.chips.indexOf('Replaced Sept 2026') >= 0
+   && relabelled.chips.indexOf('Cracked') < 0, JSON.stringify(relabelled.chips));
+ok('and so does the plan', /Replaced Sept 2026/.test(relabelled.title), relabelled.title);
+
+/* An empty label is a deliberate clearing, not "fall back to the survey". */
+const cleared = await p.evaluate(() => {
+  set('082', { label: '' });
+  buildPlan(); table(); detail();
+  return { label: document.getElementById('plabel').value,
+           chips: [...document.querySelectorAll('#tb .tagchip')].map(c => c.textContent) };
+});
+ok('clearing a label leaves it cleared, not back to the survey',
+   cleared.label === '' && cleared.chips.indexOf('Replaced Sept 2026') < 0, JSON.stringify(cleared));
+
+/* The standing explanation about panel 111 hangs off that panel's tag, so
+   confirming it on a walk-round takes the explanation with it. */
+const before111 = await p.evaluate(() =>
+  [...document.querySelectorAll('#notes .note h3')].map(h => h.textContent));
+ok('Conway shows its survey notes', before111.length === 3, JSON.stringify(before111));
+ok('including the one about panel 111', before111.some(t => /111/.test(t)), JSON.stringify(before111));
+
+const after111 = await p.evaluate(() => {
+  set('111', { tag: '' });
+  buildPlan(); paint(); paintNotes();
+  return { titles: [...document.querySelectorAll('#notes .note h3')].map(h => h.textContent),
+           ticks: document.querySelectorAll('.tick.assumed').length,
+           dashed: document.querySelectorAll('.pnl.assumed').length };
+});
+ok('confirming panel 111 retires its explanation',
+   !after111.titles.some(t => /111/.test(t)), JSON.stringify(after111.titles));
+ok('and the others stay', after111.titles.length === 2, JSON.stringify(after111.titles));
+ok('the plan stops flagging it too', after111.ticks === 0 && after111.dashed === 0,
+   JSON.stringify(after111));
+
+/* Those notes are Conway's findings about Conway. They were written into the
+   markup, so every rink built since was shown them. */
+const otherRink = await p.evaluate(() => {
+  activeBucket = 'test'; useLayout('test');
+  buildPlan(); table(); detail(); paint(); paintFacility();
+  return { hidden: document.getElementById('notes').hidden,
+           text: document.getElementById('notes').textContent.trim() };
+});
+ok('another rink is not shown Conway\'s survey notes',
+   otherRink.hidden && otherRink.text === '', JSON.stringify(otherRink));
+
 console.log('\n  ' + pass + ' passed, ' + fail + ' failed');
 await b.close();
 process.exit(fail ? 1 : 0);

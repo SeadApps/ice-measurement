@@ -24,7 +24,10 @@ async function seedSignedIn(ctx){
     window.__SYNC_CONFIG__={url:'http://localhost:8200', anon:'test', email:'operations@conwayarena.local'};
   }, tok);
 }
-const ok=(n,c)=>console.log((c?'  PASS  ':'  FAIL  ')+n);
+/* Counted, so the exit code can tell a runner whether this passed. A suite
+   that printed FAIL and still exited 0 is one nobody notices. */
+let pass=0, fail=0;
+const ok=(n,c)=>{c?pass++:fail++;console.log((c?'  PASS  ':'  FAIL  ')+n);};
 
 (async()=>{
 const b=await chromium.launch();
@@ -98,4 +101,6 @@ const rl=await pb.textContent('body');
 ok('merge survives a reload on B',    rl.includes('Conway Arena') && rl.includes('Main facility'));
 
 console.log('\nerrors:', errs.length?errs.slice(0,6):'none');
-await b.close();})();
+console.log('\n  '+pass+' passed, '+fail+' failed');
+await b.close();
+process.exit(fail?1:0);})();

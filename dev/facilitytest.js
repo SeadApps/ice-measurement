@@ -79,6 +79,31 @@ ok('a single-sheet facility is not suffixed with the sheet name',
    !(await G.p.textContent('#facName')).includes(' - '),
    await G.p.textContent('#facName'));
 
+/* ---- the seeded notes are a starting point, not an observation ---- */
+
+/* Two notes off the measurement doc are compiled into glass.html. A device
+   with no records starts from them - but sending one restamps it newest on the
+   server, and a note somebody cleared last week comes back for everybody. */
+const seeded = await G.p.evaluate(() => ({
+  note: (records.legacy['069'] || {}).note,
+  marked: !!(records.legacy['069'] || {}).seed
+}));
+ok('a fresh device starts from the surveyed notes', /Plexi currently installed/.test(seeded.note || ''),
+   seeded.note);
+ok('and they are marked as a starting point', seeded.marked === true, JSON.stringify(seeded));
+await G.p.evaluate(() => Sync.sync('again')); await sleep(3000);
+ok('which is never sent',
+   !(await rows()).some(r => r.kind === 'glass_panel' && r.id === '069'),
+   JSON.stringify((await rows()).filter(r => r.kind === 'glass_panel').map(r => r.id)));
+
+/* Clearing one is a real observation and does travel. */
+await G.p.evaluate(() => set('069', { note: '' })); await sleep(4000);
+const cleared069 = (await rows()).find(r => r.kind === 'glass_panel' && r.id === '069');
+ok('clearing it does travel', !!cleared069 && cleared069.body.note === '',
+   cleared069 && JSON.stringify(cleared069.body));
+ok('and it stops being a starting point',
+   !(await G.p.evaluate(() => (records.legacy['069'] || {}).seed)));
+
 /* ---- a mark still travels under a bare id ---- */
 await G.p.evaluate(() => set('045', { status: 'replace', note: 'cracked' }));
 await sleep(4000);

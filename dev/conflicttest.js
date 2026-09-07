@@ -1,6 +1,9 @@
 const {chromium}=require('playwright');
 const B='http://localhost:8200';
-const ok=(n,c,x)=>console.log((c?'  PASS  ':'  FAIL  ')+n+(x&&!c?'   ['+x+']':''));
+/* Counted, so the exit code can tell a runner whether this passed. A suite
+   that printed FAIL and still exited 0 is one nobody notices. */
+let pass=0, fail=0;
+const ok=(n,c,x)=>{c?pass++:fail++;console.log((c?'  PASS  ':'  FAIL  ')+n+(x&&!c?'   ['+x+']':''));};
 const CFG={url:B, anon:'test', email:'operations@conwayarena.local'};
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const rows=async()=>(await (await fetch(B+'/__rows')).json());
@@ -74,4 +77,6 @@ ok('69 is still on plexi, 82 still cracked',
 const all=await rows();
 console.log('\n  server holds '+all.length+' glass records; '+
   Object.keys(fin).length+' panels marked locally');
-await b.close();})();
+console.log('\n  '+pass+' passed, '+fail+' failed');
+await b.close();
+process.exit(fail?1:0);})();
