@@ -358,6 +358,69 @@ await sleep(400);
 ok('the walk records which way round it is',
    await p.evaluate(k => LAYOUTS[k].spec.flip === true, facedBucket));
 
+/* ---------------- the picker follows the launcher, and lets go ---------------- */
+
+p.on('dialog', d => d.accept());
+
+/* A second site, with glass of its own. */
+await p.evaluate(t => {
+  const fac = JSON.parse(localStorage.getItem('ice_v4_facilities'));
+  const sh = JSON.parse(localStorage.getItem('ice_v4_sheets'));
+  fac.fb = {id:'fb', name:'Berlin Arena', ord:1, updatedAt:t};
+  sh.sc = {id:'sc', facilityId:'fb', name:'Rink 1', ord:0, updatedAt:t};
+  localStorage.setItem('ice_v4_facilities', JSON.stringify(fac));
+  localStorage.setItem('ice_v4_sheets', JSON.stringify(sh));
+  const pr = JSON.parse(localStorage.getItem('ice_v4_prefs') || '{}');
+  pr.activeFacility = 'fb'; pr.activeSheet = 'sc';
+  localStorage.setItem('ice_v4_prefs', JSON.stringify(pr));
+}, '2026-09-01T00:00:00.000Z');
+
+await p.click('#addRink'); await sleep(500);
+ok('the builder starts on the new site\'s surface',
+   (await p.evaluate(() => BLD.sheet)) === 'sc', await p.evaluate(() => BLD.sheet));
+const onSc = await p.evaluate(walkIn, null); await sleep(400);
+ok('and walking it keys the glass to that surface', onSc === 'sc', String(onSc));
+
+/* Back at the first site, the picker should not be offering Berlin. */
+await p.evaluate(async () => {
+  const pr = JSON.parse(localStorage.getItem('ice_v4_prefs'));
+  pr.activeFacility = 'fa'; pr.activeSheet = 'sb';
+  localStorage.setItem('ice_v4_prefs', JSON.stringify(pr));
+  await switchRink('sb'); await loadSurfaces(); fillRinks();
+});
+await sleep(400);
+const offered = await p.evaluate(() =>
+  [...document.getElementById('rinkPick').options].map(o => o.value));
+ok('the picker offers this facility\'s rinks', offered.indexOf('sb') >= 0, JSON.stringify(offered));
+ok('and not another site\'s', offered.indexOf('sc') < 0, JSON.stringify(offered));
+/* Conway's glass is bound to a surface at neither site in this fixture, so it
+   cannot be classified - and something you cannot classify is better shown. */
+ok('Conway is not hidden by a facility it cannot be placed at',
+   offered.indexOf('legacy') >= 0, JSON.stringify(offered));
+
+/* Glass walked by mistake had no way off the device. */
+ok('a walked rink offers a way to remove it',
+   !(await p.evaluate(() => document.getElementById('rinkDel').hidden)));
+await p.evaluate(async () => { await switchRink('legacy'); });
+await sleep(300);
+ok('Conway does not, being compiled in rather than walked',
+   await p.evaluate(() => document.getElementById('rinkDel').hidden));
+
+await p.evaluate(async () => { await switchRink('sb'); }); await sleep(300);
+await p.evaluate(async () => { await deleteRink('sb'); }); await sleep(500);
+const gone = await p.evaluate(() => ({
+  layout: !!LAYOUTS['sb'], bucket: activeBucket, tombstoned: !!LAYOUT_GONE['sb'],
+  options: [...document.getElementById('rinkPick').options].map(o => o.value) }));
+ok('removing it takes the layout with it', !gone.layout, JSON.stringify(gone));
+ok('and drops you back on Conway', gone.bucket === 'legacy', gone.bucket);
+ok('the picker stops offering it', gone.options.indexOf('sb') < 0, JSON.stringify(gone.options));
+/* Dropped quietly, the next pull would simply hand it back. */
+ok('and it is tombstoned, not just forgotten', gone.tombstoned, JSON.stringify(gone));
+
+await p.reload(); await sleep(1800);
+await p.evaluate(() => document.querySelectorAll('.sync-gate').forEach(e => e.remove()));
+ok('it stays gone after a reload', await p.evaluate(() => !LAYOUTS['sb']));
+
 ok('nothing threw throughout', errs.length === 0, JSON.stringify(errs.slice(0, 3)));
 
 console.log('\n  ' + pass + ' passed, ' + fail + ' failed');

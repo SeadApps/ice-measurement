@@ -167,6 +167,31 @@ ok('and the good rink still arrives alongside it',
 ok('the marked panel came too', (await E.p.evaluate(k =>
    (bucketOf(k)['002'] || {}).status, bucket)) === 'replace');
 
+/* ---------------- and a rink can be taken back off ---------------- */
+
+/* Glass walked by mistake has to go everywhere, not just on the device that
+   noticed. */
+A.p.on('dialog', d => d.accept());
+await A.p.evaluate(async k => { await switchRink(k); await deleteRink(k); }, bucket);
+await sleep(4000);
+const tomb = (await layoutRows()).find(r => r.id === bucket);
+ok('removing a rink tombstones its layout', !!tomb && tomb.deleted === true,
+   tomb && JSON.stringify({id:tomb.id, deleted:tomb.deleted}));
+
+const F = await device(b);
+await F.p.goto(B + '/glass.html'); await signIn(F.p);
+await sleep(3500);
+ok('a device that never saw it does not draw it',
+   await F.p.evaluate(k => !LAYOUTS[k], bucket));
+ok('and it is not offered in the picker',
+   await F.p.evaluate(k => [...document.getElementById('rinkPick').options]
+     .every(o => o.value !== k), bucket));
+await F.ctx.close();
+
+await D.p.evaluate(() => Sync.sync('again')); await sleep(3000);
+ok('and the device that had it lets go too',
+   await D.p.evaluate(k => !LAYOUTS[k], bucket));
+
 ok('nothing threw throughout', errs.length === 0, JSON.stringify(errs.slice(0, 3)));
 
 console.log('\n  ' + pass + ' passed, ' + fail + ' failed');

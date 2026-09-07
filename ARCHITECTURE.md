@@ -238,15 +238,15 @@ Then from the repo root:
 node dev/fake-supabase.js &
 node dev/synctest.js       # 20 checks: sign-in, two devices, offline, paused
 node dev/conflicttest.js   # 10 checks: no churn, contested edits, retries
-node dev/e2e.js            # 14 checks: legacy migration, backup merge
+node dev/e2e.js            # 15 checks: legacy migration, backup merge, the scoped home screen
 node dev/homecheck.js      # 77 checks: the gate, the fleet, adding a rink, a rotated code
 node dev/cursortest.js     #  6 checks: one pull cursor per app, not per device
 node dev/facilitytest.js   # 32 checks: facilities in Glass, ids scoped without a migration,
                            #            and the glass bound to a sheet rather than a building
 node dev/layouttest.js     # 31 checks: the renderer draws a layout, and notes come off it
-node dev/layoutsynctest.js # 20 checks: a built rink crosses devices as its walk
+node dev/layoutsynctest.js # 24 checks: a built rink crosses devices as its walk, and goes back off
 node dev/gentest.js        # 19 checks: the generator reproduces Conway's survey, either way round
-node dev/buildertest.js    # 60 checks: walking a rink in, what it writes, and the surface it hangs off
+node dev/buildertest.js    # 72 checks: walking a rink in, what it writes, the surface it hangs off, removing it
 node dev/reg.js            # 14 checks: rounds persist, prefs stay separate, the switcher is reachable
 node dev/resume.js         #  9 checks: coming back lands where you left off
 ```
@@ -354,6 +354,41 @@ a centre line.
 gate is tagged differently threw there and took the whole plan down with it,
 not just the label. Openings are counted from the run instead of assumed to be
 two benches, and the uniform-joint row appears only where a survey supplied one.
+
+### The launcher's choice scopes both apps
+
+Where you are is one fact and the launcher owns it, so the apps follow it rather
+than each offering their own way to set it.
+
+**Ice's home screen is the facility you are standing in.** It listed every
+facility, which was a second way to choose one and could disagree with the
+launcher. The fleet is that facility's sheets, and the facility row names it
+with a link back to the launcher to go somewhere else. Every facility is still
+listed in **settings**, where they are renamed and deleted — an imported backup
+brings facilities in, and they have to be visible somewhere.
+
+**Glass's rink picker offers that facility's surfaces.** A bucket whose facility
+cannot be worked out is left in rather than hidden — hiding something you cannot
+classify is worse than showing it — and so is whatever is on screen, so the
+picker never hides the rink you are looking at.
+
+### Taking a rink's glass back off
+
+Glass walked by mistake had no way off the device: the picker listed it for ever
+and there was nothing to press. The picker has a ✕ for whatever it is showing,
+except Conway — that layout is compiled into the file rather than walked, so
+there is nothing to take off.
+
+**It tombstones rather than drops.** The layout has been on the server, so the
+other devices have to be told it is gone; forgetting it locally would only mean
+the next pull handed it back. `LAYOUT_GONE` holds the removals, `collect()`
+sends them, and `apply()` takes the rink off any device that receives one.
+Panel records under that bucket are tombstoned with it, which is the one place
+a scoped panel is ever removed rather than merely re-marked — Conway's never
+are.
+
+The ice surface itself stays. Deleting that is Ice's job, in settings, and is a
+different decision: a rink whose glass was walked wrong still has rounds on it.
 
 ### Which way the building faces
 
