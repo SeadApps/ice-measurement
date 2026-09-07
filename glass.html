@@ -195,6 +195,11 @@ tr.grp td{background:var(--surface-3);font-family:var(--display);font-weight:600
 .t-assumed{color:var(--warn)}
 
 /* ---- notes ---- */
+.pnl-note{display:flex;gap:8px;margin-top:10px}
+.pnl-note input{flex:1;min-width:0}
+.pnl-note input,.pnl-note select{font:inherit;font-size:13px;background:var(--surface-2);color:var(--ink);
+  border:1px solid var(--line);border-radius:8px;padding:7px 9px;height:34px}
+.pnl-note input:focus-visible,.pnl-note select:focus-visible{outline:2px solid var(--accent);outline-offset:-1px}
 .notes{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:0;border:1px solid var(--line);
   border-radius:10px;overflow:hidden;background:var(--surface)}
 .note{padding:15px 18px;border-right:1px solid var(--line)}
@@ -380,20 +385,7 @@ document.documentElement.setAttribute("data-theme",_t==="light"?"light":"dark");
   </div>
 </div>
 
-<div class="notes">
-  <div class="note info">
-    <h3>The bench openings check out</h3>
-    <p>Two openings of 29&prime; 6&Prime;, starting after panels 93 and 102 as recorded. That puts the penalty boxes and the scorekeeper opening between them, centred on centre ice to within half an inch &mdash; a good sign the 200&prime; length and the opening widths are right.</p>
-  </div>
-  <div class="note">
-    <h3>Panel 111 is inferred, not measured</h3>
-    <p>A 43&Prime; panel has been added at the bench&#8209;side corner to close the Zamboni end, on the assumption the original count missed one. It brings that end to 113&prime; 9&frac12;&Prime; against the lobby end's 113&prime; 10&Prime; &mdash; half an inch apart. Everything from 111 on is renumbered. <b>Confirm it on the next walk&#8209;round.</b></p>
-  </div>
-  <div class="note info">
-    <h3>Corners &amp; joints</h3>
-    <p>The corner radius is solved from the glass, not assumed: 27&prime; 2&Prime; is the only radius that lets a true 200&prime; sheet close with one consistent joint. Joints come out at &#8776;&frac78;&Prime; on the bleacher side, lobby end and bench side alike. Panel sizes are exactly as measured.</p>
-  </div>
-</div>
+<div class="notes" id="notes" hidden></div>
 
 <footer id="pageFooter"></footer>
 </div>
@@ -449,7 +441,20 @@ LAYOUTS[LEGACY] = {
     lede: ', Nashua NH · all 127 pieces in running order from the Zamboni doors, counter‑clockwise. '
         + 'Click any panel on the plan or in the schedule to record its condition.',
     planNote: 'Zamboni end at left · counter‑clockwise',
-    footer: '127 pieces · all glass 75″ high · ends 5/8″ tempered, sides 1/2″ · measurements as recorded'
+    footer: '127 pieces · all glass 75″ high · ends 5/8″ tempered, sides 1/2″ · measurements as recorded',
+    /* Conway's survey notes. They were written into the markup, which meant
+       every rink built since was shown Conway's findings about its own bench
+       openings. A note with `needsTag` is about something still unresolved and
+       goes when that is settled - clear panel 111's tag on the walk-round that
+       confirms it and the explanation goes with it. */
+    notes: [
+      { tone:'info', title:'The bench openings check out',
+        html:"Two openings of 29&prime; 6&Prime;, starting after panels 93 and 102 as recorded. That puts the penalty boxes and the scorekeeper opening between them, centred on centre ice to within half an inch &mdash; a good sign the 200&prime; length and the opening widths are right." },
+      { needsTag:'assumed', title:'Panel 111 is inferred, not measured',
+        html:"A 43&Prime; panel has been added at the bench&#8209;side corner to close the Zamboni end, on the assumption the original count missed one. It brings that end to 113&prime; 9&frac12;&Prime; against the lobby end's 113&prime; 10&Prime; &mdash; half an inch apart. Everything from 111 on is renumbered. <b>Confirm it on the next walk&#8209;round.</b>" },
+      { tone:'info', title:'Corners &amp; joints',
+        html:"The corner radius is solved from the glass, not assumed: 27&prime; 2&Prime; is the only radius that lets a true 200&prime; sheet close with one consistent joint. Joints come out at &#8776;&frac78;&Prime; on the bleacher side, lobby end and bench side alike. Panel sizes are exactly as measured." }
+    ]
   }
 };
 
@@ -634,6 +639,24 @@ const STATUS = {
 };
 let state = {};          // the active facility's panels: id -> {status, note}
 let sel = null;          // selected panel id
+
+/* The layout carries what a panel was surveyed as; the record carries what
+   somebody has since decided it should say. Nothing in the app could edit
+   these before, so a panel replaced last month still read "Cracked" and the
+   only fix was editing the file.
+
+   An empty string is a deliberate clearing and is not the same as never having
+   set one - which is why this checks for the key rather than a truthy value. */
+const TAGS = {'':'Nothing noted', door:'Door', damage:'Damage',
+              assumed:'Assumed \u2014 verify', feature:'Feature', zamdoor:'Zamboni door'};
+function labelOf(p){
+  const r = p && state[p.id];
+  return (r && r.label !== undefined) ? r.label : ((p && p.label) || '');
+}
+function tagOf(p){
+  const r = p && state[p.id];
+  return (r && r.tag !== undefined) ? r.tag : ((p && p.tag) || '');
+}
 let filter = null;       // status filter
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const st = id => (state[id] && state[id].status) || 'ok';
@@ -696,12 +719,12 @@ function buildPlan(target){
 
   // glass
   GLASS.forEach(p=>{
-    parts.push(`<path class="pnl${p.tag==='assumed'?' assumed':''}" id="pnl-${p.id}" data-id="${p.id}" d="${p.d}"><title>#${p.id.replace(/^0+/,'')} · ${p.width_in}″ · ${p.thickness}${p.label?' · '+p.label:''}</title></path>`);
+    parts.push(`<path class="pnl${tagOf(p)==='assumed'?' assumed':''}" id="pnl-${p.id}" data-id="${p.id}" d="${p.d}"><title>#${p.id.replace(/^0+/,'')} · ${p.width_in}″ · ${p.thickness}${labelOf(p)?' · '+labelOf(p):''}</title></path>`);
   });
-  GLASS.filter(p=>p.tag && p.tag!=='zamdoor').forEach(p=>{
+  GLASS.filter(p=>tagOf(p) && tagOf(p)!=='zamdoor').forEach(p=>{
     const dx=p.ix-p.cx, dy=p.iy-p.cy, m=Math.hypot(dx,dy);
     const x0=p.cx+dx/m*1.45, y0=p.cy+dy/m*1.45;
-    parts.push(`<line class="tick ${p.tag}" x1="${x0.toFixed(2)}" y1="${y0.toFixed(2)}" x2="${(x0+dx/m*2.1).toFixed(2)}" y2="${(y0+dy/m*2.1).toFixed(2)}"/>`);
+    parts.push(`<line class="tick ${tagOf(p)}" x1="${x0.toFixed(2)}" y1="${y0.toFixed(2)}" x2="${(x0+dx/m*2.1).toFixed(2)}" y2="${(y0+dy/m*2.1).toFixed(2)}"/>`);
   });
   GLASS.forEach(p=>{
     if(p.len_ft >= 2.4) parts.push(`<text class="pnum" id="num-${p.id}" x="${p.lx}" y="${p.ly}" transform="rotate(${p.rot} ${p.lx} ${p.ly})">${p.id.replace(/^0+/,'')}</text>`);
@@ -709,7 +732,7 @@ function buildPlan(target){
   /* Guarded: a rink whose gate is tagged differently, or has none, used to
      throw here on d1.ix and take the whole plan down with it — not just the
      label. */
-  const d1 = GLASS.find(p=>p.tag==='zamdoor');
+  const d1 = GLASS.find(p=>tagOf(p)==='zamdoor');
   if(d1 && LAYOUT.zamDoorLabel)
     parts.push(`<text class="doorlbl" x="${(d1.ix+2.2)}" y="0" transform="rotate(-90 ${d1.ix+2.2} 0)">${esc(LAYOUT.zamDoorLabel)}</text>`);
 
@@ -738,7 +761,7 @@ function paint(){
   GLASS.forEach(p=>{
     const el = document.getElementById('pnl-'+p.id); if(!el) return;
     const s = st(p.id);
-    el.setAttribute('fill', s==='ok' ? (p.tag==='zamdoor'?'var(--surface-3)':'var(--ok-soft)') : `var(--${STATUS[s].cls})`);
+    el.setAttribute('fill', s==='ok' ? (tagOf(p)==='zamdoor'?'var(--surface-3)':'var(--ok-soft)') : `var(--${STATUS[s].cls})`);
     el.classList.toggle('sel', sel===p.id);
     el.classList.toggle('dim', !!filter && s!==filter);
     const n = document.getElementById('num-'+p.id);
@@ -809,7 +832,7 @@ function table(){
         <td class="num">${p.width_in}&Prime;</td>
         <td class="num" style="color:var(--ink-3)">${p.thickness}</td>
         <td><span class="pill p-${STATUS[s].cls}"><i></i>${STATUS[s].short}</span></td>
-        <td style="color:var(--ink-2);font-size:12.5px">${p.label?`<span class="tagchip t-${p.tag}">${esc(p.label)}</span> `:''}${esc(n)}</td></tr>`);
+        <td style="color:var(--ink-2);font-size:12.5px">${labelOf(p)?`<span class="tagchip t-${tagOf(p)}">${esc(labelOf(p))}</span> `:''}${esc(n)}</td></tr>`);
     });
   });
   const tb = document.getElementById('tb');
@@ -831,10 +854,14 @@ function detail(){
       <dt>Height</dt><dd>${glassHeightOf(p)}&Prime;</dd>
       <dt>Thickness</dt><dd>${p.thickness} tempered</dd>
       <dt>Section</dt><dd style="font-family:var(--body)">${esc(p.section)}</dd>
-      ${p.label?`<dt>Noted</dt><dd style="font-family:var(--body)"><span class="tagchip t-${p.tag}">${esc(p.label)}</span></dd>`:''}
     </dl>
     <div class="stat-btns">
       ${Object.entries(STATUS).map(([k,v])=>`<button class="sbtn" data-s="${k}" aria-pressed="${s===k}"><i class="sw-${v.cls}"></i>${v.label}</button>`).join('')}
+    </div>
+    <div class="pnl-note">
+      <input id="plabel" type="text" placeholder="Nothing noted" value="${esc(labelOf(p))}"
+             aria-label="What this panel is noted as">
+      <select id="ptag" aria-label="Kind of note">${Object.keys(TAGS).map(k=>`<option value="${k}"${tagOf(p)===k?' selected':''}>${TAGS[k]}</option>`).join('')}</select>
     </div>
     <textarea id="note" placeholder="Note — supplier, date, who spotted it…">${esc(nt(sel))}</textarea>
     <div class="savenote" id="savenote"></div>`;
@@ -842,6 +869,13 @@ function detail(){
   let t; el.querySelector('#note').addEventListener('input', e=>{
     clearTimeout(t); t = setTimeout(()=>set(sel,{note:e.target.value},true), 600);
   });
+  /* A label or a tag changes what the plan and the schedule draw and can
+     retire a survey note, so more has to be redrawn than a condition does. */
+  const redraw = () => { buildPlan(); paint(); paintNotes(); };
+  let lt; el.querySelector('#plabel').addEventListener('input', e=>{
+    clearTimeout(lt); lt = setTimeout(()=>{ set(sel,{label:e.target.value},true); redraw(); }, 600);
+  });
+  el.querySelector('#ptag').addEventListener('change', e=>{ set(sel,{tag:e.target.value}); redraw(); });
 }
 function select(id){ sel = (sel===id?null:id); detail(); table(); paint(); }
 
@@ -989,7 +1023,25 @@ function paintFacility(){
   set('specSize', fmtFt(L * 12) + ' × ' + fmtFt(W * 12));
   set('specRadius', fmtFt(R * 12));
   set('specRun', fmtFt(GLASS.reduce((a, p) => a + p.width_in, 0)));
+  paintNotes();
   fillRinks();
+}
+
+/* This rink's survey notes. A note tied to a tag is about something still
+   unresolved, so it goes when that tag does: confirm panel 111 on a
+   walk-round, clear its tag, and the explanation goes with it rather than
+   leaving a note about a question that has been answered.
+
+   The copy is compiled into this file, not typed by anybody, which is why it
+   can carry its own markup. */
+function paintNotes(){
+  const el = document.getElementById('notes');
+  if(!el) return;
+  const list = ((LAYOUT.copy || {}).notes || [])
+    .filter(x => !x.needsTag || GLASS.some(p => tagOf(p) === x.needsTag));
+  el.innerHTML = list.map(x => '<div class="note' + (x.tone === 'info' ? ' info' : '') + '">'
+    + '<h3>' + x.title + '</h3><p>' + x.html + '</p></div>').join('');
+  el.hidden = !list.length;
 }
 
 /* The way back off a rink the builder just made. Before this, bldSave() moved
@@ -1103,8 +1155,18 @@ async function restore(){
   } else {
     let v1 = null;
     try{ v1 = JSON.parse(await Store.get(KEY_V1) || 'null'); }catch(e){}
-    records = {}; records[LEGACY] = (v1 && v1.panels) ? v1.panels
-                                  : JSON.parse(JSON.stringify(DATA.cond || {}));
+    records = {};
+    if(v1 && v1.panels) records[LEGACY] = v1.panels;
+    else {
+      /* The two notes off the measurement doc. They are where a device with
+         nothing starts, not something it observed - so they are marked, and
+         collect() never sends them. Sending one restamps it newest on the
+         server, and the note somebody cleared last week comes back for
+         everybody: that is what made those two effectively permanent. */
+      const seed = JSON.parse(JSON.stringify(DATA.cond || {}));
+      for(const id in seed) seed[id].seed = true;
+      records[LEGACY] = seed;
+    }
     who = (v1 && v1.who) || '';
     /* v1 is left untouched as a fallback, the same way the Ice app leaves
        ice_sheet_v3 alone after moving to records. */
@@ -1117,8 +1179,10 @@ async function restore(){
 const nowISO = () => new Date().toISOString();
 const stampOf = r => (r && (r.updatedAt || r.at)) || '';   // full timestamp, else the older date-only field
 function set(id, patch, quiet){
-  state[id] = Object.assign({status:'ok',note:''}, state[id], patch,
-                            {by: who || '', at: stamp(), updatedAt: nowISO()});
+  const next = Object.assign({status:'ok',note:''}, state[id], patch,
+                             {by: who || '', at: stamp(), updatedAt: nowISO()});
+  delete next.seed;            // somebody has touched it, so it is an observation now
+  state[id] = next;
   store(); rail(); table(); paint();
   if(!quiet) detail();          // keep focus in the note box while typing
 }
@@ -1585,7 +1649,10 @@ async function bldSave(){
       const panels={};
       for(const bucket in records){
         const m=records[bucket];
-        for(const pid in m){ const rid=recId(bucket,pid); panels[rid]=Object.assign({}, m[pid], {id:rid}); }
+        for(const pid in m){
+          if(m[pid] && m[pid].seed) continue;      // a starting point, not an observation
+          const rid=recId(bucket,pid); panels[rid]=Object.assign({}, m[pid], {id:rid});
+        }
       }
       /* facilityId rides along beside sheetId so a device still on the
          facility-bound build reads a binding it understands, instead of seeing

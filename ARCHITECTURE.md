@@ -80,7 +80,7 @@ per-kind maps in local storage, and each carries its own timestamp.
 | `facility` | `ice_v4_facilities` | name, settings |
 | `sheet` | `ice_v4_sheets` | `facilityId`, size |
 | `session` | `ice_v4_sessions` | `sheetId`, date, mode, `data` (readings), `notes` |
-| `glass_panel` | `glass_record_v2` | status, note, by, at (`glass_record_v1` kept as a fallback) |
+| `glass_panel` | `glass_record_v2` | status, note, by, at, and `label`/`tag` where somebody has changed them |
 | `glass_binding` | `glass_record_v2` | `sheetId` — which ice surface the Conway panels are the glass for |
 | `glass_layout` | `glass_record_v2` | the walk a built rink was made from; the drawing is regenerated |
 | — | `ice_v4_prefs` | **device-local, never synced** |
@@ -241,9 +241,9 @@ node dev/conflicttest.js   # 10 checks: no churn, contested edits, retries
 node dev/e2e.js            # 14 checks: legacy migration, backup merge
 node dev/homecheck.js      # 77 checks: the gate, the fleet, adding a rink, a rotated code
 node dev/cursortest.js     #  6 checks: one pull cursor per app, not per device
-node dev/facilitytest.js   # 27 checks: facilities in Glass, ids scoped without a migration,
+node dev/facilitytest.js   # 32 checks: facilities in Glass, ids scoped without a migration,
                            #            and the glass bound to a sheet rather than a building
-node dev/layouttest.js     # 19 checks: the renderer draws a layout, not Conway
+node dev/layouttest.js     # 31 checks: the renderer draws a layout, and notes come off it
 node dev/layoutsynctest.js # 20 checks: a built rink crosses devices as its walk
 node dev/gentest.js        # 14 checks: the generator reproduces Conway's survey
 node dev/buildertest.js    # 42 checks: walking a rink in, what it writes, and the way back off it
@@ -348,6 +348,38 @@ gate is tagged differently threw there and took the whole plan down with it,
 not just the label. Openings are counted from the run instead of assumed to be
 two benches, and the uniform-joint row appears only where a survey supplied one.
 
+### Taking a note back off
+
+Two kinds of writing sit on the glass and they behaved differently, neither of
+them well.
+
+**Condition notes** are what somebody typed against a panel. Two are compiled
+into `glass.html` from the measurement doc — panels 069 and 082 — and a device
+with no records of its own starts from them. That much is right; what was wrong
+is that it then *sent* them. A push restamps a record newest on the server, so a
+note cleared last week came back for everybody the first time a new device
+opened Glass. Those two notes were effectively permanent.
+
+Seeded records are marked, and `collect()` never sends a marked one: it is
+where this device starts, not something it observed. The mark comes off the
+moment anybody edits the record, so clearing a note is a real observation and
+travels like any other.
+
+**Labels and tags** — "Cracked", "Added to close the end — verify" — lived in
+the layout, and nothing in the app could edit them. A panel replaced last month
+still read "Cracked" and the only fix was editing the file. They are now part of
+the record too: `labelOf()` and `tagOf()` prefer the record and fall back to
+the layout, so the survey is still the default and an edit is an override.
+**An empty string is a deliberate clearing** and is not the same as never having
+set one, which is why both check for the key rather than a truthy value.
+
+**The survey notes under the plan are layout copy**, not markup. They were
+written into the page, so every rink built since was shown Conway's findings
+about Conway's bench openings. A note carrying `needsTag` is about something
+still unresolved and is drawn only while some panel still has that tag — so
+confirming panel 111 on a walk-round and clearing its tag takes the explanation
+with it, rather than leaving a note about a question that has been answered.
+
 ### Sending a rink: the walk, not the drawing
 
 A generated layout is around 60KB — a panel per piece, each carrying an SVG
@@ -427,7 +459,9 @@ where that facility has more than one surface, so Conway still reads
 
 - **Zamboni end, panel 111.** A 43″ panel inferred to close a 43½″ shortfall,
   drawn dashed and flagged in the schedule. Never confirmed on site. Either a
-  missed panel or the Zamboni doorway is wider than its two 57½″ leaves.
+  missed panel or the Zamboni doorway is wider than its two 57½″ leaves. The app
+  can now be told the answer: clearing that panel's tag retires the dashes, the
+  tick and the standing explanation together.
 - **Glass Manager on a phone** has not been looked at. Desktop and tablet are fine.
 - **Ice app has no "marked by" field.** Glass does. Worth adding for parity —
   attribution without individual logins.

@@ -17,7 +17,10 @@ async function seedSignedIn(ctx){
     window.__SYNC_CONFIG__={url:'http://localhost:8200', anon:'test', email:'operations@conwayarena.local'};
   }, tok);
 }
-const ok=(n,c)=>console.log((c?'  PASS  ':'  FAIL  ')+n);
+/* Counted, so the exit code can tell a runner whether this passed. A suite
+   that printed FAIL and still exited 0 is one nobody notices. */
+let pass=0, fail=0;
+const ok=(n,c)=>{c?pass++:fail++;console.log((c?'  PASS  ':'  FAIL  ')+n);};
 (async()=>{const b=await chromium.launch();
 const ctx = await b.newContext({viewport:{width:1400,height:900}}); await seedSignedIn(ctx);
 const p=await ctx.newPage(); const errs=[];
@@ -56,4 +59,6 @@ await p.reload(); await p.waitForTimeout(1500);
 ok('a reload also resumes the sheet', await p.isVisible('#rink'));
 
 console.log('\nerrors:', errs.length?errs.slice(0,5):'none');
-await b.close();})();
+console.log('\n  '+pass+' passed, '+fail+' failed');
+await b.close();
+process.exit(fail?1:0);})();
