@@ -235,6 +235,92 @@ ok('a corner start gives four stretches', /Stretch 1 of 4/.test(await p.textCont
    (await p.textContent('#bldBody')).slice(0, 40));
 await p.click('#bldClose'); await sleep(150);
 
+/* ---------------- the join: glass hangs off an ice surface ---------------- */
+
+/* Seeded the way the launcher writes them, so the builder is looking at real
+   surfaces rather than anything invented here. */
+await p.evaluate(t => {
+  localStorage.setItem('ice_v4_facilities', JSON.stringify({
+    fa:{id:'fa',name:'Laconia Ice',ord:0,updatedAt:t} }));
+  localStorage.setItem('ice_v4_sheets', JSON.stringify({
+    sa:{id:'sa',facilityId:'fa',name:'Rink 1',ord:0,updatedAt:t},
+    sb:{id:'sb',facilityId:'fa',name:'Rink 2',ord:1,updatedAt:t} }));
+  localStorage.setItem('ice_v4_sessions', JSON.stringify({}));
+  const pr = JSON.parse(localStorage.getItem('ice_v4_prefs') || '{}');
+  pr.activeFacility = 'fa'; pr.activeSheet = 'sb';
+  localStorage.setItem('ice_v4_prefs', JSON.stringify(pr));
+}, '2026-09-01T00:00:00.000Z');
+
+await p.click('#addRink'); await sleep(500);
+const surfaces = await p.evaluate(() =>
+  [...document.getElementById('bSheet').options].map(o => ({ v: o.value, t: o.textContent })));
+ok('the builder offers the surfaces that have no glass yet',
+   surfaces.some(o => o.v === 'sa') && surfaces.some(o => o.v === 'sb'), JSON.stringify(surfaces));
+ok('naming them by facility and sheet',
+   (surfaces.find(o => o.v === 'sa') || {}).t === 'Laconia Ice \u2014 Rink 1',
+   JSON.stringify(surfaces));
+/* The reason you opened this is the rink you are standing in. */
+ok('and it starts on the one the launcher says you are at',
+   (await p.evaluate(() => BLD.sheet)) === 'sb');
+ok('the rink-name field stays out of the way for a surface that exists',
+   !(await p.isVisible('#bNewWrap')));
+
+/* Fills every stretch to roughly its board length and saves, the way the
+   walk does, without driving the form a fourth time. */
+async function walkIn(name) {
+  if (name) BLD.name = name;
+  BLD.L = 185; BLD.W = 85; BLD.Rft = 28; BLD.Rin = 0; BLD.height = 72;
+  BLD.start = 'end'; BLD.walls = []; BLD.wi = 0;
+  bldEnsureWalls();
+  const spans = bldWalls().spans;
+  BLD.walls.forEach((w, i) => {
+    const count = Math.max(1, Math.round(spans[i] * 12 / 48));
+    const each = Math.floor(spans[i] * 12 / count);
+    w.items = Array.from({ length: count },
+      () => ({ kind: 'glass', width_in: each, label: null, height_in: null }));
+  });
+  await bldSave();
+  return activeBucket;
+}
+
+const onSb = await p.evaluate(walkIn, null); await sleep(400);
+ok('walking it keys the glass by the surface itself', onSb === 'sb', String(onSb));
+ok('so the plan is named after that surface',
+   /Laconia Ice/.test(await p.textContent('#facName')), await p.textContent('#facName'));
+
+await p.click('#addRink'); await sleep(500);
+const left = await p.evaluate(() =>
+  [...document.getElementById('bSheet').options].map(o => o.value));
+ok('a surface that already has glass is not offered again', left.indexOf('sb') < 0,
+   JSON.stringify(left));
+
+/* And a rink that is not in the system at all: the builder writes the facility
+   and the sheet, through the same method the launcher uses. */
+await p.selectOption('#bSheet', '__new'); await sleep(250);
+ok('choosing a new surface asks what it is called', await p.isVisible('#bNewWrap'));
+const made = await p.evaluate(walkIn, 'Rink 3'); await sleep(400);
+const recs = await p.evaluate(() => ({
+  sh: JSON.parse(localStorage.getItem('ice_v4_sheets') || '{}'),
+  fac: JSON.parse(localStorage.getItem('ice_v4_facilities') || '{}') }));
+ok('a rink walked from scratch gets a sheet record', !!recs.sh[made], String(made));
+ok('under the facility you are already at', !!recs.sh[made] && recs.sh[made].facilityId === 'fa',
+   JSON.stringify(recs.sh[made]));
+ok('named what you called it', !!recs.sh[made] && recs.sh[made].name === 'Rink 3',
+   JSON.stringify(recs.sh[made]));
+ok('and its glass is keyed by that same surface',
+   await p.evaluate(k => !!LAYOUTS[k], made));
+
+/* Which rink you are at is one fact, not one per app. */
+await p.evaluate(async () => { await switchRink('sb'); }); await sleep(500);
+const prefs = await p.evaluate(() => JSON.parse(localStorage.getItem('ice_v4_prefs') || '{}'));
+ok('switching rink in Glass moves where the launcher says you are',
+   prefs.activeSheet === 'sb' && prefs.activeFacility === 'fa', JSON.stringify(prefs));
+
+await p.reload(); await sleep(1800);
+await p.evaluate(() => document.querySelectorAll('.sync-gate').forEach(e => e.remove()));
+ok('and Glass opens on that surface next time',
+   (await p.evaluate(() => activeBucket)) === 'sb');
+
 ok('nothing threw throughout', errs.length === 0, JSON.stringify(errs.slice(0, 3)));
 
 console.log('\n  ' + pass + ' passed, ' + fail + ' failed');

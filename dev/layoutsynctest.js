@@ -56,8 +56,9 @@ async function seed(rec) {
 /* Set up a walk and save it the way the builder does. A plain 185 x 85 sheet
    with a Zamboni gate on the first end - deliberately not Conway, so nothing
    can pass by falling back to the compiled-in layout. */
-function walkAndSave(name) {
-  BLD.name = name; BLD.L = 185; BLD.W = 85; BLD.Rft = 28; BLD.Rin = 0;
+async function walkAndSave(name) {
+  BLD.name = name; BLD.sheet = '__new';
+  BLD.L = 185; BLD.W = 85; BLD.Rft = 28; BLD.Rin = 0;
   BLD.height = 72; BLD.start = 'end'; BLD.thickness = '1/2"';
   BLD.walls = []; BLD.wi = 0;
   bldEnsureWalls();
@@ -69,7 +70,7 @@ function walkAndSave(name) {
       () => ({ kind: 'glass', width_in: each, label: null, height_in: null }));
   });
   BLD.walls[0].items.push({ kind: 'gate', width_in: 24, label: 'Zamboni', height_in: null });
-  bldSave();
+  await bldSave();
   return activeBucket;
 }
 
