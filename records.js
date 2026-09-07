@@ -45,6 +45,25 @@
     async set(k,v){ try{ if(global.storage&&global.storage.set){ await global.storage.set(k,v); return; } }catch(e){}
                     try{ localStorage.setItem(k,v); }catch(e){} }};
 
+  /* ---------- the shapes a new record takes ----------
+     These moved in with the store because the launcher creates facilities and
+     sheets now, and a sheet it made has to be indistinguishable from one Ice
+     made. The specific way that goes wrong is a sheet with no session in it:
+     Ice reaches straight for sheets[0].sessions[0] when it boots. */
+  const RINK_SIZES = [
+    {id:"nhl",   name:"NHL — 200 × 85 ft",      L:200, W:85,  corner:28},
+    {id:"intl",  name:"Olympic — 200 × 100 ft", L:200, W:100, corner:28},
+    {id:"hybrid",name:"Hybrid — 200 × 90 ft",   L:200, W:90,  corner:28},
+    {id:"studio",name:"Studio — 185 × 85 ft",   L:185, W:85,  corner:25}
+  ];
+  const NHL_SIZE = () => ({...RINK_SIZES[0]});
+  const DEFAULT_EDGES = [0.6875,1.4375,1.5625,1.9375];
+  const uid = () => Math.random().toString(36).slice(2,9);
+  const newSession = () => ({id:uid(),date:new Date().toISOString(),label:"",mode:"moderate",data:{},notes:{}});
+  const newSheet = (n,size) => ({id:uid(),name:n||"Main sheet",size:size||NHL_SIZE(),sessions:[newSession()]});
+  const defaultSettings = () => ({target:1.5,edges:[...DEFAULT_EDGES],tieAttention:true,floodBelow:1.25,shaveAbove:1.5625});
+  const newFacility = n => {const sh=newSheet();return{id:uid(),name:n||"Main facility",settings:defaultSettings(),sheets:[sh]};};
+
   const nowISO = () => new Date().toISOString();
   const rd = async k => { try{ return JSON.parse(await Store.get(k) || "null"); }catch(e){ return null; } };
 
@@ -90,9 +109,10 @@
      older than overdueDays. An empty session is a sheet nobody has been to
      yet, not a round. Both screens that show this call in here, so they cannot
      drift into disagreeing about what is overdue. */
+  const hasReadings = s => !!(s && !s.deleted && s.data && Object.keys(s.data).length);
   function lastRound(sessions, sheetId){
     return (sessions||[])
-      .filter(s => s && !s.deleted && s.sheetId === sheetId && s.data && Object.keys(s.data).length)
+      .filter(s => hasReadings(s) && s.sheetId === sheetId)
       .sort((a,b) => new Date(b.date) - new Date(a.date))[0] || null;
   }
   function isOverdue(last, overdueDays){
@@ -144,6 +164,40 @@
       return prefs;
     },
 
+    /* Adding a rink is adding an ice surface: a sheet, and a facility to hang
+       it on if this is a new site.
+
+       It goes through load() rather than read(), and that is the whole reason
+       it lives in here. save() stamps against what was last written, so a save
+       built on read() - which deliberately leaves that snapshot empty - would
+       hand every record on the device a fresh updatedAt and make this device
+       look newest on all of them. That is precisely the clobber the record
+       store exists to prevent, and it is invisible until another device loses
+       work. A page cannot get it wrong if it never does the dance itself. */
+    async addSheet(opts){
+      const o = opts || {};
+      const st = (await this.load()) || {};
+      if(!Array.isArray(st.facilities)) st.facilities = [];
+      let fac = o.facilityId ? st.facilities.find(f => f && f.id === o.facilityId) : null;
+      let sheet;
+      if(fac){
+        sheet = newSheet(o.name, o.size);
+        fac.sheets = (fac.sheets || []).concat([sheet]);
+      } else {
+        fac = newFacility(o.facilityName);
+        sheet = fac.sheets[0];
+        if(o.name) sheet.name = o.name;
+        if(o.size) sheet.size = o.size;
+        st.facilities.push(fac);
+      }
+      /* Land on what you just added - it is why you added it. */
+      st.activeFacility = fac.id;
+      st.activeSheet = sheet.id;
+      st.activeSession = sheet.sessions[0].id;
+      await this.save(st);
+      return { facilityId: fac.id, sheetId: sheet.id, sessionId: sheet.sessions[0].id };
+    },
+
     /* Fold another copy in, newest wins per record. Readings inside a round are
        merged point by point, so two people logging different spots in the same
        round both keep their work. */
@@ -178,5 +232,7 @@
   };
 
   global.Records = { KEYS:K, PREF_KEYS, Store, Repo,
-                     decompose, reassemble, nowISO, lastRound, isOverdue };
+                     decompose, reassemble, nowISO, hasReadings, lastRound, isOverdue,
+                     RINK_SIZES, NHL_SIZE, DEFAULT_EDGES,
+                     uid, newSession, newSheet, defaultSettings, newFacility };
 })(this);
