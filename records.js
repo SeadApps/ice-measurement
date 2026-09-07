@@ -223,6 +223,15 @@
       return {taken,facilities:reassemble(SNAP.fac,SNAP.sh,SNAP.se)};
     },
 
+    /* Write the maps as they stand. A page that merged records but holds no
+       nested state of its own has nothing to hand save() - and re-deriving the
+       maps to get there would risk restamping records nobody touched. */
+    async persistMaps(){
+      await Promise.all([Store.set(K.fac,JSON.stringify(SNAP.fac)),
+                         Store.set(K.sh,JSON.stringify(SNAP.sh)),
+                         Store.set(K.se,JSON.stringify(SNAP.se))]);
+    },
+
     /* The per-kind maps as last written — what sync collects, and what a
        backup is made of. */
     maps(){ return {fac:SNAP.fac, sh:SNAP.sh, se:SNAP.se}; },

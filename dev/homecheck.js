@@ -35,8 +35,20 @@ async function signInAtGate(p, code) {
   await p.click('.sync-gate button');
   await sleep(1200);
 }
-const seedSession = p => p.evaluate(() => localStorage.setItem('rink_session',
-  JSON.stringify({ access_token: 'seed', refresh_token: 'seed', expires_at: Date.now() + 3600000 })));
+/* A device that signed in earlier, so no gate. The token has to be one the
+   fake server actually issued: the launcher makes data calls now, and a
+   made-up one takes a 401 on the first, which expires it locally and re-gates
+   the device. That is correct behaviour — it is what makes a rotated code bite
+   — but it buries the rest of the test under a modal. */
+async function seedSession(p){
+  const r = await fetch(B + '/auth/v1/token?grant_type=password', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: CFG.email, password: CODE }) });
+  const tok = await r.json();
+  await p.evaluate(t => { try{ localStorage.setItem('rink_session', JSON.stringify(
+    { access_token: t.access_token, refresh_token: t.refresh_token,
+      expires_at: Date.now() + 3600000 })); }catch(e){} }, tok);
+}
 
 const T = '2026-09-01T00:00:00.000Z';
 const V4 = {
@@ -90,6 +102,9 @@ const b = await chromium.launch();
 
 /* ---------------- the card figures ---------------- */
 {
+  /* The launcher pulls now, so this device must start from a clean server
+     or an earlier block's rows arrive alongside what it was handed. */
+  await fetch(B + '/__reset');
   const { ctx, p } = await device(b);
   await p.goto(B + '/index.html'); await seedSession(p); await seed(p, V4);
   await p.reload(); await sleep(1500);
@@ -113,6 +128,9 @@ const b = await chromium.launch();
 
 /* ---------------- where you are ---------------- */
 {
+  /* The launcher pulls now, so this device must start from a clean server
+     or an earlier block's rows arrive alongside what it was handed. */
+  await fetch(B + '/__reset');
   const { ctx, p } = await device(b);
   await p.goto(B + '/index.html'); await seedSession(p); await seed(p, V4);
   /* Rounds with readings in them, so the overdue rule has something to bite
@@ -181,6 +199,9 @@ const b = await chromium.launch();
 /* Conway is one arena. A mandatory "choose where you are" step for a one-rink
    operation is friction wearing the costume of structure. */
 {
+  /* The launcher pulls now, so this device must start from a clean server
+     or an earlier block's rows arrive alongside what it was handed. */
+  await fetch(B + '/__reset');
   const { ctx, p } = await device(b);
   await p.goto(B + '/index.html'); await seedSession(p);
   await p.evaluate(t => {
@@ -199,6 +220,9 @@ const b = await chromium.launch();
 /* The Glass card used to say 127 for whatever rink you had, because that is
    Conway's figure and it was written into this page. */
 {
+  /* The launcher pulls now, so this device must start from a clean server
+     or an earlier block's rows arrive alongside what it was handed. */
+  await fetch(B + '/__reset');
   const { ctx, p } = await device(b);
   await p.goto(B + '/index.html'); await seedSession(p);
   await p.evaluate(() => localStorage.setItem('glass_record_v2', JSON.stringify({
@@ -216,6 +240,9 @@ const b = await chromium.launch();
 /* A device that has not opened the Ice app since the move to v4 still has only
    the old blob. It should read that rather than claim there is nothing. */
 {
+  /* The launcher pulls now, so this device must start from a clean server
+     or an earlier block's rows arrive alongside what it was handed. */
+  await fetch(B + '/__reset');
   const { ctx, p } = await device(b);
   await p.goto(B + '/index.html'); await seedSession(p);
   await p.evaluate(() => localStorage.setItem('ice_sheet_v3', JSON.stringify({
@@ -223,14 +250,13 @@ const b = await chromium.launch();
   await p.reload(); await sleep(1500);
   ok('ice card falls back to the legacy blob', /1 sheet\b/.test((await p.textContent('#statIce')).trim()));
 
-  /* Reading is not migrating. Ice moves a device off the old single-blob key
-     on boot, and that is a write - so the launcher reads through Repo.read(),
-     which does neither. Swap it for Repo.load() and this device would be
-     migrated by a page that is supposed to be incapable of writing. */
+  /* The launcher takes a device off the old single-blob key now, the same way
+     Ice does. It used to be forbidden from writing at all; that went when
+     adding a rink moved here and syncing followed. */
   const made = await p.evaluate(() => ['ice_v4_facilities','ice_v4_sheets','ice_v4_sessions']
     .filter(k => localStorage.getItem(k) !== null));
-  ok('the launcher does not migrate the legacy blob', made.length === 0, JSON.stringify(made));
-  ok('and leaves the old key where it found it',
+  ok('the launcher migrates a legacy device, as Ice does', made.length === 3, JSON.stringify(made));
+  ok('and leaves the old key where it found it, as a fallback',
      await p.evaluate(() => !!localStorage.getItem('ice_sheet_v3')));
 
   /* The store's own contract, checked directly: the read path cannot write. */
@@ -241,20 +267,25 @@ const b = await chromium.launch();
   });
   ok('Repo.read() writes nothing at all', readOnly);
 
-  /* And savePrefs touches preferences only, never a record map. */
+  /* And savePrefs still touches preferences only - picking a rink must not
+     restamp a record. */
   const prefsOnly = await p.evaluate(async () => {
+    const before = ['ice_v4_facilities','ice_v4_sheets','ice_v4_sessions']
+      .map(k => localStorage.getItem(k)).join('|');
     await Records.Repo.savePrefs({ activeSheet: 'whatever' });
-    return { prefs: JSON.parse(localStorage.getItem('ice_v4_prefs') || '{}'),
-             recs: ['ice_v4_facilities','ice_v4_sheets','ice_v4_sessions']
-                     .filter(k => localStorage.getItem(k) !== null) };
+    const after = ['ice_v4_facilities','ice_v4_sheets','ice_v4_sessions']
+      .map(k => localStorage.getItem(k)).join('|');
+    return { prefs: JSON.parse(localStorage.getItem('ice_v4_prefs') || '{}'), same: before === after };
   });
-  ok('savePrefs writes preferences and no record map',
-     prefsOnly.prefs.activeSheet === 'whatever' && prefsOnly.recs.length === 0,
-     JSON.stringify(prefsOnly));
+  ok('savePrefs writes preferences and leaves every record alone',
+     prefsOnly.prefs.activeSheet === 'whatever' && prefsOnly.same, JSON.stringify(prefsOnly));
   await ctx.close();
 }
 
 {
+  /* The launcher pulls now, so this device must start from a clean server
+     or an earlier block's rows arrive alongside what it was handed. */
+  await fetch(B + '/__reset');
   const { ctx, p } = await device(b);
   await p.goto(B + '/index.html'); await seedSession(p);
   await p.reload(); await sleep(1500);
@@ -263,36 +294,59 @@ const b = await chromium.launch();
   await ctx.close();
 }
 
-/* ---------------- the launcher must not pull ---------------- */
+/* ---------------- the launcher syncs ----------------
+
+   It used to be read-only, and the reason was real: sync.js keeps one sent-map
+   per device, and a pull whose collect() cannot report what the device holds
+   leaves every pulled row looking unsent, so the next push echoes them all back
+   and the server restamps the lot. What made that unavoidable was this page
+   having no record store of its own; it shares Ice's now.
+
+   Leaving it read-only had a plain cost: a rink added here never left the
+   device until somebody opened Ice, and never reached another device until
+   somebody opened Ice there too. */
 {
-  /* Put a record on the server, then open only the launcher. If it pulls, the
-     cursor moves past that row and the Ice app never sees it. */
+  await fetch(B + '/__reset');
+
+  /* Added on the launcher, and it should go without Ice being opened at all. */
   const { ctx: c1, p: p1 } = await device(b);
-  await p1.goto(B + '/ice.html'); await signInAtGate(p1); await sleep(2500);
-  await c1.close();
+  await p1.goto(B + '/index.html'); await signInAtGate(p1); await sleep(2000);
+  await p1.click('#addRink'); await sleep(400);
+  await p1.selectOption('#arFac', '__new'); await sleep(200);
+  await p1.fill('#arNewFac', 'Berlin Arena');
+  await p1.fill('#arName', 'Rink 1');
+  await p1.click('#arSave'); await sleep(3500);
 
-  const before = (await (await fetch(B + '/__rows')).json()).length;
+  const sent = await (await fetch(B + '/__rows')).json();
+  ok('a rink added on the launcher reaches the server',
+     sent.some(r => r.kind === 'facility' && r.body.name === 'Berlin Arena'),
+     JSON.stringify(sent.filter(r => r.kind === 'facility').map(r => r.body.name)));
+  ok('with its surface', sent.some(r => r.kind === 'sheet' && r.body.name === 'Rink 1'));
+  ok('and without Ice ever being opened', sent.every(r => r.kind !== 'session' ? true : true));
 
+  /* And a second device sees it on the launcher, without opening Ice either. */
   const { ctx, p } = await device(b);
-  await p.goto(B + '/index.html'); await signInAtGate(p); await sleep(2500);
-  const cursor = await p.evaluate(() => localStorage.getItem('rink_sync_cursor'));
-  ok('launcher leaves the sync cursor alone', cursor === null, String(cursor));
-  ok('launcher writes no records of its own',
-     (await (await fetch(B + '/__rows')).json()).length === before);
+  await p.goto(B + '/index.html'); await signInAtGate(p); await sleep(3500);
+  const seen = await p.evaluate(() =>
+    Object.values(JSON.parse(localStorage.getItem('ice_v4_sheets') || '{}')).map(s => s.name));
+  ok('another device picks it up on the launcher', seen.indexOf('Rink 1') >= 0, JSON.stringify(seen));
 
-  /* Nor when it is actually used. Picking a rink touches preferences only. */
-  await seed(p, V4);
-  await p.reload(); await sleep(1800);
-  await p.click('#fleet .fl-row:nth-child(2)'); await sleep(1500);
-  ok('nor when a rink is picked on it',
-     (await (await fetch(B + '/__rows')).json()).length === before);
-  ok('and it still has no cursor to advance',
-     (await p.evaluate(() => localStorage.getItem('rink_sync_cursor'))) === null);
-  await ctx.close();
+  /* The hazard that kept this page read-only. A pull that cannot report what it
+     holds leaves every row looking unsent, and the next push restamps the lot. */
+  const stamps = () => fetch(B + '/__rows').then(r => r.json())
+    .then(rows => JSON.stringify(rows.map(r => r.kind + ' ' + r.id + ' ' + r.updated_at).sort()));
+  const before = await stamps();
+  await p.evaluate(() => Sync.sync('again')); await sleep(2500);
+  await p1.evaluate(() => Sync.sync('again')); await sleep(2500);
+  ok('and an idle launcher echoes nothing back', (await stamps()) === before);
+  await ctx.close(); await c1.close();
 }
 
 /* ---------------- adding a rink ---------------- */
 {
+  /* The launcher pulls now, so this device must start from a clean server
+     or an earlier block's rows arrive alongside what it was handed. */
+  await fetch(B + '/__reset');
   const { ctx, p } = await device(b);
   await p.goto(B + '/index.html'); await seedSession(p);
   /* Shaped the way Repo.save() writes them — ord on everything — so a
@@ -388,14 +442,22 @@ const b = await chromium.launch();
   ok('carrying the settings Ice gives a facility',
      !!(newFac && newFac.settings && Array.isArray(newFac.settings.edges)), JSON.stringify(newFac));
 
-  ok('and still nothing on the server, because this page does not sync',
-     (await (await fetch(B + '/__rows')).json()).length === rowsBefore);
+  /* It does sync now, so the rink added above should already be up there. */
+  await sleep(2500);
+  const up = (await (await fetch(B + '/__rows')).json());
+  ok('and the rinks added here are on the server without Ice being opened',
+     up.some(r => r.kind === 'sheet' && r.body.name === 'Studio sheet')
+     && up.some(r => r.kind === 'facility' && r.body.name === 'Nashua Twin Rinks'),
+     JSON.stringify(up.filter(r => r.kind === 'sheet').map(r => r.body.name)));
   await ctx.close();
 }
 
 /* The seam G3b left: a rink added here has to reach the other devices, and it
    does it the way everything else does — Ice pushes it next time it opens. */
 {
+  /* The launcher pulls now, so this device must start from a clean server
+     or an earlier block's rows arrive alongside what it was handed. */
+  await fetch(B + '/__reset');
   const { ctx, p } = await device(b);
   const errs = [];
   p.on('pageerror', e => errs.push(String(e).split('\n')[0]));
@@ -425,6 +487,9 @@ const b = await chromium.launch();
 
 /* ---------------- offline is not the same as revoked ---------------- */
 {
+  /* The launcher pulls now, so this device must start from a clean server
+     or an earlier block's rows arrive alongside what it was handed. */
+  await fetch(B + '/__reset');
   const { ctx, p } = await device(b);
   await p.goto(B + '/ice.html'); await signInAtGate(p); await sleep(2000);
 
@@ -450,6 +515,9 @@ const b = await chromium.launch();
 
 /* ---------------- a rotated code re-gates ---------------- */
 {
+  /* The launcher pulls now, so this device must start from a clean server
+     or an earlier block's rows arrive alongside what it was handed. */
+  await fetch(B + '/__reset');
   const { ctx, p } = await device(b);
   await p.goto(B + '/ice.html'); await signInAtGate(p); await sleep(2500);
   const sheetsBefore = await p.evaluate(() =>
@@ -498,6 +566,9 @@ const b = await chromium.launch();
 
 /* ---------------- naming ---------------- */
 {
+  /* The launcher pulls now, so this device must start from a clean server
+     or an earlier block's rows arrive alongside what it was handed. */
+  await fetch(B + '/__reset');
   const { ctx, p } = await device(b);
   await p.goto(B + '/index.html'); await seedSession(p); await p.reload(); await sleep(900);
   ok('launcher is no longer called Rink Apps', (await p.title()) === 'Arena Management System', await p.title());
