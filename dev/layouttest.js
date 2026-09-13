@@ -145,6 +145,86 @@ const cleared = await p.evaluate(() => {
 ok('clearing a label leaves it cleared, not back to the survey',
    cleared.label === '' && cleared.chips.indexOf('Replaced Sept 2026') < 0, JSON.stringify(cleared));
 
+/* ---------------- and off through the card, not just through set() ---------------- */
+/* Everything above drives set() directly, which is why it stayed green while
+   the box a person actually types in was broken. The note and the label save
+   600ms after the last keystroke, and both wrote to `sel` - read when the timer
+   fired rather than when you typed. Click the next panel inside that window and
+   the note landed on that one instead, leaving the pane you meant untouched.
+   That is what made the two seeded notes look impossible to delete. */
+{
+  /* select() toggles, so calling it on the panel already showing closes the
+     card. Force the selection rather than assume what is open. */
+  const pick = id => p.evaluate(i => { sel = null; select(i); }, id);
+
+  await pick('005');
+  await sleep(250);
+  await p.click('#note');
+  await p.keyboard.type('meant for 005');
+  await sleep(150);                                  // well inside the window
+  await p.evaluate(() => select('007'));             // move on before it fires
+  await sleep(1200);
+  const landed = await p.evaluate(() => ({ five: (state['005'] || {}).note || '',
+                                           seven: (state['007'] || {}).note || '' }));
+  ok('a note lands on the panel it was typed on', landed.five === 'meant for 005', JSON.stringify(landed));
+  ok('and not on the one clicked next', landed.seven === '', JSON.stringify(landed));
+
+  /* Clearing had the same shape: empty the box, move on, and the clear went to
+     whatever you clicked while the old note stayed put. */
+  await p.evaluate(() => { set('082', { note: 'Cracked (per measurement doc)' }, true); });
+  await pick('082');
+  await sleep(300);
+  await p.click('#note');
+  await p.keyboard.press('Control+a'); await p.keyboard.press('Delete');
+  await sleep(150);
+  await pick('005');
+  await sleep(1200);
+  ok('clearing a note sticks when you move straight on',
+     await p.evaluate(() => (state['082'] || {}).note || '') === '',
+     await p.evaluate(() => (state['082'] || {}).note || ''));
+
+  /* The X clears without a select-all first - the control the seeded notes
+     wanted - and Save applies without waiting for the timer. */
+  await p.evaluate(() => { set('005', { note: 'something typed' }, true); });
+  await pick('005');
+  await sleep(300);
+  await p.click('#noteClear');
+  await sleep(300);
+  ok('the clear button empties the note', await p.evaluate(() => (state['005'] || {}).note || '') === '');
+  ok('and empties the box with it', await p.evaluate(() => document.getElementById('note').value) === '');
+
+  await p.click('#note');
+  await p.keyboard.type('saved by hand');
+  await p.click('#noteSave');
+  await sleep(250);
+  ok('the save button applies at once, without the timer',
+     await p.evaluate(() => (state['005'] || {}).note || '') === 'saved by hand',
+     await p.evaluate(() => (state['005'] || {}).note || ''));
+
+  /* Leaving the box is as good as asking for it to be saved. */
+  await pick('009');
+  await sleep(300);
+  await p.click('#note');
+  await p.keyboard.type('typed then blurred');
+  await p.evaluate(() => document.getElementById('note').blur());
+  await sleep(300);
+  ok('leaving the box saves it', await p.evaluate(() => (state['009'] || {}).note || '') === 'typed then blurred',
+     await p.evaluate(() => (state['009'] || {}).note || ''));
+
+  /* The label carried the identical bug. */
+  await pick('011');
+  await sleep(250);
+  await p.click('#plabel');
+  await p.keyboard.type('north gate');
+  await sleep(150);
+  await pick('013');
+  await sleep(1200);
+  const lab = await p.evaluate(() => ({ eleven: (state['011'] || {}).label || '',
+                                        thirteen: (state['013'] || {}).label || '' }));
+  ok('a label lands on the panel it was typed on', lab.eleven === 'north gate', JSON.stringify(lab));
+  ok('and not on the one clicked next', lab.thirteen === '', JSON.stringify(lab));
+}
+
 /* The standing explanation about panel 111 hangs off that panel's tag, so
    confirming it on a walk-round takes the explanation with it. */
 const before111 = await p.evaluate(() =>

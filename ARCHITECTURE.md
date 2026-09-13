@@ -136,8 +136,19 @@ it straight back. `sparestest` drives the two-device case directly and asserts
 the shelf lands on 1 — if that check ever goes red, the design has been undone
 rather than a detail broken.
 
-A size is width **and** height **and** thickness. Conway carries 33" and 14.5" in
-both 1/2" and 5/8", and a 1/2" pane will not fill a 5/8" hole.
+A size is width **and** height **and** thickness **and** material. Conway carries
+33" and 14.5" in both 1/2" and 5/8", a 1/2" pane will not fill a 5/8" hole, and
+the shelf holds both tempered and plexi — which are not interchangeable. Plexi is
+what goes in to keep the game on while the real pane is on order.
+
+So **plexi never counts as cover.** A flagged pane wants tempered, because that is
+what the rink is glazed in; counting a plexi sheet as cover would tell somebody
+not to order glass they are going to need. It is reported alongside instead —
+*"1 to order · 2 plexi to patch with"* — since knowing tonight's game is safe is
+worth saying. A movement written before materials existed carries none and is read
+as tempered, which is what the shelf held; nothing was rewritten to make that true,
+and a device on the older build reads a plexi movement as tempered, overstating its
+glass rather than losing the record.
 
 **Fitting a pane deducts it, and the event is a transition.** `replace` means
 *needs* replacing, so the moment glass actually goes in is the one where a
@@ -145,6 +156,12 @@ flagged panel returns to `ok` — clearing plexi included, since real glass
 replaced the patch. `set()` compares the status it had against the one being
 written and calls `autoFit()` only on that edge, so editing the note of a panel
 that is already good deducts nothing.
+
+**Which pile it comes off follows the same transition.** Back to `ok` is the real
+fix, so that is tempered; going to `plexi` is the stopgap, and that takes a plexi
+sheet. Both are real fittings out of different piles, which is why the
+once-per-day guard is per panel *per material* — a pane patched in the morning
+and glazed properly in the afternoon is two deductions, not a double.
 
 The risk in deducting rather than offering is a flag cleared because it was
 raised in error, which is not a fitting. The answer is that it is never silent:
@@ -294,7 +311,7 @@ node dev/homecheck.js      # 78 checks: the gate, the fleet, adding a rink, sync
 node dev/cursortest.js     #  6 checks: one pull cursor per app, not per device
 node dev/facilitytest.js   # 32 checks: facilities in Glass, ids scoped without a migration,
                            #            and the glass bound to a sheet rather than a building
-node dev/layouttest.js     # 31 checks: the renderer draws a layout, and notes come off it
+node dev/layouttest.js     # 40 checks: the renderer draws a layout, and notes come off it - through the card, not just through set()
 node dev/layoutsynctest.js # 24 checks: a built rink crosses devices as its walk, and goes back off
 node dev/gentest.js        # 19 checks: the generator reproduces Conway's survey, either way round
 node dev/buildertest.js    # 72 checks: walking a rink in, what it writes, the surface it hangs off, removing it
@@ -302,10 +319,10 @@ node dev/reg.js            # 14 checks: rounds persist, prefs stay separate, the
 node dev/resume.js         #  9 checks: coming back lands where you left off
 node dev/phonetest.js      # 42 checks: no page scrolls sideways on a phone, tapping a panel shows it, and the desktop is untouched
 node dev/scheduletest.js   # 31 checks: the schedule opens on what needs attention, and print still carries all 127
-node dev/sparestest.js     # 35 checks: spare stock is a ledger per facility, fitting a pane deducts it, and two devices fitting take two off
+node dev/sparestest.js     # 46 checks: spare stock is a ledger per facility, tempered and plexi are different piles, and fitting a pane deducts the right one
 ```
 
-438 checks in all. Tests point `window.__SYNC_CONFIG__` at the fake via
+458 checks in all. Tests point `window.__SYNC_CONFIG__` at the fake via
 `addInitScript`; the real pages never read it.
 
 **Run them one at a time.** They share the one fake server, and several assert

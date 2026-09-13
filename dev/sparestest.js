@@ -40,13 +40,15 @@ async function signIn(p) {
   await p.click('.sync-gate button');
   await sleep(4000);
 }
-/* Record a movement through the page, the way the card does. */
-const move = (p, w, h, thk, qty, note) =>
-  p.evaluate(a => { addMovement(a.w, a.h, a.thk, a.q, a.n || ''); store(); spares(); table(); },
-             { w, h, thk, q: qty, n: note });
-const stock = (p, w, h, thk) =>
-  p.evaluate(a => (stockOf(activeFacilityId())[[a.w, a.h, a.thk].join('|')] || { qty: 0 }).qty,
-             { w, h, thk });
+/* Record a movement through the page, the way the card does. Material defaults
+   to tempered, which is both what the shelf mostly holds and what a movement
+   written before materials existed is read as. */
+const move = (p, w, h, thk, qty, note, mat) =>
+  p.evaluate(a => { addMovement(a.w, a.h, a.thk, a.m, a.q, a.n || ''); store(); spares(); table(); },
+             { w, h, thk, q: qty, n: note, m: mat || 'tempered' });
+const stock = (p, w, h, thk, mat) =>
+  p.evaluate(a => (stockOf(activeFacilityId())[[a.w, a.h, a.thk, a.m].join('|')] || { qty: 0 }).qty,
+             { w, h, thk, m: mat || 'tempered' });
 
 (async () => {
 await fetch(B + '/__reset');
@@ -254,6 +256,87 @@ ok('the scope line says so beside the order button', /from stock/.test(cov.scope
   await sleep(400);
   ok('retracting an automatic deduction puts it back', await stock(A.p, 42, 75, '5/8"') === 3,
      String(await stock(A.p, 42, 75, '5/8"')));
+}
+
+/* ---------------- tempered and plexi are different things ---------------- */
+/* The shelf carries both and they are not interchangeable: plexi is what goes
+   in to keep the game on while the real pane is on order. */
+{
+  await move(A.p, 50, 75, '5/8"', 2, 'glass', 'tempered');
+  await move(A.p, 50, 75, '5/8"', 3, 'sheet stock', 'plexi');
+  const t = await stock(A.p, 50, 75, '5/8"', 'tempered');
+  const x = await stock(A.p, 50, 75, '5/8"', 'plexi');
+  ok('the same size in two materials is two piles', t === 2 && x === 3, t + ' / ' + x);
+
+  /* A movement written before materials existed is read as tempered - that is
+     what the shelf held - and nothing had to be rewritten to make it so. */
+  await A.p.evaluate(() => {
+    SPARES['legacymv'] = { id:'legacymv', fac:activeFacilityId(), w:50, h:75, thk:'5/8"',
+                           qty:1, note:'before materials', by:'', at:'2026-09-01',
+                           updatedAt:'2026-09-01T00:00:00.000Z' };
+    store(); spares(); table();
+  });
+  await sleep(300);
+  ok('a movement with no material counts as tempered',
+     await stock(A.p, 50, 75, '5/8"', 'tempered') === 3 && await stock(A.p, 50, 75, '5/8"', 'plexi') === 3,
+     (await stock(A.p, 50, 75, '5/8"', 'tempered')) + ' / ' + (await stock(A.p, 50, 75, '5/8"', 'plexi')));
+
+  /* The toggle points the form at a pile. */
+  await A.p.evaluate(() => { document.getElementById('spAddBox').open = true; });
+  await A.p.click('.sp-mat button[data-m="plexi"]');
+  await sleep(250);
+  const pressed = await A.p.evaluate(() => ({
+    mat: spMat,
+    plexiOn: document.querySelector('.sp-mat button[data-m="plexi"]').getAttribute('aria-pressed'),
+    tempOn: document.querySelector('.sp-mat button[data-m="tempered"]').getAttribute('aria-pressed')
+  }));
+  ok('the toggle picks the pile', pressed.mat === 'plexi' && pressed.plexiOn === 'true' && pressed.tempOn === 'false',
+     JSON.stringify(pressed));
+  /* and the size list is shapes, not shapes doubled per material */
+  const opts = await A.p.evaluate(() => [...document.querySelectorAll('#spSize option')].map(o => o.value));
+  ok('the size list is not doubled by material', opts.every(v => v === '__other' || v.split('|').length === 3),
+     JSON.stringify(opts.slice(0, 3)));
+  await A.p.click('.sp-mat button[data-m="tempered"]');
+  await sleep(200);
+}
+
+/* ---------------- plexi patches, it does not cover ---------------- */
+{
+  /* A 57.5" pane with plexi on the shelf but no glass: still to order, and the
+     card says a patch is possible rather than pretending it is covered. */
+  await move(A.p, 57.5, 75, '5/8"', 2, '', 'plexi');
+  const pid = await A.p.evaluate(() => {
+    const p = GLASS.find(x => x.width_in === 57.5);
+    set(p.id, { status: 'replace' }, true);
+    return p.id;
+  });
+  await sleep(500);
+  const cov = await A.p.evaluate(i => {
+    const c = coverage(), r = c.rows.find(x => x.p.id === i);
+    return { covered: r.covered, patch: r.patch, toOrder: c.toOrder, patchable: c.patchable };
+  }, pid);
+  ok('plexi does not count as cover', cov.covered === false, JSON.stringify(cov));
+  ok('but it is reported as a patch', cov.patch === true, JSON.stringify(cov));
+  ok('and the pane still has to be ordered', cov.toOrder >= 1, String(cov.toOrder));
+
+  /* Fitting the plexi takes a plexi sheet, not a pane of glass. */
+  const before = { t: await stock(A.p, 57.5, 75, '5/8"', 'tempered'),
+                   x: await stock(A.p, 57.5, 75, '5/8"', 'plexi') };
+  await A.p.evaluate(i => set(i, { status: 'plexi' }, true), pid);
+  await sleep(500);
+  const afterPlexi = { t: await stock(A.p, 57.5, 75, '5/8"', 'tempered'),
+                       x: await stock(A.p, 57.5, 75, '5/8"', 'plexi') };
+  ok('marking a pane as plexi takes a plexi sheet', afterPlexi.x === before.x - 1, JSON.stringify(afterPlexi));
+  ok('and leaves the glass alone', afterPlexi.t === before.t, JSON.stringify(afterPlexi));
+
+  /* Then the real pane arrives and goes in: that is the tempered one. */
+  await move(A.p, 57.5, 75, '5/8"', 1, 'the real one', 'tempered');
+  await A.p.evaluate(i => set(i, { status: 'ok' }, true), pid);
+  await sleep(500);
+  const done = { t: await stock(A.p, 57.5, 75, '5/8"', 'tempered'),
+                 x: await stock(A.p, 57.5, 75, '5/8"', 'plexi') };
+  ok('and putting glass back takes the tempered one', done.t === 0, JSON.stringify(done));
+  ok('leaving the plexi where it was', done.x === afterPlexi.x, JSON.stringify(done));
 }
 
 /* ---------------- and the order list itself ---------------- */
