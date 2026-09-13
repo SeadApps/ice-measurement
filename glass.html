@@ -163,6 +163,13 @@ textarea{width:100%;margin-top:10px;min-height:62px;resize:vertical;font:inherit
 textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .empty{color:var(--ink-3);font-size:13.5px}
 .savenote{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--ink-3);margin-top:9px;min-height:14px}
+/* Clear and Save sit under the note. The note still saves itself 600ms after
+   you stop typing and again when you leave the box - these are for certainty,
+   and because a note you want gone should not need a select-all first. */
+.note-act{display:flex;align-items:center;gap:8px;margin-top:9px;flex-wrap:wrap}
+.note-act .savenote{margin-top:0;margin-left:auto;text-align:right}
+.note-x{padding:6px 10px;line-height:1;font-size:12px}
+.note-x:hover{border-color:var(--replace);color:var(--replace)}
 
 /* ---- spare glass ---- */
 .sp-where{margin:0 0 10px;font-size:11.5px;color:var(--ink-3)}
@@ -185,6 +192,14 @@ textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
   border-radius:8px;background:var(--surface-2);color:var(--ink);min-width:0}
 .sp-form select:focus-visible,.sp-form input:focus-visible{outline:2px solid var(--accent);outline-offset:-1px}
 .sp-row{display:grid;grid-template-columns:64px 1fr auto;gap:6px}
+/* Same segmented shape as the theme switch at the top of the page, so the two
+   read as the same kind of control. */
+.sp-mat{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;align-self:flex-start}
+.sp-mat button{font:inherit;font-size:12.5px;padding:6px 12px;border:0;background:var(--surface-2);
+  color:var(--ink-2);cursor:pointer}
+.sp-mat button+button{border-left:1px solid var(--line)}
+.sp-mat button[aria-pressed="true"]{background:var(--accent);color:var(--ground);font-weight:600}
+.sp-mat button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .sp-other{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
 /* Same trap as .bld-f above: display:grid on a class outranks the browser's
    own [hidden]{display:none}, so the custom-size boxes sat open permanently. */
@@ -498,6 +513,10 @@ document.documentElement.setAttribute("data-theme",_t==="light"?"light":"dark");
       <details class="sp-add" id="spAddBox">
         <summary>Record a movement</summary>
         <div class="sp-form">
+          <div class="sp-mat" role="group" aria-label="Material">
+            <button type="button" data-m="tempered" aria-pressed="true">Tempered</button>
+            <button type="button" data-m="plexi" aria-pressed="false">Plexi</button>
+          </div>
           <select id="spSize" aria-label="Size"></select>
           <div class="sp-other" id="spOther" hidden>
             <input type="number" id="spW" placeholder="Width" step="0.25" aria-label="Width in inches">
@@ -973,15 +992,23 @@ function totals(){
 }
 /* Every size this facility could sensibly hold: the ones this rink is built
    from, plus anything already on the shelf - stock bought for another surface
-   in the same building stays visible even though its layout is not loaded. */
+   in the same building stays visible even though its layout is not loaded.
+
+   Shapes only, with no material in them. The form picks that with a toggle, so
+   the list stays the sixteen shapes Conway is made of rather than the same
+   sixteen twice over. */
+const dimKey = (w, h, thk) => [w, h, thk].join('|');
 function knownSizes(){
   const out = {};
   GLASS.forEach(p => {
     const s = {w:p.width_in, h:glassHeightOf(p), thk:p.thickness};
-    out[sizeKey(s.w, s.h, s.thk)] = s;
+    out[dimKey(s.w, s.h, s.thk)] = s;
   });
   const have = stockOf(activeFacilityId());
-  for(const k in have) if(!out[k]) out[k] = {w:have[k].w, h:have[k].h, thk:have[k].thk};
+  for(const k in have){
+    const s = have[k], dk = dimKey(s.w, s.h, s.thk);
+    if(!out[dk]) out[dk] = {w:s.w, h:s.h, thk:s.thk};
+  }
   return out;
 }
 
@@ -1027,16 +1054,19 @@ function spares(){
      said, or the card looks complete while the order list is not. */
   const missing = Object.keys(want).filter(k => !have[k]);
   if(missing.length){
-    const sizes = knownSizes();
     box.innerHTML += missing.map(k => {
-      const s = sizes[k] || {w:'?', h:'?', thk:'?'};
+      const q = k.split('|'), s = {w:q[0], h:q[1], thk:q[2], mat:q[3]};
+      /* A plexi sheet the same size is not cover, but it is worth saying that
+         the game can go on tonight. */
+      const pq = (have[sizeKey(s.w, s.h, s.thk, 'plexi')] || {}).qty || 0;
       return `<div class="sp-line">
         <span class="sp-sz">${sizeLabel(s)}</span><span class="sp-n short">0</span>
-        <span class="sp-need"><b>${want[k]}</b> flagged on this rink · ${want[k]} to order</span></div>`;
+        <span class="sp-need"><b>${want[k]}</b> flagged on this rink · ${want[k]} to order${
+          pq ? ` · ${pq} plexi to patch with` : ''}</span></div>`;
     }).join('');
   }
 
-  /* the size picker */
+  /* The size picker carries shapes; the toggle beside it carries material. */
   const sizes = knownSizes();
   const sel = document.getElementById('spSize');
   const keep = sel.value;
@@ -1046,6 +1076,8 @@ function spares(){
     .join('') + `<option value="__other">Another size…</option>`;
   if(keep && sel.querySelector(`option[value="${CSS.escape(keep)}"]`)) sel.value = keep;
   document.getElementById('spOther').hidden = sel.value !== '__other';
+  document.querySelectorAll('.sp-mat button').forEach(bt =>
+    bt.setAttribute('aria-pressed', String(bt.dataset.m === spMat)));
 
   /* the last few movements, newest first, each retractable */
   const mine = Object.keys(SPARES)
@@ -1171,20 +1203,86 @@ function detail(){
       <select id="ptag" aria-label="Kind of note">${Object.keys(TAGS).map(k=>`<option value="${k}"${tagOf(p)===k?' selected':''}>${TAGS[k]}</option>`).join('')}</select>
     </div>
     <textarea id="note" placeholder="Note — supplier, date, who spotted it…">${esc(nt(sel))}</textarea>
-    <div class="savenote" id="savenote"></div>`;
-  el.querySelectorAll('.sbtn').forEach(b=>b.addEventListener('click',()=>set(sel,{status:b.dataset.s})));
-  let t; el.querySelector('#note').addEventListener('input', e=>{
-    clearTimeout(t); t = setTimeout(()=>set(sel,{note:e.target.value},true), 600);
+    <div class="note-act">
+      <button class="btn note-x" id="noteClear" title="Clear this note" aria-label="Clear this note">✕</button>
+      <button class="btn" id="noteSave">Save note</button>
+      <span class="savenote" id="savenote"></span>
+    </div>`;
+  /* The panel this card is about, fixed now rather than read back later. */
+  const pid = sel;
+  el.querySelectorAll('.sbtn').forEach(b=>b.addEventListener('click',()=>{
+    flushEdits();                       // the note you just typed belongs to this panel too
+    set(pid,{status:b.dataset.s});
+  }));
+
+  const noteEl = el.querySelector('#note');
+  noteEl.addEventListener('input', e=>queueEdit(pid, {note:e.target.value}));
+  /* Leaving the box is as good as asking for it to be saved, and it is the one
+     thing somebody does without thinking. */
+  noteEl.addEventListener('blur', flushEdits);
+  el.querySelector('#noteSave').addEventListener('click', ()=>{
+    queueEdit(pid, {note:noteEl.value});
+    if(!flushEdits()) say('Nothing to save.');
   });
+  /* Emptying the box by hand works, but a note you want gone should not need
+     a select-all first - and this is the control the seeded notes wanted. */
+  el.querySelector('#noteClear').addEventListener('click', ()=>{
+    noteEl.value = '';
+    queueEdit(pid, {note:''});
+    flushEdits();
+    noteEl.focus();
+    say('Note cleared.');
+  });
+
   /* A label or a tag changes what the plan and the schedule draw and can
      retire a survey note, so more has to be redrawn than a condition does. */
-  const redraw = () => { buildPlan(); paint(); paintNotes(); };
-  let lt; el.querySelector('#plabel').addEventListener('input', e=>{
-    clearTimeout(lt); lt = setTimeout(()=>{ set(sel,{label:e.target.value},true); redraw(); }, 600);
+  const labelEl = el.querySelector('#plabel');
+  labelEl.addEventListener('input', e=>queueEdit(pid, {label:e.target.value}, true));
+  labelEl.addEventListener('blur', flushEdits);
+  el.querySelector('#ptag').addEventListener('change', e=>{
+    flushEdits();
+    set(pid,{tag:e.target.value}); redrawLabels();
   });
-  el.querySelector('#ptag').addEventListener('change', e=>{ set(sel,{tag:e.target.value}); redraw(); });
 }
-function select(id){ sel = (sel===id?null:id); detail(); table(); paint(); reveal(); }
+/* A pending edit belongs to the panel it was typed on.
+
+   The note and the label save 600ms after the last keystroke, and both used to
+   write to `sel` - read when the timer fired rather than when you typed. Click
+   the next panel inside that window and your note landed on *that* one instead:
+   a note about one pane appearing against another, and the pane you meant left
+   untouched. Clearing had the same shape, which is why the two seeded notes
+   looked impossible to delete - empty the box, move on, and the clear was
+   applied to whatever you had clicked while the old note stayed put.
+
+   So the panel id is held here alongside the patch, and anything that moves the
+   selection flushes first. */
+let editFor = null, editPatch = null, editTimer = null, editRedraw = false;
+const redrawLabels = () => { buildPlan(); paint(); paintNotes(); };
+
+function queueEdit(pid, patch, needsRedraw){
+  if(editFor && editFor !== pid) flushEdits();   // the other panel's edit is due first
+  editFor = pid;
+  editPatch = Object.assign(editPatch || {}, patch);
+  editRedraw = editRedraw || !!needsRedraw;
+  clearTimeout(editTimer);
+  editTimer = setTimeout(flushEdits, 600);
+  say('Not saved yet…');
+}
+
+function flushEdits(){
+  clearTimeout(editTimer); editTimer = null;
+  if(!editFor || !editPatch) return false;
+  const id = editFor, patch = editPatch, redraw = editRedraw;
+  editFor = null; editPatch = null; editRedraw = false;
+  set(id, patch, true);                          // store() says "Saved"
+  if(redraw) redrawLabels();
+  return true;
+}
+
+function select(id){
+  flushEdits();                                  // never carry an edit to another panel
+  sel = (sel===id?null:id); detail(); table(); paint(); reveal();
+}
 
 /* Tapping a panel has to show you the panel you tapped.
 
@@ -1267,14 +1365,32 @@ let activeBucket = LEGACY;
    screen would ever show it. Movements only ever appear, so summing them is
    right however they arrive, in whatever order, on any number of devices.
    Correcting a mistake is another movement, or a tombstone on the wrong one. */
-let SPARES = {};              // movementId -> {id,fac,w,h,thk,qty,note,by,at,updatedAt,deleted}
+let SPARES = {};              // movementId -> {id,fac,w,h,thk,mat,qty,note,by,at,updatedAt,deleted}
+let spMat = 'tempered';       // which pile the record form is pointed at
 
 const mvId = () => 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-/* Width, height and thickness together, because width alone does not identify
-   a piece: Conway carries 33" and 14.5" in both 1/2" and 5/8", and a 1/2" pane
-   will not fill a 5/8" hole. */
-const sizeKey = (w, h, thk) => [w, h, thk].join('|');
-const sizeLabel = s => `${s.w}″ × ${s.h}″ · ${s.thk}`;
+
+/* The shelf carries both, and they are not interchangeable: a plexi pane is
+   what goes in to keep the game on while the real one is on order. So material
+   is part of what identifies a piece, not a note about it.
+
+   Movements written before this existed carry no material and are read as
+   tempered, which is what the shelf held at the time. A device on the older
+   build reads a plexi movement as though it were tempered - it groups on
+   width, height and thickness and knows nothing else - which overstates its
+   glass rather than losing the record. It corrects itself the moment that
+   device updates, because nothing was rewritten to make this work. */
+const MATERIALS = {tempered:'Tempered', plexi:'Plexi'};
+const matOf = m => (m && m.mat === 'plexi') ? 'plexi' : 'tempered';
+
+/* Width, height, thickness and material together, because none of them alone
+   identifies a piece: Conway carries 33" and 14.5" in both 1/2" and 5/8", a
+   1/2" pane will not fill a 5/8" hole, and plexi will not do the job of glass
+   for longer than it takes the order to arrive. */
+const sizeKey = (w, h, thk, mat) => [w, h, thk, mat || 'tempered'].join('|');
+const keyOfMove = m => sizeKey(m.w, m.h, m.thk, matOf(m));
+const sizeLabel = s => `${s.w}″ × ${s.h}″ · ${s.thk}`
+                     + (matOf(s) === 'plexi' ? ' · plexi' : '');
 
 /* Which building's shelf are we looking at? A sheet names its facility; the
    legacy bucket reaches its sheet through the binding. Where that is not known
@@ -1289,15 +1405,15 @@ function activeFacilityId(){
   return null;
 }
 
-/* size key -> {w,h,thk,qty,moves,last} for one facility. */
+/* size key -> {w,h,thk,mat,qty,moves,last} for one facility. */
 function stockOf(fac){
   const out = {};
   if(!fac) return out;
   for(const id in SPARES){
     const m = SPARES[id];
     if(!m || m.deleted || m.fac !== fac) continue;
-    const k = sizeKey(m.w, m.h, m.thk);
-    if(!out[k]) out[k] = {w:m.w, h:m.h, thk:m.thk, qty:0, moves:0, last:''};
+    const k = keyOfMove(m);
+    if(!out[k]) out[k] = {w:m.w, h:m.h, thk:m.thk, mat:matOf(m), qty:0, moves:0, last:''};
     out[k].qty += (+m.qty || 0);
     out[k].moves++;
     if((m.at || '') > out[k].last) out[k].last = m.at || '';
@@ -1313,24 +1429,33 @@ function coverage(){
   const fac = activeFacilityId(), have = stockOf(fac), left = {};
   for(const k in have) left[k] = have[k].qty;
   const rows = GLASS.filter(p => st(p.id) !== 'ok').map(p => {
-    const k = sizeKey(p.width_in, glassHeightOf(p), p.thickness);
+    /* The rink is built from tempered, so a flagged pane wants tempered. A
+       plexi sheet the same size is the stopgap, not the fix: counting it as
+       cover would tell somebody not to order glass they are going to need.
+       It is reported separately instead, because knowing you can keep the
+       game on tonight is worth saying. */
+    const k  = sizeKey(p.width_in, glassHeightOf(p), p.thickness, 'tempered');
+    const pk = sizeKey(p.width_in, glassHeightOf(p), p.thickness, 'plexi');
     const covered = (left[k] || 0) > 0;
     if(covered) left[k] -= 1;
-    return {p, k, covered};
+    const patch = !covered && (left[pk] || 0) > 0;
+    if(patch) left[pk] -= 1;
+    return {p, k, covered, patch};
   });
   return {fac, have, rows,
           flagged: rows.length,
           fromStock: rows.filter(r => r.covered).length,
+          patchable: rows.filter(r => r.patch).length,
           toOrder: rows.filter(r => !r.covered).length};
 }
 
 /* A movement is only ever added. `qty` is signed: positive received, negative
    fitted or written off. */
-function addMovement(w, h, thk, qty, note){
+function addMovement(w, h, thk, mat, qty, note){
   const fac = activeFacilityId();
   if(!fac || !qty) return null;
   const id = mvId();
-  SPARES[id] = {id, fac, w:+w, h:+h, thk:String(thk), qty:+qty,
+  SPARES[id] = {id, fac, w:+w, h:+h, thk:String(thk), mat:matOf({mat:mat}), qty:+qty,
                 note:note || '', by:who || '', at:stamp(), updatedAt:nowISO()};
   return id;
 }
@@ -1363,22 +1488,27 @@ function dropMovement(id){
    devices clearing the same panel before either has synced will still record
    two fittings; that one is visible in the list and retractable, which is the
    whole reason stock is a ledger rather than a number. */
-function autoFit(pid){
+function autoFit(pid, mat){
   const p = GLASS.find(x => x.id === pid);
   if(!p) return null;
   const fac = activeFacilityId();
   if(!fac) return null;
-  const h = glassHeightOf(p), k = sizeKey(p.width_in, h, p.thickness);
-  const size = {w:p.width_in, h:h, thk:p.thickness};
-  const have = stockOf(fac)[k];
+  const h = glassHeightOf(p);
+  const size = {w:p.width_in, h:h, thk:p.thickness, mat:mat || 'tempered'};
+  const have = stockOf(fac)[sizeKey(size.w, size.h, size.thk, size.mat)];
   if(!have || have.qty <= 0) return {short:true, size};
   const today = stamp();
+  /* Once per panel per day per material: a pane going to plexi and then to
+     glass on the same day is two real fittings out of two different piles, so
+     the guard cannot be on the panel alone. */
   const twice = Object.keys(SPARES).some(mid => {
     const m = SPARES[mid];
-    return m && !m.deleted && m.fac === fac && m.forPanel === pid && m.at === today;
+    return m && !m.deleted && m.fac === fac && m.forPanel === pid
+        && m.at === today && matOf(m) === size.mat;
   });
   if(twice) return {already:true, size};
-  const id = addMovement(size.w, size.h, size.thk, -1, 'fitted panel ' + pid.replace(/^0+/, ''));
+  const id = addMovement(size.w, size.h, size.thk, size.mat, -1,
+                         'fitted panel ' + pid.replace(/^0+/, ''));
   if(!id) return null;
   SPARES[id].forPanel = pid;
   SPARES[id].auto = true;
@@ -1705,10 +1835,15 @@ function set(id, patch, quiet){
                              {by: who || '', at: stamp(), updatedAt: nowISO()});
   delete next.seed;            // somebody has touched it, so it is an observation now
   state[id] = next;
-  /* Flagged going back to good is a pane fitted, so the shelf follows. Only on
-     a status change - editing the note of a panel that is already good is not
-     somebody fitting glass. */
-  const fitted = (patch && patch.status === 'ok' && was !== 'ok') ? autoFit(id) : null;
+  /* A pane fitted comes off the shelf, and which pile it comes off depends on
+     what went in. Back to good is the real fix, so that is tempered. Going to
+     plexi is the stopgap that keeps the game on, and that is a plexi sheet out
+     of the same shelf. Only on a status change - editing the note of a panel
+     that is already good is not somebody fitting anything. */
+  const fitted =
+      (patch && patch.status === 'ok'    && was !== 'ok')    ? autoFit(id, 'tempered')
+    : (patch && patch.status === 'plexi' && was !== 'plexi') ? autoFit(id, 'plexi')
+    : null;
   /* Flagging or clearing a panel changes what the shelf has to cover, so the
      spares card is part of the same redraw rather than something that catches
      up on the next reload. */
@@ -1717,9 +1852,10 @@ function set(id, patch, quiet){
   /* After detail(), which rebuilds the element say() writes into. */
   if(fitted){
     const n = id.replace(/^0+/, ''), sz = sizeLabel(fitted.size);
-    say(fitted.short   ? `Panel ${n} good — no ${sz} on the shelf, so nothing was deducted.`
-      : fitted.already ? `Panel ${n} good — already deducted today.`
-      :                  `Panel ${n} good — one ${sz} off the shelf.`);
+    const verb = fitted.size.mat === 'plexi' ? 'patched' : 'good';
+    say(fitted.short   ? `Panel ${n} ${verb} — no ${sz} on the shelf, so nothing was deducted.`
+      : fitted.already ? `Panel ${n} ${verb} — already deducted today.`
+      :                  `Panel ${n} ${verb} — one ${sz} off the shelf.`);
   }
 }
 
@@ -1737,20 +1873,25 @@ document.getElementById('csv').addEventListener('click', ()=>{
      without doing it again by hand. */
   const cov = coverage();
   const rows = [['Panel','Section','Width (in)','Height (in)','Thickness','Status','Source','Note','Marked by','Date']];
-  cov.rows.forEach(({p, covered})=>{
+  cov.rows.forEach(({p, covered, patch})=>{
     const s = state[p.id] || {};
     rows.push([p.id.replace(/^0+/,''), p.section, p.width_in, glassHeightOf(p), p.thickness,
-               STATUS[st(p.id)].label, covered?'From stock':'Order', nt(p.id), s.by||'', s.at||'']);
+               STATUS[st(p.id)].label,
+               covered ? 'From stock' : (patch ? 'Order — plexi to patch' : 'Order'),
+               nt(p.id), s.by||'', s.at||'']);
   });
   if(!cov.rows.length) rows.push(['—','Nothing flagged yet','','','','','','','','']);
   else {
     const want = {};
     cov.rows.forEach(r=>{ want[r.k]=(want[r.k]||0)+1; });
     rows.push(['','','','','','','','','','']);
-    rows.push(['To order','','Width (in)','Height (in)','Thickness','Flagged','In stock','Order','','']);
+    /* Plexi on hand is not cover and is not counted as such, but it is what
+       somebody reading this wants to know before deciding how fast to order. */
+    rows.push(['To order','','Width (in)','Height (in)','Thickness','Material','Flagged','In stock','Order','Plexi on hand']);
     Object.keys(want).sort((a,b)=>want[b]-want[a]).forEach(k=>{
       const q = k.split('|'), have = (cov.have[k]||{}).qty || 0, n = want[k];
-      rows.push(['','',q[0],q[1],q[2],n,have,Math.max(0,n-have),'','']);
+      const plexi = (cov.have[sizeKey(q[0],q[1],q[2],'plexi')]||{}).qty || 0;
+      rows.push(['','',q[0],q[1],q[2],MATERIALS[q[3]]||q[3],n,have,Math.max(0,n-have),plexi]);
     });
   }
   grab('conway-arena-glass-order.csv',
@@ -1792,6 +1933,10 @@ document.getElementById('print').addEventListener('click', ()=>window.print());
 document.getElementById('spSize').addEventListener('change', e=>{
   document.getElementById('spOther').hidden = e.target.value !== '__other';
 });
+document.querySelectorAll('.sp-mat button').forEach(bt=>bt.addEventListener('click', ()=>{
+  spMat = bt.dataset.m === 'plexi' ? 'plexi' : 'tempered';
+  spares();
+}));
 document.getElementById('spAdd').addEventListener('click', ()=>{
   const sel = document.getElementById('spSize').value;
   let w, h, thk;
@@ -1807,11 +1952,11 @@ document.getElementById('spAdd').addEventListener('click', ()=>{
   const qty = parseInt(document.getElementById('spQty').value, 10);
   if(!qty){ say('A movement of nothing is not a movement.'); return; }
   const note = document.getElementById('spNote').value.trim();
-  if(!addMovement(w, h, thk, qty, note)){ say('No arena to hold this stock yet.'); return; }
+  if(!addMovement(w, h, thk, spMat, qty, note)){ say('No arena to hold this stock yet.'); return; }
   document.getElementById('spNote').value = '';
   document.getElementById('spQty').value = '1';
   store(); spares(); table();
-  say(`${qty > 0 ? 'Received' : 'Taken off'} ${Math.abs(qty)} × ${w}″ × ${h}″ ${thk}.`);
+  say(`${qty > 0 ? 'Received' : 'Taken off'} ${Math.abs(qty)} × ${sizeLabel({w, h, thk, mat:spMat})}.`);
 });
 document.getElementById('who').addEventListener('input', e=>{ who = e.target.value.trim(); store(); });
 
