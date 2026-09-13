@@ -10,7 +10,8 @@
     "e2e": "node e2e.js",
     "home": "node homecheck.js",
     "reg": "node reg.js",
-    "resume": "node resume.js"
+    "resume": "node resume.js",
+    "phone": "node phonetest.js"
   },
   "devDependencies": {
     "playwright": "^1.49.0"

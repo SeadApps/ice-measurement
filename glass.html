@@ -138,7 +138,10 @@ svg.rink{display:block;width:100%;min-width:760px;height:auto}
 
 /* ---- lower grid ---- */
 .grid{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:22px;align-items:start}
-@media (max-width:1040px){.grid{grid-template-columns:1fr}}
+/* minmax(0,...) as above, not a bare 1fr: 1fr means minmax(auto,1fr), and that
+   auto floors the column at its min-content width. The column then refuses to
+   shrink, and takes the whole page sideways with it - 121px of it at 390px. */
+@media (max-width:1040px){.grid{grid-template-columns:minmax(0,1fr)}}
 .aside{position:sticky;top:18px;display:flex;flex-direction:column;gap:18px}
 .pad{padding:14px 16px}
 .detail dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:5px 14px;font-size:13.5px}
@@ -213,6 +216,24 @@ tr.grp td{background:var(--surface-3);font-family:var(--display);font-weight:600
 kbd{font-family:var(--mono);font-size:12px;background:var(--surface-2);border:1px solid var(--line);
   border-radius:6px;padding:0 4px}
 footer{font-size:12.5px;color:var(--ink-3);text-align:center;font-family:var(--mono);letter-spacing:.04em}
+/* ---- phone ----
+   Glass was built on a desktop and never looked at on a phone. At 390px the
+   rink started 1116px down - past two screenfuls - because everything that
+   sits in a row on a desktop stacks here: the header wrapped to four rows and
+   the tiles to four, and between them they pushed the plan off the screen.
+   Nothing is dropped that is not said elsewhere on the page. 560px is the
+   breakpoint ice.html already uses, so the two pages turn together. */
+@media (max-width:560px){
+  .wrap{padding:14px 14px 40px;gap:14px}
+  header{gap:9px;padding-bottom:12px}
+  .brand{width:100%;margin-right:0}
+  .brand h1{font-size:18px}
+  .brand .sub{display:none}      /* restates the title, and costs two lines here */
+  .specstrip{gap:12px}
+  .specs{gap:12px 18px}
+  .spec b{font-size:17px}
+  .tile{flex-basis:140px}        /* two tiles to a row rather than one */
+}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 @media print{
   @page{size:landscape;margin:12mm}
@@ -908,7 +929,38 @@ function detail(){
   });
   el.querySelector('#ptag').addEventListener('change', e=>{ set(sel,{tag:e.target.value}); redraw(); });
 }
-function select(id){ sel = (sel===id?null:id); detail(); table(); paint(); }
+function select(id){ sel = (sel===id?null:id); detail(); table(); paint(); reveal(); }
+
+/* Tapping a panel has to show you the panel you tapped.
+
+   On a desktop the detail card is a sticky column beside the plan, so it
+   follows you down and selecting fills it in where you are already looking.
+   Once the grid stacks, that column becomes a block underneath a 560px-tall
+   schedule - a screen and a half below the panel you just pressed, with
+   nothing on screen to say anything happened. That is a portrait iPad as much
+   as a phone, which is the thing actually carried round the boards.
+
+   Two conditions, and both matter. Only when the grid has stacked, asked of
+   the grid itself rather than by testing a width - the breakpoint can move and
+   this still tracks it, and a desktop keeps exactly the behaviour it had.
+   And only when the card is not already on screen, so selecting panel after
+   panel down the schedule does not keep yanking the page.
+
+   Only on select, too. Deselecting must not drag the page anywhere. */
+function reveal(){
+  if(!sel) return;
+  const grid = document.querySelector('.grid'), el = document.getElementById('detail');
+  if(!grid || !el) return;
+  const stacked = getComputedStyle(grid).gridTemplateColumns.split(' ').length === 1;
+  if(!stacked) return;                        // sticky beside the plan; nothing to do
+  const r = el.getBoundingClientRect();
+  const shown = Math.min(r.bottom, innerHeight) - Math.max(r.top, 0);
+  if(shown >= 80) return;                     // enough of it is already on screen
+  el.scrollIntoView({
+    block: 'start',
+    behavior: matchMedia('(prefers-reduced-motion:reduce)').matches ? 'auto' : 'smooth'
+  });
+}
 
 /* ---------------- persistence ---------------- */
 /* Same wrapper the Ice app uses: a host-provided store if one exists, else this browser. */

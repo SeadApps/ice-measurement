@@ -250,10 +250,20 @@ node dev/gentest.js        # 19 checks: the generator reproduces Conway's survey
 node dev/buildertest.js    # 72 checks: walking a rink in, what it writes, the surface it hangs off, removing it
 node dev/reg.js            # 14 checks: rounds persist, prefs stay separate, the switcher is reachable
 node dev/resume.js         #  9 checks: coming back lands where you left off
+node dev/phonetest.js      # 42 checks: no page scrolls sideways on a phone, tapping a panel shows it, and the desktop is untouched
 ```
 
-124 checks in all. Tests point `window.__SYNC_CONFIG__` at the fake via
+372 checks in all. Tests point `window.__SYNC_CONFIG__` at the fake via
 `addInitScript`; the real pages never read it.
+
+**Run them one at a time.** They share the one fake server, and several assert
+what the server is holding — `synctest` prints its record count and checks it.
+Two suites at once against `:8200` fail each other in ways that look like real
+bugs and do not reproduce on a re-run.
+
+`phonetest` is the only suite that does not drive a 1280x900 window, which is
+how Glass came to ship a page that scrolled sideways by 121px at 390px: every
+other suite would have had to be looking at a phone to see it.
 
 **Seed a session the fake server actually issued.** A made-up token takes a 401
 on its first data call, which expires it locally and re-gates the device. That
