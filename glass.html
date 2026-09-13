@@ -164,6 +164,50 @@ textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .empty{color:var(--ink-3);font-size:13.5px}
 .savenote{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--ink-3);margin-top:9px;min-height:14px}
 
+/* ---- spare glass ---- */
+.sp-where{margin:0 0 10px;font-size:11.5px;color:var(--ink-3)}
+.sp-line{display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:baseline;
+  padding:7px 0;border-top:1px solid var(--line)}
+.sp-line:first-child{border-top:0}
+.sp-sz{font-family:var(--mono);font-size:12.5px;color:var(--ink)}
+.sp-n{font-family:var(--mono);font-size:14px;font-weight:600;font-variant-numeric:tabular-nums}
+.sp-n.short{color:var(--replace)}
+.sp-need{grid-column:1/-1;font-size:11.5px;color:var(--ink-3)}
+.sp-need b{color:var(--ink-2);font-weight:600}
+.sp-none{margin:0;font-size:12.5px;color:var(--ink-3)}
+.sp-add{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
+.sp-add summary{font-size:12px;color:var(--accent);cursor:pointer;list-style:none}
+.sp-add summary::-webkit-details-marker{display:none}
+.sp-add summary::before{content:"+ ";font-family:var(--mono)}
+.sp-add[open] summary::before{content:"− ";font-family:var(--mono)}
+.sp-form{display:flex;flex-direction:column;gap:7px;margin-top:9px}
+.sp-form select,.sp-form input{font:inherit;font-size:12.5px;padding:6px 8px;border:1px solid var(--line);
+  border-radius:8px;background:var(--surface-2);color:var(--ink);min-width:0}
+.sp-form select:focus-visible,.sp-form input:focus-visible{outline:2px solid var(--accent);outline-offset:-1px}
+.sp-row{display:grid;grid-template-columns:64px 1fr auto;gap:6px}
+.sp-other{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+/* Same trap as .bld-f above: display:grid on a class outranks the browser's
+   own [hidden]{display:none}, so the custom-size boxes sat open permanently. */
+.sp-other[hidden]{display:none}
+.sp-hint{margin:8px 0 0;font-size:11px;line-height:1.45;color:var(--ink-3)}
+.sp-mv{margin-top:11px;border-top:1px solid var(--line);padding-top:9px;
+  display:flex;flex-direction:column;gap:5px}
+.sp-mv-h{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+.sp-mv-r{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:baseline;font-size:12px}
+.sp-mv-q{font-family:var(--mono);font-weight:600;font-variant-numeric:tabular-nums}
+.sp-mv-q.up{color:var(--ok)}
+.sp-mv-q.down{color:var(--ink-2)}
+.sp-mv-t{color:var(--ink-2);overflow-wrap:anywhere}
+.sp-undo{font:inherit;font-size:11px;background:none;border:0;color:var(--ink-3);cursor:pointer;padding:0}
+.sp-undo:hover{color:var(--replace)}
+/* A deduction the app made rather than somebody typing it. Marked because it
+   is the one movement nobody chose, so it is the one worth being able to spot
+   and take back. */
+.sp-auto{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;
+  border:1px solid var(--line-2);border-radius:4px;padding:0 4px;color:var(--ink-3)}
+.sp-cov{font-size:12px;color:var(--ink-2)}
+.sp-cov b{color:var(--ink);font-weight:600}
+
 /* ---- schedule ---- */
 .hd-t{display:flex;flex-direction:column;gap:2px;min-width:0}
 .sched-sub{margin:0;font-size:12px;line-height:1.45;color:var(--ink-3);font-weight:400;
@@ -446,6 +490,30 @@ document.documentElement.setAttribute("data-theme",_t==="light"?"light":"dark");
     <section class="card pad">
       <h2 style="font-family:var(--display);font-size:14px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;margin:0 0 10px">Run totals</h2>
       <dl id="totals" style="margin:0;display:grid;grid-template-columns:1fr auto;gap:5px 14px;font-size:13px"></dl>
+    </section>
+    <section class="card pad" id="spares">
+      <h2 style="font-family:var(--display);font-size:14px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;margin:0 0 4px">Spare glass</h2>
+      <p class="sp-where" id="spWhere"></p>
+      <div id="spStock"></div>
+      <details class="sp-add" id="spAddBox">
+        <summary>Record a movement</summary>
+        <div class="sp-form">
+          <select id="spSize" aria-label="Size"></select>
+          <div class="sp-other" id="spOther" hidden>
+            <input type="number" id="spW" placeholder="Width" step="0.25" aria-label="Width in inches">
+            <input type="number" id="spH" placeholder="Height" step="0.25" aria-label="Height in inches">
+            <input type="text" id="spT" placeholder="Thk" aria-label="Thickness">
+          </div>
+          <div class="sp-row">
+            <input type="number" id="spQty" value="1" step="1" aria-label="Quantity, negative to take off the shelf">
+            <input type="text" id="spNote" placeholder="Supplier, or which panel" aria-label="Note">
+            <button class="btn" id="spAdd">Record</button>
+          </div>
+        </div>
+        <p class="sp-hint">Positive received, negative fitted or written off. Stock is the sum, so a
+          correction is just another movement.</p>
+      </details>
+      <div id="spMoves"></div>
     </section>
   </div>
 </div>
@@ -903,6 +971,101 @@ function totals(){
     `<dt style="font-family:var(--body);color:${i>4?'var(--warn)':'var(--ink-2)'};text-transform:none;letter-spacing:0;font-size:13px">${esc(a)}</dt>
      <dd style="font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right;font-size:12.5px">${esc(b)}</dd>`).join('');
 }
+/* Every size this facility could sensibly hold: the ones this rink is built
+   from, plus anything already on the shelf - stock bought for another surface
+   in the same building stays visible even though its layout is not loaded. */
+function knownSizes(){
+  const out = {};
+  GLASS.forEach(p => {
+    const s = {w:p.width_in, h:glassHeightOf(p), thk:p.thickness};
+    out[sizeKey(s.w, s.h, s.thk)] = s;
+  });
+  const have = stockOf(activeFacilityId());
+  for(const k in have) if(!out[k]) out[k] = {w:have[k].w, h:have[k].h, thk:have[k].thk};
+  return out;
+}
+
+function spares(){
+  const card = document.getElementById('spares');
+  if(!card) return;
+  const fac = activeFacilityId();
+  const where = document.getElementById('spWhere');
+  const box = document.getElementById('spStock');
+  const addBox = document.getElementById('spAddBox');
+
+  /* No facility on this device yet - the binding has not arrived. Say so
+     rather than invent a shelf to hang stock on, because a movement written
+     against a guessed facility would be wrong on every other device. */
+  if(!fac){
+    where.textContent = 'Kept per arena. This device does not know which arena this rink belongs to yet — open Ice Manager, or sync.';
+    box.innerHTML = '';
+    addBox.hidden = true;
+    document.getElementById('spMoves').innerHTML = '';
+    return;
+  }
+  addBox.hidden = false;
+  where.innerHTML = `Kept per arena, shared across every sheet at <b>${esc(facilityName(activeBucket))}</b>.`;
+
+  const cov = coverage(), have = cov.have;
+  /* How many flagged pieces on this rink want each size, so a short shelf is
+     visible next to the number rather than worked out in somebody's head. */
+  const want = {};
+  cov.rows.forEach(r => { want[r.k] = (want[r.k] || 0) + 1; });
+
+  const keys = Object.keys(have).sort((a, b) => (have[b].qty - have[a].qty) || (have[b].w - have[a].w));
+  box.innerHTML = keys.length ? keys.map(k => {
+    const s = have[k], n = want[k] || 0, short = n > s.qty;
+    return `<div class="sp-line">
+      <span class="sp-sz">${sizeLabel(s)}</span>
+      <span class="sp-n${short?' short':''}">${s.qty}</span>
+      ${n ? `<span class="sp-need"><b>${n}</b> flagged on this rink · ${
+        short ? `${n - s.qty} to order` : 'covered from stock'}</span>` : ''}
+    </div>`;
+  }).join('') : `<p class="sp-none">Nothing on the shelf yet.</p>`;
+
+  /* Sizes flagged here that the shelf does not carry at all still have to be
+     said, or the card looks complete while the order list is not. */
+  const missing = Object.keys(want).filter(k => !have[k]);
+  if(missing.length){
+    const sizes = knownSizes();
+    box.innerHTML += missing.map(k => {
+      const s = sizes[k] || {w:'?', h:'?', thk:'?'};
+      return `<div class="sp-line">
+        <span class="sp-sz">${sizeLabel(s)}</span><span class="sp-n short">0</span>
+        <span class="sp-need"><b>${want[k]}</b> flagged on this rink · ${want[k]} to order</span></div>`;
+    }).join('');
+  }
+
+  /* the size picker */
+  const sizes = knownSizes();
+  const sel = document.getElementById('spSize');
+  const keep = sel.value;
+  sel.innerHTML = Object.keys(sizes)
+    .sort((a, b) => sizes[b].w - sizes[a].w)
+    .map(k => `<option value="${esc(k)}">${sizeLabel(sizes[k])}</option>`)
+    .join('') + `<option value="__other">Another size…</option>`;
+  if(keep && sel.querySelector(`option[value="${CSS.escape(keep)}"]`)) sel.value = keep;
+  document.getElementById('spOther').hidden = sel.value !== '__other';
+
+  /* the last few movements, newest first, each retractable */
+  const mine = Object.keys(SPARES)
+    .map(id => SPARES[id])
+    .filter(m => m && !m.deleted && m.fac === fac)
+    .sort((a, b) => String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')));
+  const mv = document.getElementById('spMoves');
+  mv.innerHTML = mine.length ? `<div class="sp-mv">
+    <div class="sp-mv-h">Recent movements</div>
+    ${mine.slice(0, 6).map(m => `<div class="sp-mv-r">
+      <span class="sp-mv-q ${m.qty > 0 ? 'up' : 'down'}">${m.qty > 0 ? '+' : ''}${m.qty}</span>
+      <span class="sp-mv-t">${m.auto ? '<span class="sp-auto">auto</span> ' : ''}${sizeLabel(m)}${m.note ? ' · ' + esc(m.note) : ''}${m.at ? ' · ' + esc(m.at) : ''}${m.by ? ' · ' + esc(m.by) : ''}</span>
+      <button class="sp-undo" data-mv="${esc(m.id)}" title="Retract this movement">retract</button>
+    </div>`).join('')}
+  </div>` : '';
+  mv.querySelectorAll('.sp-undo').forEach(b => b.addEventListener('click', () => {
+    if(dropMovement(b.dataset.mv)){ store(); spares(); table(); }
+  }));
+}
+
 /* Is this panel in the current view? The table, the plan's dimming and the
    count line all have to give the same answer, so they ask in one place.
    'flagged' is deliberately the same predicate the order list exports on
@@ -930,9 +1093,17 @@ function scope(){
   const flagged = GLASS.filter(p => st(p.id) !== 'ok').length;
   const names = { flagged:'needing attention', replace:'needing replacement',
                   plexi:'on temporary plexi', ok:'in good order' };
-  t.innerHTML = (!filter && !q)
+  /* What the order list will say, beside the line describing what you are
+     looking at - the button is right there, and "2 flagged" means something
+     different once you know one of them is on the shelf. */
+  const cov = coverage();
+  const covTxt = (cov.flagged && cov.fromStock)
+    ? ` <span class="sp-cov">&middot; <b>${cov.fromStock}</b> from stock, order <b>${cov.toOrder}</b></span>`
+    : '';
+  t.innerHTML = ((!filter && !q)
     ? `All <b>${total}</b> pieces.`
-    : `Showing <b>${shown}</b> of ${total}${filter?' &mdash; '+names[filter]:''}${q?' &mdash; matching &ldquo;'+esc(q)+'&rdquo;':''}.`;
+    : `Showing <b>${shown}</b> of ${total}${filter?' &mdash; '+names[filter]:''}${q?' &mdash; matching &ldquo;'+esc(q)+'&rdquo;':''}.`)
+    + covTxt;
   b.textContent = filter ? `Show all ${total}` : `Show only what needs attention (${flagged})`;
   b.disabled = !filter && !flagged;
   b.onclick = () => { filter = filter ? null : 'flagged'; rail(); table(); paint(); };
@@ -1080,6 +1251,139 @@ let FACILITY_NAMES = {};      // names for rinks built here, before Ice has a re
 let LAYOUT_AT = {};           // bucket -> the layout's updatedAt, so layouts merge newest-wins
 let bindingAt = '';           // its updatedAt, so the binding merges newest-wins
 let activeBucket = LEGACY;
+
+/* ---- spare glass -------------------------------------------------------
+
+   Spares hang off the *facility*, and that is deliberately the opposite way
+   round from the panels. G1 moved glass onto sheets because an arena with two
+   ice surfaces has two sets of glass, two schedules and two condition records.
+   Spare stock is not like that: it sits on a rack in one storage room and gets
+   fitted to whichever surface breaks. One building, one shelf.
+
+   Stock is not stored. Each receipt or fitting is its own record and the level
+   is their sum, because a quantity is the one shape this record model merges
+   badly: newest-wins on a number means the iPad taking 3 to 2 and the desktop
+   doing the same from its own copy merge to 2 rather than 1, and nothing on
+   screen would ever show it. Movements only ever appear, so summing them is
+   right however they arrive, in whatever order, on any number of devices.
+   Correcting a mistake is another movement, or a tombstone on the wrong one. */
+let SPARES = {};              // movementId -> {id,fac,w,h,thk,qty,note,by,at,updatedAt,deleted}
+
+const mvId = () => 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+/* Width, height and thickness together, because width alone does not identify
+   a piece: Conway carries 33" and 14.5" in both 1/2" and 5/8", and a 1/2" pane
+   will not fill a 5/8" hole. */
+const sizeKey = (w, h, thk) => [w, h, thk].join('|');
+const sizeLabel = s => `${s.w}″ × ${s.h}″ · ${s.thk}`;
+
+/* Which building's shelf are we looking at? A sheet names its facility; the
+   legacy bucket reaches its sheet through the binding. Where that is not known
+   yet - a device that has never synced - this is null and the card says so
+   rather than inventing a shelf, the same way a facility-only binding is held
+   pending rather than guessed at. */
+function activeFacilityId(){
+  const sid = activeBucket === LEGACY ? boundSheetId : activeBucket;
+  const sh = sid && sheets[sid];
+  if(sh && sh.facilityId) return sh.facilityId;
+  if(activeBucket === LEGACY && pendingFacilityId) return pendingFacilityId;
+  return null;
+}
+
+/* size key -> {w,h,thk,qty,moves,last} for one facility. */
+function stockOf(fac){
+  const out = {};
+  if(!fac) return out;
+  for(const id in SPARES){
+    const m = SPARES[id];
+    if(!m || m.deleted || m.fac !== fac) continue;
+    const k = sizeKey(m.w, m.h, m.thk);
+    if(!out[k]) out[k] = {w:m.w, h:m.h, thk:m.thk, qty:0, moves:0, last:''};
+    out[k].qty += (+m.qty || 0);
+    out[k].moves++;
+    if((m.at || '') > out[k].last) out[k].last = m.at || '';
+  }
+  return out;
+}
+
+/* What the order list has to say: of the pieces flagged on this rink, which
+   come off the shelf and which have to be bought. Allocation inside a size is
+   in running order - the pieces are identical, so which one gets the spare is
+   arbitrary, and only the counts matter. */
+function coverage(){
+  const fac = activeFacilityId(), have = stockOf(fac), left = {};
+  for(const k in have) left[k] = have[k].qty;
+  const rows = GLASS.filter(p => st(p.id) !== 'ok').map(p => {
+    const k = sizeKey(p.width_in, glassHeightOf(p), p.thickness);
+    const covered = (left[k] || 0) > 0;
+    if(covered) left[k] -= 1;
+    return {p, k, covered};
+  });
+  return {fac, have, rows,
+          flagged: rows.length,
+          fromStock: rows.filter(r => r.covered).length,
+          toOrder: rows.filter(r => !r.covered).length};
+}
+
+/* A movement is only ever added. `qty` is signed: positive received, negative
+   fitted or written off. */
+function addMovement(w, h, thk, qty, note){
+  const fac = activeFacilityId();
+  if(!fac || !qty) return null;
+  const id = mvId();
+  SPARES[id] = {id, fac, w:+w, h:+h, thk:String(thk), qty:+qty,
+                note:note || '', by:who || '', at:stamp(), updatedAt:nowISO()};
+  return id;
+}
+/* Undoing one is a tombstone rather than a deletion, or the next pull hands it
+   straight back - the same rule the removed layouts follow. */
+function dropMovement(id){
+  if(!SPARES[id]) return false;
+  SPARES[id] = {id, deleted:true, updatedAt:nowISO()};
+  return true;
+}
+
+/* Fitting a pane takes it off the shelf.
+
+   The event is not a status value, it is a *transition*: `replace` means needs
+   replacing, so the moment a pane is actually fitted is the one where a flagged
+   panel goes back to good. Clearing plexi counts too - real glass went in where
+   the patch was.
+
+   This is deducted rather than offered, which is what was asked for, so the
+   guard against it being wrong is that it is never silent: it says what it did,
+   the movement is at the top of the card marked `auto`, and retracting it is one
+   click. A flag cleared because it was raised in error is a movement to take
+   back, not a number to go hunting for.
+
+   Two things it will not do. It will not take the shelf negative - no spare of
+   that size means the glass came from somewhere other than the rack, so the
+   ledger stays true to the rack and says nothing was deducted. And it will not
+   deduct twice for the same panel on the same day, which is the realistic
+   double: somebody clearing a flag, re-flagging, and clearing it again. Two
+   devices clearing the same panel before either has synced will still record
+   two fittings; that one is visible in the list and retractable, which is the
+   whole reason stock is a ledger rather than a number. */
+function autoFit(pid){
+  const p = GLASS.find(x => x.id === pid);
+  if(!p) return null;
+  const fac = activeFacilityId();
+  if(!fac) return null;
+  const h = glassHeightOf(p), k = sizeKey(p.width_in, h, p.thickness);
+  const size = {w:p.width_in, h:h, thk:p.thickness};
+  const have = stockOf(fac)[k];
+  if(!have || have.qty <= 0) return {short:true, size};
+  const today = stamp();
+  const twice = Object.keys(SPARES).some(mid => {
+    const m = SPARES[mid];
+    return m && !m.deleted && m.fac === fac && m.forPanel === pid && m.at === today;
+  });
+  if(twice) return {already:true, size};
+  const id = addMovement(size.w, size.h, size.thk, -1, 'fitted panel ' + pid.replace(/^0+/, ''));
+  if(!id) return null;
+  SPARES[id].forPanel = pid;
+  SPARES[id].auto = true;
+  return {id, size};
+}
 
 const bucketOf = b => (records[b] = records[b] || {});
 
@@ -1266,7 +1570,7 @@ async function deleteRink(bucket){
   setBucket(LEGACY);
   store();
   defaultScope();
-  buildPlan(); rail(); totals(); table(); detail(); paint(); paintFacility();
+  buildPlan(); rail(); totals(); table(); detail(); paint(); paintFacility(); spares();
   say('Removed ' + name + '.');
 }
 
@@ -1285,7 +1589,7 @@ async function switchRink(b){
     await Records.Repo.savePrefs(patch);
   }
   defaultScope();
-  buildPlan(); rail(); totals(); table(); detail(); paint(); paintFacility();
+  buildPlan(); rail(); totals(); table(); detail(); paint(); paintFacility(); spares();
   say('Showing ' + facilityName(b) + '.');
 }
 
@@ -1339,7 +1643,7 @@ async function loadSurfaces(){
 const SYNC=(typeof Sync!=="undefined")?Sync:null;   // absent if sync.js failed to load; the page still works locally
 const snapshot = () => JSON.stringify({records, who, boundSheetId, pendingFacilityId, bindingAt,
                                        activeBucket, names: FACILITY_NAMES, at: LAYOUT_AT, gone: LAYOUT_GONE,
-                                       counts: GLASS_COUNTS(),
+                                       counts: GLASS_COUNTS(), spares: SPARES,
                                        specs: BUILT_SPECS(), built: BUILT_DRAWN()});
 function store(){ Store.set(KEY, snapshot()); say('Saved'); if(SYNC) SYNC.nudge(); }
 
@@ -1359,6 +1663,7 @@ async function restore(){
        so it is never stored and never overwritten from storage. */
     LAYOUT_AT = saved.at || {};
     LAYOUT_GONE = saved.gone || {};
+    SPARES = saved.spares || {};
     const specs = saved.specs || {};
     for(const k in specs){
       if(k === LEGACY) continue;
@@ -1395,12 +1700,27 @@ async function restore(){
 const nowISO = () => new Date().toISOString();
 const stampOf = r => (r && (r.updatedAt || r.at)) || '';   // full timestamp, else the older date-only field
 function set(id, patch, quiet){
+  const was = (state[id] && state[id].status) || 'ok';
   const next = Object.assign({status:'ok',note:''}, state[id], patch,
                              {by: who || '', at: stamp(), updatedAt: nowISO()});
   delete next.seed;            // somebody has touched it, so it is an observation now
   state[id] = next;
-  store(); rail(); table(); paint();
+  /* Flagged going back to good is a pane fitted, so the shelf follows. Only on
+     a status change - editing the note of a panel that is already good is not
+     somebody fitting glass. */
+  const fitted = (patch && patch.status === 'ok' && was !== 'ok') ? autoFit(id) : null;
+  /* Flagging or clearing a panel changes what the shelf has to cover, so the
+     spares card is part of the same redraw rather than something that catches
+     up on the next reload. */
+  store(); rail(); table(); paint(); spares();
   if(!quiet) detail();          // keep focus in the note box while typing
+  /* After detail(), which rebuilds the element say() writes into. */
+  if(fitted){
+    const n = id.replace(/^0+/, ''), sz = sizeLabel(fitted.size);
+    say(fitted.short   ? `Panel ${n} good — no ${sz} on the shelf, so nothing was deducted.`
+      : fitted.already ? `Panel ${n} good — already deducted today.`
+      :                  `Panel ${n} good — one ${sz} off the shelf.`);
+  }
 }
 
 /* ---------------- files ---------------- */
@@ -1411,13 +1731,28 @@ function grab(name, text, type){
   setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
 }
 document.getElementById('csv').addEventListener('click', ()=>{
-  const rows = [['Panel','Section','Width (in)','Height (in)','Thickness','Status','Note','Marked by','Date']];
-  GLASS.filter(p=>st(p.id)!=='ok').forEach(p=>{
+  /* The list exists to say what to buy, so a shelf with the right piece on it
+     belongs in it: each flagged panel says whether it comes off stock, and the
+     block underneath is the per-size arithmetic somebody can put on an order
+     without doing it again by hand. */
+  const cov = coverage();
+  const rows = [['Panel','Section','Width (in)','Height (in)','Thickness','Status','Source','Note','Marked by','Date']];
+  cov.rows.forEach(({p, covered})=>{
     const s = state[p.id] || {};
     rows.push([p.id.replace(/^0+/,''), p.section, p.width_in, glassHeightOf(p), p.thickness,
-               STATUS[st(p.id)].label, nt(p.id), s.by||'', s.at||'']);
+               STATUS[st(p.id)].label, covered?'From stock':'Order', nt(p.id), s.by||'', s.at||'']);
   });
-  if(rows.length===1) rows.push(['—','Nothing flagged yet','','','','','','','']);
+  if(!cov.rows.length) rows.push(['—','Nothing flagged yet','','','','','','','','']);
+  else {
+    const want = {};
+    cov.rows.forEach(r=>{ want[r.k]=(want[r.k]||0)+1; });
+    rows.push(['','','','','','','','','','']);
+    rows.push(['To order','','Width (in)','Height (in)','Thickness','Flagged','In stock','Order','','']);
+    Object.keys(want).sort((a,b)=>want[b]-want[a]).forEach(k=>{
+      const q = k.split('|'), have = (cov.have[k]||{}).qty || 0, n = want[k];
+      rows.push(['','',q[0],q[1],q[2],n,have,Math.max(0,n-have),'','']);
+    });
+  }
   grab('conway-arena-glass-order.csv',
        rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\r\n'),
        'text/csv');
@@ -1452,6 +1787,32 @@ document.getElementById('file').addEventListener('change', e=>{
   r.readAsText(f);
 });
 document.getElementById('print').addEventListener('click', ()=>window.print());
+
+/* ---------------- spare glass ---------------- */
+document.getElementById('spSize').addEventListener('change', e=>{
+  document.getElementById('spOther').hidden = e.target.value !== '__other';
+});
+document.getElementById('spAdd').addEventListener('click', ()=>{
+  const sel = document.getElementById('spSize').value;
+  let w, h, thk;
+  if(sel === '__other'){
+    w = parseFloat(document.getElementById('spW').value);
+    h = parseFloat(document.getElementById('spH').value);
+    thk = document.getElementById('spT').value.trim();
+    if(!(w > 0) || !(h > 0) || !thk){ say('Give the size a width, a height and a thickness.'); return; }
+  } else {
+    const parts = String(sel).split('|');
+    w = parseFloat(parts[0]); h = parseFloat(parts[1]); thk = parts[2];
+  }
+  const qty = parseInt(document.getElementById('spQty').value, 10);
+  if(!qty){ say('A movement of nothing is not a movement.'); return; }
+  const note = document.getElementById('spNote').value.trim();
+  if(!addMovement(w, h, thk, qty, note)){ say('No arena to hold this stock yet.'); return; }
+  document.getElementById('spNote').value = '';
+  document.getElementById('spQty').value = '1';
+  store(); spares(); table();
+  say(`${qty > 0 ? 'Received' : 'Taken off'} ${Math.abs(qty)} × ${w}″ × ${h}″ ${thk}.`);
+});
 document.getElementById('who').addEventListener('input', e=>{ who = e.target.value.trim(); store(); });
 
 document.getElementById('q').addEventListener('input', table);
@@ -1833,7 +2194,7 @@ async function bldSave(){
   store();
   bldClose();
   defaultScope();
-  buildPlan(); rail(); totals(); table(); detail(); paint(); paintFacility();
+  buildPlan(); rail(); totals(); table(); detail(); paint(); paintFacility(); spares();
   say('Rink added \u2014 ' + n + ' pieces.');
 }
 
@@ -1856,7 +2217,7 @@ async function bldSave(){
   }
   setBucket(activeBucket);
   defaultScope();
-  buildPlan(); rail(); totals(); table(); detail(); paint(); paintFacility();
+  buildPlan(); rail(); totals(); table(); detail(); paint(); paintFacility(); spares();
 
   document.getElementById('addRink').addEventListener('click', bldOpen);
   document.getElementById('rinkPick').addEventListener('change', e => switchRink(e.target.value));
@@ -1873,7 +2234,7 @@ async function bldSave(){
     /* facility and sheet are pulled, never pushed - the Ice app owns those
        records, and collect() deliberately omits them so nothing here can
        restamp one. */
-    kinds:['facility','sheet','glass_panel','glass_binding','glass_layout'],
+    kinds:['facility','sheet','glass_panel','glass_binding','glass_layout','glass_spare'],
     collect:()=>{
       const panels={};
       for(const bucket in records){
@@ -1904,7 +2265,12 @@ async function bldSave(){
       /* Removals travel as tombstones. Dropping one quietly would only mean
          the next pull handed it back. */
       for(const k in LAYOUT_GONE) layouts[k]={id:k, deleted:true, updatedAt:LAYOUT_GONE[k]};
-      return {glass_panel:panels, glass_binding:binding, glass_layout:layouts};
+      /* Movements go out whole, tombstones included. Each one is written once
+         and never edited, so there is nothing here for two devices to contend
+         over - which is the entire reason stock is kept this way. */
+      const spares={};
+      for(const id in SPARES){ const m=SPARES[id]; if(m) spares[id]=Object.assign({}, m, {id:id}); }
+      return {glass_panel:panels, glass_binding:binding, glass_layout:layouts, glass_spare:spares};
     },
     apply:(incoming)=>{
       let taken=0;
@@ -1964,6 +2330,18 @@ async function bldSave(){
         taken++;
       }
 
+      /* Movements are written once and never edited, so the only contest is a
+         tombstone against the movement it retires - newest wins settles that,
+         and two devices recording their own fittings simply both arrive. */
+      const sp=incoming.glass_spare||{};
+      for(const id in sp){
+        const v=sp[id], cur=SPARES[id];
+        if(cur && (v.updatedAt||'') <= (cur.updatedAt||'')) continue;
+        SPARES[id]= v.deleted ? {id:id, deleted:true, updatedAt:v.updatedAt||''}
+                              : Object.assign({}, v, {id:id});
+        taken++;
+      }
+
       const inc=incoming.glass_panel||{};
       for(const rid in inc){
         const v=inc[rid];
@@ -1989,7 +2367,7 @@ async function bldSave(){
       if(taken){
         setBucket(activeBucket);
         Store.set(KEY, snapshot());
-        paintFacility(); rail(); table(); detail(); paint();
+        paintFacility(); rail(); table(); detail(); paint(); spares();
       }
       return taken;
     }

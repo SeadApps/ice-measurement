@@ -12,7 +12,8 @@
     "reg": "node reg.js",
     "resume": "node resume.js",
     "phone": "node phonetest.js",
-    "schedule": "node scheduletest.js"
+    "schedule": "node scheduletest.js",
+    "spares": "node sparestest.js"
   },
   "devDependencies": {
     "playwright": "^1.49.0"
