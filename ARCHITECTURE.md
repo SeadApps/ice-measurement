@@ -251,9 +251,10 @@ node dev/buildertest.js    # 72 checks: walking a rink in, what it writes, the s
 node dev/reg.js            # 14 checks: rounds persist, prefs stay separate, the switcher is reachable
 node dev/resume.js         #  9 checks: coming back lands where you left off
 node dev/phonetest.js      # 42 checks: no page scrolls sideways on a phone, tapping a panel shows it, and the desktop is untouched
+node dev/scheduletest.js   # 31 checks: the schedule opens on what needs attention, and print still carries all 127
 ```
 
-372 checks in all. Tests point `window.__SYNC_CONFIG__` at the fake via
+403 checks in all. Tests point `window.__SYNC_CONFIG__` at the fake via
 `addInitScript`; the real pages never read it.
 
 **Run them one at a time.** They share the one fake server, and several assert

@@ -165,6 +165,22 @@ textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .savenote{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--ink-3);margin-top:9px;min-height:14px}
 
 /* ---- schedule ---- */
+.hd-t{display:flex;flex-direction:column;gap:2px;min-width:0}
+.sched-sub{margin:0;font-size:12px;line-height:1.45;color:var(--ink-3);font-weight:400;
+  text-transform:none;letter-spacing:0}
+/* The line that says what you are looking at, and the way back to all of it.
+   The order list sits here rather than among Save/Load/Print because it is
+   what this table is for, not a fourth way to get a file out of it. */
+.scopebar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+  padding:9px 16px;border-bottom:1px solid var(--line);background:var(--surface-2)}
+.scope-t{margin:0;font-size:12.5px;color:var(--ink-2)}
+.scope-t b{color:var(--ink);font-weight:600}
+.scope-a{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.btn-go{border-color:var(--accent);color:var(--accent)}
+.btn-go:hover{background:var(--accent);color:var(--ground)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn:disabled:hover{background:var(--surface)}
+tr.off{display:none}
 .tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 input[type=search]{font:inherit;font-size:13px;padding:6px 10px;border:1px solid var(--line);border-radius:10px;
   background:var(--ground);color:var(--ink);width:150px}
@@ -239,7 +255,17 @@ footer{font-size:12.5px;color:var(--ink-3);text-align:center;font-family:var(--m
   @page{size:landscape;margin:12mm}
   body{background:#fff}
   .wrap{max-width:none;padding:0;gap:14px}
-  .rail,.whoami,.tools,.aside,.theme,.card-hd .lgd span:last-child{display:none!important}
+  .rail,.whoami,.tools,.aside,.theme,.scopebar,.card-hd .lgd span:last-child{display:none!important}
+  /* The printed sheet is the reference document: every piece, whatever the
+     screen is scoped to - the status scope and the search box both. That is
+     what max-height:none below has always been for, and it is why rows out of
+     view are hidden rather than left out: the table now opens on the two
+     flagged panels, and a printout that followed the screen would silently
+     have become two rows. Searching and then printing gives all 127 too, which
+     is the one case where this surprises; the order list is the way to get a
+     subset onto paper. */
+  tr.off{display:table-row!important}
+  tr.none{display:none!important}
   .card{box-shadow:none;border-color:#bbb;break-inside:avoid}
   .grid{grid-template-columns:1fr}
   .tblwrap{max-height:none;overflow:visible}
@@ -390,14 +416,23 @@ document.documentElement.setAttribute("data-theme",_t==="light"?"light":"dark");
 <div class="grid">
   <section class="card">
     <div class="card-hd">
-      <h2>Panel schedule</h2>
+      <div class="hd-t">
+        <h2>Panel schedule</h2>
+        <p class="sched-sub">Every piece in running order &mdash; the sizes you order replacement glass from.</p>
+      </div>
       <div class="tools">
         <input type="search" id="q" placeholder="Panel # or size" aria-label="Search panels">
-        <button class="btn" id="csv">Order list (CSV)</button>
         <button class="btn" id="save">Save record</button>
         <button class="btn" id="load">Load record</button>
         <button class="btn" id="print">Print</button>
         <input type="file" id="file" accept=".json,application/json" hidden>
+      </div>
+    </div>
+    <div class="scopebar">
+      <p class="scope-t" id="scopeText"></p>
+      <div class="scope-a">
+        <button class="btn" id="scopeToggle"></button>
+        <button class="btn btn-go" id="csv">Order list (CSV)</button>
       </div>
     </div>
     <div class="tblwrap"><table>
@@ -815,7 +850,7 @@ function paint(){
     const s = st(p.id);
     el.setAttribute('fill', s==='ok' ? (tagOf(p)==='zamdoor'?'var(--surface-3)':'var(--ok-soft)') : `var(--${STATUS[s].cls})`);
     el.classList.toggle('sel', sel===p.id);
-    el.classList.toggle('dim', !!filter && s!==filter);
+    el.classList.toggle('dim', !inView(p));
     const n = document.getElementById('num-'+p.id);
     if(n){ n.classList.toggle('on', sel===p.id); n.style.fill = (s!=='ok')?'var(--surface)':''; }
   });
@@ -868,18 +903,58 @@ function totals(){
     `<dt style="font-family:var(--body);color:${i>4?'var(--warn)':'var(--ink-2)'};text-transform:none;letter-spacing:0;font-size:13px">${esc(a)}</dt>
      <dd style="font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right;font-size:12.5px">${esc(b)}</dd>`).join('');
 }
+/* Is this panel in the current view? The table, the plan's dimming and the
+   count line all have to give the same answer, so they ask in one place.
+   'flagged' is deliberately the same predicate the order list exports on
+   (status is not ok), so what the table opens on is what the CSV will contain. */
+function inView(p){
+  if(!filter) return true;
+  const s = st(p.id);
+  return filter === 'flagged' ? s !== 'ok' : s === filter;
+}
+const searchHit = (p, q) => !q || p.id.includes(q) || String(p.width_in).includes(q);
+
+/* Open on what needs attention, where there is any. 127 rows of which 125 say
+   GOOD buries the two that matter and makes a parts list read as an inventory
+   dump. Called on load and whenever the rink changes, since the answer is per
+   rink - but never over a choice already made on screen. */
+function defaultScope(){ filter = GLASS.some(p => st(p.id) !== 'ok') ? 'flagged' : null; }
+
+/* Says what you are looking at, and offers the way back to all of it. */
+function scope(){
+  const t = document.getElementById('scopeText'), b = document.getElementById('scopeToggle');
+  if(!t || !b) return;
+  const total = GLASS.length;
+  const q = (document.getElementById('q').value || '').trim().toLowerCase();
+  const shown = GLASS.filter(p => inView(p) && searchHit(p, q)).length;
+  const flagged = GLASS.filter(p => st(p.id) !== 'ok').length;
+  const names = { flagged:'needing attention', replace:'needing replacement',
+                  plexi:'on temporary plexi', ok:'in good order' };
+  t.innerHTML = (!filter && !q)
+    ? `All <b>${total}</b> pieces.`
+    : `Showing <b>${shown}</b> of ${total}${filter?' &mdash; '+names[filter]:''}${q?' &mdash; matching &ldquo;'+esc(q)+'&rdquo;':''}.`;
+  b.textContent = filter ? `Show all ${total}` : `Show only what needs attention (${flagged})`;
+  b.disabled = !filter && !flagged;
+  b.onclick = () => { filter = filter ? null : 'flagged'; rail(); table(); paint(); };
+}
+
 function table(){
   const q = document.getElementById('q').value.trim().toLowerCase();
   const rows = [];
+  let anyVisible = false;
   SEC_ORDER.forEach(k=>{
-    const g = GLASS.filter(p=>p.sectionKey===k
-      && (!filter || st(p.id)===filter)
-      && (!q || p.id.includes(q) || String(p.width_in).includes(q)));
+    const g = GLASS.filter(p=>p.sectionKey===k);
     if(!g.length) return;
-    rows.push(`<tr class="grp"><td colspan="5">${esc(g[0].section)} &nbsp;·&nbsp; ${g[0].thickness}</td></tr>`);
+    /* Every panel is rendered and the ones out of view are hidden rather than
+       left out, so the printed sheet can still carry all 127 whatever the
+       screen is scoped to. A section with nothing showing hides its header. */
+    const vis = p => inView(p) && searchHit(p, q);
+    const secVis = g.some(vis);
+    if(secVis) anyVisible = true;
+    rows.push(`<tr class="grp${secVis?'':' off'}"><td colspan="5">${esc(g[0].section)} &nbsp;·&nbsp; ${g[0].thickness}</td></tr>`);
     g.forEach(p=>{
       const s = st(p.id), n = nt(p.id);
-      rows.push(`<tr data-id="${p.id}" class="${sel===p.id?'sel':''}">
+      rows.push(`<tr data-id="${p.id}" class="${sel===p.id?'sel ':''}${vis(p)?'':'off'}">
         <td class="num">${p.id.replace(/^0+/,'')}</td>
         <td class="num">${p.width_in}&Prime;</td>
         <td class="num" style="color:var(--ink-3)">${p.thickness}</td>
@@ -887,9 +962,18 @@ function table(){
         <td style="color:var(--ink-2);font-size:12.5px">${labelOf(p)?`<span class="tagchip t-${tagOf(p)}">${esc(labelOf(p))}</span> `:''}${esc(n)}</td></tr>`);
     });
   });
+  /* Clearing the last flagged panel while scoped to them empties the table,
+     and "no panels match" is the wrong words for having just fixed the lot. */
+  if(!anyVisible){
+    const msg = q ? `No panels match &ldquo;${esc(q)}&rdquo;.`
+              : filter === 'flagged' ? 'Nothing needs attention on this rink.'
+              : 'No panels match.';
+    rows.push(`<tr class="none"><td colspan="5" style="padding:22px;color:var(--ink-3)">${msg}</td></tr>`);
+  }
   const tb = document.getElementById('tb');
-  tb.innerHTML = rows.join('') || `<tr><td colspan="5" style="padding:22px;color:var(--ink-3)">No panels match.</td></tr>`;
+  tb.innerHTML = rows.join('');
   tb.querySelectorAll('tr[data-id]').forEach(tr=>tr.addEventListener('click',()=>select(tr.dataset.id)));
+  scope();
 }
 function detail(){
   const el = document.getElementById('detail');
@@ -1181,6 +1265,7 @@ async function deleteRink(bucket){
   delete LAYOUTS[bucket];
   setBucket(LEGACY);
   store();
+  defaultScope();
   buildPlan(); rail(); totals(); table(); detail(); paint(); paintFacility();
   say('Removed ' + name + '.');
 }
@@ -1199,6 +1284,7 @@ async function switchRink(b){
     if(sh && sh.facilityId) patch.activeFacility = sh.facilityId;
     await Records.Repo.savePrefs(patch);
   }
+  defaultScope();
   buildPlan(); rail(); totals(); table(); detail(); paint(); paintFacility();
   say('Showing ' + facilityName(b) + '.');
 }
@@ -1746,6 +1832,7 @@ async function bldSave(){
   setBucket(bucket);                    // records, layout and `state`, together
   store();
   bldClose();
+  defaultScope();
   buildPlan(); rail(); totals(); table(); detail(); paint(); paintFacility();
   say('Rink added \u2014 ' + n + ' pieces.');
 }
@@ -1768,6 +1855,7 @@ async function bldSave(){
     else if(boundSheetId && want === boundSheetId) activeBucket = LEGACY;
   }
   setBucket(activeBucket);
+  defaultScope();
   buildPlan(); rail(); totals(); table(); detail(); paint(); paintFacility();
 
   document.getElementById('addRink').addEventListener('click', bldOpen);
