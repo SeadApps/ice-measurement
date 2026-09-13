@@ -84,6 +84,7 @@ per-kind maps in local storage, and each carries its own timestamp.
 | `glass_panel` | `glass_record_v2` | status, note, by, at, and `label`/`tag` where somebody has changed them |
 | `glass_binding` | `glass_record_v2` | `sheetId` — which ice surface the Conway panels are the glass for |
 | `glass_layout` | `glass_record_v2` | the walk a built rink was made from; the drawing is regenerated |
+| `glass_spare` | `glass_record_v2` | one **movement** of spare glass in or out, against a facility — not a stock level |
 | — | `ice_v4_prefs` | **device-local, never synced** |
 
 ### Why not one blob
@@ -106,6 +107,55 @@ collision on the same reading falls back to newest-wins.
 Deletes are **tombstones** (`deleted: true`), never row removal — which is why
 there is deliberately no DELETE policy in the database. A mistaken delete stays
 recoverable.
+
+### Spare glass is a ledger, not a number
+
+Two decisions, and both are the opposite of the obvious one.
+
+**Stock hangs off the facility**, where panels hang off the sheet. G1 moved
+glass onto sheets because an arena with two ice surfaces has two sets of glass,
+two schedules and two condition records. Spare stock is not like that: it sits
+on one rack in one building and gets fitted to whichever surface breaks. So
+`glass_spare` carries a `fac`, and `activeFacilityId()` reaches it through the
+sheet — or through the binding, for Conway. Where that is not known yet the card
+says so rather than inventing a shelf, because a movement written against a
+guessed facility is wrong on every other device.
+
+**A level is never stored.** Each receipt or fitting is its own record —
+`{fac, w, h, thk, qty, note, by, at}` with `qty` signed — and the level is their
+sum. This is the important one: *a quantity is the single shape this record model
+merges badly.* Newest-wins on a number means the iPad taking 3 → 2 and the
+desktop doing the same from its own copy merge to **2 rather than 1**, and
+nothing on screen would ever show it. That is precisely the silent-loss failure
+the record store exists to prevent, reappearing in a new place.
+
+Movements only ever appear, so summing them is right however they arrive, in
+whatever order, on any number of devices. Correcting a mistake is another
+movement; undoing one is a tombstone, never a deletion, or the next pull hands
+it straight back. `sparestest` drives the two-device case directly and asserts
+the shelf lands on 1 — if that check ever goes red, the design has been undone
+rather than a detail broken.
+
+A size is width **and** height **and** thickness. Conway carries 33" and 14.5" in
+both 1/2" and 5/8", and a 1/2" pane will not fill a 5/8" hole.
+
+**Fitting a pane deducts it, and the event is a transition.** `replace` means
+*needs* replacing, so the moment glass actually goes in is the one where a
+flagged panel returns to `ok` — clearing plexi included, since real glass
+replaced the patch. `set()` compares the status it had against the one being
+written and calls `autoFit()` only on that edge, so editing the note of a panel
+that is already good deducts nothing.
+
+The risk in deducting rather than offering is a flag cleared because it was
+raised in error, which is not a fitting. The answer is that it is never silent:
+it says what it did, the movement sits at the top of the card marked `auto`, and
+retracting it is one click. Two guards sit under it — the shelf is never taken
+negative (no spare of that size means the glass came from somewhere other than
+the rack, so the ledger stays true to the rack), and the same panel is not
+deducted twice in a day, which catches the realistic double of clearing,
+re-flagging and clearing again. Two devices clearing the same panel before
+either has synced will still record two fittings; that one is visible and
+retractable, which is the whole reason stock is a ledger rather than a number.
 
 ### Device preferences are separate on purpose
 
@@ -252,9 +302,10 @@ node dev/reg.js            # 14 checks: rounds persist, prefs stay separate, the
 node dev/resume.js         #  9 checks: coming back lands where you left off
 node dev/phonetest.js      # 42 checks: no page scrolls sideways on a phone, tapping a panel shows it, and the desktop is untouched
 node dev/scheduletest.js   # 31 checks: the schedule opens on what needs attention, and print still carries all 127
+node dev/sparestest.js     # 35 checks: spare stock is a ledger per facility, fitting a pane deducts it, and two devices fitting take two off
 ```
 
-403 checks in all. Tests point `window.__SYNC_CONFIG__` at the fake via
+438 checks in all. Tests point `window.__SYNC_CONFIG__` at the fake via
 `addInitScript`; the real pages never read it.
 
 **Run them one at a time.** They share the one fake server, and several assert
