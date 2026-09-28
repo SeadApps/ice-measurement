@@ -112,6 +112,60 @@ const g1=await G1.p.evaluate(()=>(() => {
 ok('and back the other way', g1['020'] && g1['020'].status==='plexi');
 ok('neither device lost its own mark', g1['045'] && g1['045'].status==='replace' && g2['045']);
 
+/* ---------------- and the numbers inside a round ---------------- */
+/* A round reaching the server is not the same thing as the readings in it
+   reaching the server, and for a long time it was not the same thing at all.
+
+   decompose() copied a session with Object.assign, which copies the nested
+   data and notes maps by reference - so the snapshot of "what was last
+   written" pointed at the very object Ice goes on to mutate. bodyOf(prev) and
+   bodyOf(next) then serialised the same object, save() saw no change, the
+   timestamp never moved, the sent-map still matched, and push skipped the
+   record. A round was stamped once, when it was created, and every reading
+   typed afterwards stayed on the device: the round synced, the numbers did
+   not, and the device that took them looked perfectly healthy.
+
+   Flat fields copy by value, which is why renaming a sheet always worked and
+   only the nested maps went missing - and why this hid for so long. Nothing
+   here drove a measurement in through Ice's own UI and then looked at what
+   crossed the wire; the order below is the point of the test. */
+await A.p.evaluate(()=>window.Sync && window.Sync.sync('test')); await sleep(2500);
+const sid = await A.p.evaluate(()=>session().id);
+const emptied = (await rows()).find(x=>x.kind==='session' && x.id===sid);
+ok('the round reaches the server while still empty',
+   !!emptied && Object.keys((emptied.body&&emptied.body.data)||{}).length===0,
+   JSON.stringify(emptied && emptied.body && emptied.body.data));
+
+const stampBefore = await A.p.evaluate(i=>(Records.Repo.maps().se[i]||{}).updatedAt, sid);
+await A.p.evaluate(()=>{ for(let i=0;i<6;i++){ selIdx=i; assign('3/4'); } });
+await sleep(1500);
+const afterLocal = await A.p.evaluate(i=>{
+  const s=Records.Repo.maps().se[i]||{};
+  return {keys:s.data?Object.keys(s.data).length:0, upd:s.updatedAt};
+}, sid);
+ok('the readings are in the local store', afterLocal.keys===6, String(afterLocal.keys));
+/* The load-bearing one: without a fresh stamp nothing downstream is even
+   attempted, because push asks the sent-map first. */
+ok('entering a reading restamps the round', afterLocal.upd!==stampBefore,
+   stampBefore+' -> '+afterLocal.upd);
+/* And the reason it did not. The snapshot must not be the object the app is
+   editing, or the next comparison is an object against itself again. */
+ok('the snapshot is detached from the live round',
+   await A.p.evaluate(()=>Records.Repo.maps().se[session().id].data !== session().data));
+
+await A.p.evaluate(()=>window.Sync && window.Sync.sync('test')); await sleep(2500);
+const pushed = (await rows()).find(x=>x.kind==='session' && x.id===sid);
+const pushedKeys = pushed ? Object.keys((pushed.body&&pushed.body.data)||{}).length : -1;
+ok('the readings reach the server', pushedKeys===6, String(pushedKeys));
+
+await Bd.p.evaluate(()=>window.Sync && window.Sync.sync('test')); await sleep(2500);
+const onB = await Bd.p.evaluate(i=>{
+  const s=Records.Repo.maps().se[i];
+  return s?{exists:true, keys:s.data?Object.keys(s.data).length:0}:{exists:false};
+}, sid);
+ok('and the other device gets the numbers, not just the round',
+   onB.exists && onB.keys===6, JSON.stringify(onB));
+
 /* ---------------- the session survives a reload ---------------- */
 await G1.p.reload(); await sleep(2000);
 ok('no second sign-in after a reload', !(await G1.p.isVisible('.sync-gate')));
