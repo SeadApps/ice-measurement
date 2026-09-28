@@ -75,12 +75,33 @@
       fac[f.id]={id:f.id,name:f.name,settings:f.settings,ord:fi};
       (f.sheets||[]).forEach((x,si)=>{
         sh[x.id]={id:x.id,facilityId:f.id,name:x.name,size:x.size,ord:si};
-        (x.sessions||[]).forEach((z,zi)=>{ se[z.id]=Object.assign({},z,{sheetId:x.id,ord:zi}); });
+        (x.sessions||[]).forEach((z,zi)=>{ se[z.id]=detach(Object.assign({},z,{sheetId:x.id,ord:zi})); });
       });
     });
     return {fac,sh,se};
   }
   const bodyOf=r=>{const c=Object.assign({},r);delete c.updatedAt;delete c.deleted;return JSON.stringify(c);};
+
+  /* A session carries two nested maps - the readings and the per-point notes -
+     and Object.assign copies only the reference to them. That left the snapshot
+     of "what was last written" pointing at the very object the app goes on to
+     mutate, so by the time save() compared the two, bodyOf(prev) and
+     bodyOf(next) were serialising the same object and nothing ever looked
+     changed.
+
+     The cost was silent and severe: a round was stamped once, when it was
+     created, and never again. Every reading typed after that moment changed no
+     timestamp, so the sent-map still matched and push skipped the record. The
+     round reached the other devices; the numbers in it never did, and the
+     device that took them looked perfectly healthy.
+
+     Flat fields are copied by value, which is why renaming a sheet always
+     worked and only the nested maps went missing - and why this hid for so
+     long. Detach them on the way into the snapshot and on the way back out, so
+     a snapshot is genuinely a snapshot and neither side can reach the other's. */
+  const detach = r => !r ? r : Object.assign({}, r,
+    r.data  ? {data:  Object.assign({}, r.data)}  : {},
+    r.notes ? {notes: Object.assign({}, r.notes)} : {});
 
   /* Stamp only what changed, and leave a tombstone for anything removed, so a
      delete on one device isn't undone by a merge from another. */
@@ -100,7 +121,9 @@
     const byOrd=(a,b)=>(a.ord||0)-(b.ord||0)||String(a.id).localeCompare(String(b.id));
     return live(fac).sort(byOrd).map(f=>Object.assign({},f,{
       sheets:live(sh).filter(x=>x.facilityId===f.id).sort(byOrd).map(x=>Object.assign({},x,{
-        sessions:live(se).filter(z=>z.sheetId===x.id).sort(byOrd)
+        /* Detached on the way out too: what a page is handed to edit must not
+           be the snapshot's own object, or the alias comes straight back. */
+        sessions:live(se).filter(z=>z.sheetId===x.id).sort(byOrd).map(detach)
       }))
     }));
   }

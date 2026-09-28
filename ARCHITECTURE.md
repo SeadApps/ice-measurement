@@ -97,6 +97,31 @@ cleanly, silently, no error.
 Splitting into records with individual timestamps is what makes merging
 possible. **Don't collapse it back.**
 
+### The snapshot has to be a snapshot
+
+`SNAP` is "the records as last written", and `save()` decides what changed by
+comparing it against a fresh `decompose()` of the live state. That only works if
+the two are genuinely separate objects.
+
+They were not. `Object.assign({}, z, …)` copies a session's nested `data` and
+`notes` maps **by reference**, so the snapshot pointed at the very object Ice
+goes on to mutate. `bodyOf(prev)` and `bodyOf(next)` then serialised the same
+object, `stampChanges` saw no change, and the record's `updatedAt` never moved —
+so the sent-map still matched and push skipped it.
+
+**A round was stamped once, when it was created, and never again.** Every reading
+typed after that moment stayed on the device: the round reached the other
+devices, the numbers in it did not, and the device that took them looked
+perfectly healthy. Flat fields (`name`, `date`, `mode`) copy by value, which is
+why renaming a sheet always worked and only the nested maps went missing — and
+why this survived so long.
+
+`detach()` copies those maps on the way into the snapshot and on the way back out
+of `reassemble()`, so neither side can reach the other's. If you add another
+nested map to a record, it belongs in `detach()` too, or it inherits the same
+silence. `synctest` pins the whole chain, in the order that matters: sync the
+round while it is empty, *then* enter readings, then look at what crossed.
+
 ### The merge rule
 
 Newest `updatedAt` wins, per record. One exception: for `session` records the
@@ -304,7 +329,7 @@ Then from the repo root:
 
 ```
 node dev/fake-supabase.js &
-node dev/synctest.js       # 20 checks: sign-in, two devices, offline, paused
+node dev/synctest.js       # 26 checks: sign-in, two devices, offline, paused, and the readings inside a round
 node dev/conflicttest.js   # 10 checks: no churn, contested edits, retries
 node dev/e2e.js            # 15 checks: legacy migration, backup merge, the scoped home screen
 node dev/homecheck.js      # 78 checks: the gate, the fleet, adding a rink, syncing, a rotated code
@@ -322,7 +347,7 @@ node dev/scheduletest.js   # 31 checks: the schedule opens on what needs attenti
 node dev/sparestest.js     # 46 checks: spare stock is a ledger per facility, tempered and plexi are different piles, and fitting a pane deducts the right one
 ```
 
-458 checks in all. Tests point `window.__SYNC_CONFIG__` at the fake via
+464 checks in all. Tests point `window.__SYNC_CONFIG__` at the fake via
 `addInitScript`; the real pages never read it.
 
 **Run them one at a time.** They share the one fake server, and several assert
