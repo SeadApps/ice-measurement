@@ -301,6 +301,40 @@
     return new Set([...seen].filter(f=>!real.has(f)));
   }
 
+  /* A reading is stored as a label: sixteen of them in eighths, and "2+" which
+     counts as 2.1. This is the one parser; Ice's own parseFrac is the same rule,
+     and facilitiestest checks the two agree on every label. */
+  function readingValue(label){
+    const f = String(label).replace(/"/g,"").trim();
+    if(f === "2+") return 2.1;
+    if(f.includes(" ")){ const [w,fr] = f.split(" "), [n,d] = fr.split("/"); return +w + (+n)/(+d); }
+    if(f.includes("/")){ const [n,d] = f.split("/"); return (+n)/(+d); }
+    return +f;
+  }
+  /* The average thickness of each of the last n rounds that has readings, oldest
+     first. One calculation for the Sheets page and, later, Ice's Trends. */
+  function trendOf(sessions, sheetId, n){
+    return (sessions||[])
+      .filter(s => hasReadings(s) && s.sheetId === sheetId)
+      .sort((a,b) => new Date(a.date) - new Date(b.date))
+      .slice(-(n||10))
+      .map(s => { const v = Object.values(s.data).map(readingValue).filter(isFinite);
+                  return {id:s.id, date:s.date, n:v.length, avg:v.reduce((a,b)=>a+b,0)/v.length}; });
+  }
+  /* What Glass has on this device for a sheet: whether it has a layout and how
+     many pieces are flagged. Read from Glass's own storage, so a device that has
+     not opened Glass says "not known" instead of guessing. Writes nothing. */
+  async function glassSummary(sheetId){
+    const v2 = await rd("glass_record_v2");
+    if(!v2) return {known:false};
+    const bound = v2.boundSheetId === sheetId;
+    const layout = bound || !!((v2.specs && v2.specs[sheetId]) || (v2.built && v2.built[sheetId]));
+    let replace = 0, plexi = 0;
+    (bound ? [sheetId,"legacy"] : [sheetId]).forEach(b => Object.values((v2.records||{})[b]||{}).forEach(r => {
+      if(r && r.status === "replace") replace++; else if(r && r.status === "plexi") plexi++; }));
+    return {known:true, layout, replace, plexi};
+  }
+
   const Repo = {
     async save(st,opts){
       const d=decompose(st);
@@ -538,6 +572,7 @@
   global.Records = { KEYS:K, PREF_KEYS, Store, Repo,
                      decompose, reassemble, nowISO, hasReadings, lastRound, isOverdue,
                      RINK_SIZES, NHL_SIZE, DEFAULT_EDGES, SETTINGS_VERSION, eighthUp, eighthNear,
+                     readingValue, trendOf, glassSummary,
                      settingsOf, upgradeSettings, settingsNeedUpgrade, overdueDaysOf,
                      STD_CORNER, shapeFromSize, shapeOf, sizeOf, compareShape, shapeProblem, SHAPE_TOLERANCE,
                      uid, newSession, newSheet, defaultSettings, newFacility };

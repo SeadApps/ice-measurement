@@ -32,7 +32,7 @@ const EMAIL = 'operations@conwayarena.local';
 const STAFF_DOMAIN = '@staff.conwayarena.local';
 const DEFAULT_CODE = 'test-access-code';
 const EDIT_CODE = 'test-editing-code';
-const TYPES = {'.html':'text/html','.js':'application/javascript','.json':'application/json','.png':'image/png'};
+const TYPES = {'.html':'text/html','.css':'text/css','.js':'application/javascript','.json':'application/json','.png':'image/png'};
 const SETTINGS_KINDS = ['facility','sheet'];     // Staff may read these, never write them
 
 let rows, tokens, staff, unlocks, failures, activity, opts, lastMs = 0;

@@ -1,0 +1,365 @@
+/* The shell: the part of the program a person moves around in.
+
+   It owns three things, and nothing else may:
+     - the ADDRESS. Where you are is read from location.hash and from nothing else:
+       reload, back and a bookmark all work because no second copy exists.
+     - the CHROME: one top bar, a rail on a laptop, a tab bar on a phone, and the
+       account menu.
+     - WHERE YOU ARE, as a device preference (Repo.savePrefs). It is the only writer
+       of the active facility and sheet; Ice and Glass read it.
+
+   Like the old launcher it writes no synced record by accident: it reads through
+   Repo.read(), writes preferences through Repo.savePrefs(), and records only
+   through Repo.addSheet(). Nothing about the rinks is read or drawn before the
+   sign-in gate has been passed, and it never invents a facility.
+
+   Pages live in home.js and are handed a route and the data; they return elements.
+   Every name a person typed is set as text, never as markup. */
+(function (global) {
+  "use strict";
+
+  var Repo = Records.Repo, Store = Records.Store;
+  var NOTICE = "That page is not available.";
+  var PHONE_MAX = 560, IPAD_MAX = 1100;
+
+  var layoutName = "laptop", layoutCbs = [];
+  var root = null, appEl = null, pageEl = null, home = null;
+  var data = null, route = { page: "facilities" }, notice = "";
+  var statusEl = null, unlockEl = null, busy = false, again = false;
+  var openMenu = null, acct = null;
+
+  /* ---------- small DOM helper ---------- */
+  function h(tag, p, kids) {
+    var e = document.createElement(tag);
+    for (var k in (p || {})) {
+      var v = p[k];
+      if (k === "text") e.textContent = v;
+      else if (k === "cls") e.className = v;
+      else if (k.slice(0, 2) === "on") e.addEventListener(k.slice(2), v);
+      else if (v === true) e.setAttribute(k, "");
+      else if (v !== false && v != null) e.setAttribute(k, v);
+    }
+    (kids || []).forEach(function (c) { if (c) e.appendChild(typeof c === "string" ? document.createTextNode(c) : c); });
+    return e;
+  }
+
+  /* ---------- the layout follows the width, not the device ---------- */
+  function layoutFor(w) { return w <= PHONE_MAX ? "phone" : w <= IPAD_MAX ? "ipad" : "laptop"; }
+  function measure() {
+    var n = layoutFor(global.innerWidth);
+    if (n === layoutName && appEl && appEl.dataset.layout === n) return;
+    layoutName = n;
+    if (appEl) appEl.dataset.layout = n;
+    layoutCbs.forEach(function (cb) { try { cb(n); } catch (e) {} });
+  }
+
+  /* ---------- the address ---------- */
+  function parse(hash) {
+    var m = String(hash || "").replace(/^#/, "");
+    if (m === "" || m === "/") return { page: "facilities" };
+    var p = m.split("/").filter(Boolean);
+    if (p.length === 1 && p[0] === "staff") return { page: "staff" };
+    if (p[0] === "f" && p[1]) {
+      if (p.length === 2) return { page: "sheets", fid: p[1] };
+      if (p[2] === "s" && p[3] && p.length === 4) return { page: "sheets", fid: p[1], sid: p[3] };
+      if (p[2] === "s" && p[3] && p[4] === "settings" && p.length === 5) return { page: "settings", fid: p[1], sid: p[3] };
+    }
+    return { page: "unknown" };
+  }
+  /* A route the person may not have, or that names nothing, lands on Facilities
+     with one message: it never says which, so it does not reveal what exists. */
+  function resolve(r) {
+    if (r.page === "facilities") return r;
+    if (r.page === "staff") return isManager() ? r : null;
+    if (r.page === "unknown") return null;
+    var f = (data.facilities || []).filter(function (x) { return x.id === r.fid; })[0];
+    if (!f) return null;
+    if (r.sid && !(f.sheets || []).some(function (s) { return s.id === r.sid; })) return null;
+    return r;
+  }
+  function go(path) { global.location.hash = path; }
+
+  /* ---------- who may do what ---------- */
+  var SYNC = (typeof Sync !== "undefined") ? Sync : null;
+  var canSee = function (fid) { return !SYNC || SYNC.canSee(fid); };
+  var canManage = function () { return !SYNC || SYNC.canManage(); };
+  var person = function () { return SYNC ? SYNC.person() : null; };
+  /* The Staff page needs people to exist and the person to be Management. */
+  function isManager() { return !!(SYNC && SYNC.person() && SYNC.canManage()); }
+
+  /* ---------- data, read-only ---------- */
+  async function load() {
+    var st = await Repo.read();
+    var facs = ((st && st.facilities) || []).filter(function (f) { return canSee(f.id); });
+    var glass = {};
+    for (var i = 0; i < facs.length; i++) {
+      var sheets = facs[i].sheets || [];
+      for (var j = 0; j < sheets.length; j++) glass[sheets[j].id] = await Records.glassSummary(sheets[j].id);
+    }
+    return { prefs: (st && st.prefs) || {}, facilities: facs, sessions: (st && st.sessions) || [], glass: glass };
+  }
+
+  /* How a sheet is doing. The overdue rule is the store's, read from the
+     facility, so this screen, the rail and Ice cannot disagree. */
+  function status(d, f, s) {
+    var last = Records.lastRound(d.sessions, s.id);
+    var od = Records.overdueDaysOf(f, d.prefs);
+    var days = last ? Math.floor((Date.now() - new Date(last.date)) / 86400000) : null;
+    var over = Records.isOverdue(last, od);
+    return { last: last, days: days, over: over, overBy: over ? days - od : 0, overdueDays: od };
+  }
+
+  /* ---------- where you are ---------- */
+  function activeSheetOf(f) {
+    if (!f) return null;
+    var sheets = f.sheets || [];
+    if (route.sid) return sheets.filter(function (s) { return s.id === route.sid; })[0] || sheets[0] || null;
+    var pref = sheets.filter(function (s) { return s.id === (data.prefs || {}).activeSheet; })[0];
+    return pref || sheets[0] || null;
+  }
+  async function setHere(f, s) {
+    var newest = (data.sessions || []).filter(function (x) { return x && !x.deleted && x.sheetId === s.id; })
+      .sort(function (a, b) { return new Date(b.date) - new Date(a.date); })[0];
+    var patch = { activeFacility: f.id, activeSheet: s.id };
+    if (newest) patch.activeSession = newest.id;       // Ice repairs this itself if a sheet has none
+    data.prefs = await Repo.savePrefs(patch);
+  }
+  function appHref(app, f, s) { return app + ".html#/f/" + f.id + "/s/" + s.id; }
+
+  /* ---------- menus ---------- */
+  function closeMenu() {
+    if (openMenu) { openMenu.drop.remove(); openMenu.btn.setAttribute("aria-expanded", "false"); openMenu = null; }
+  }
+  function makeMenu(btn, items, right) {
+    var wrap = h("span", { cls: "menuwrap" });
+    var api = { el: wrap, btn: btn };
+    function toggle() {
+      if (openMenu && openMenu.btn === btn) { closeMenu(); return; }
+      closeMenu();
+      var drop = h("div", { cls: "dropdown" + (right ? " right" : ""), role: "menu" });
+      items().forEach(function (it) {
+        if (it.hd) { drop.appendChild(h("div", { cls: "hd", text: it.hd })); return; }
+        if (it.hr) { drop.appendChild(h("hr")); return; }
+        var node = it.href
+          ? h("a", { cls: "it", role: "menuitem", href: it.href, text: it.label })
+          : h("button", { cls: "it", role: "menuitem", type: "button", text: it.label, disabled: !!it.disabled });
+        if (it.current) node.setAttribute("aria-current", "true");
+        node.addEventListener("click", function (e) { closeMenu(); if (it.onclick) it.onclick(e); });
+        drop.appendChild(node);
+      });
+      wrap.appendChild(drop);
+      btn.setAttribute("aria-expanded", "true");
+      openMenu = { btn: btn, drop: drop };
+    }
+    btn.addEventListener("click", function (e) { e.stopPropagation(); toggle(); });
+    btn.setAttribute("aria-haspopup", "menu"); btn.setAttribute("aria-expanded", "false");
+    wrap.insertBefore(btn, wrap.firstChild);
+    api.open = function () { if (!openMenu || openMenu.btn !== btn) toggle(); };
+    return api;
+  }
+
+  /* ---------- the chrome ---------- */
+  function theme(t) {
+    document.documentElement.setAttribute("data-theme", t);
+    var m = document.querySelector("meta[name=theme-color]");
+    if (m) m.setAttribute("content", t === "light" ? "#f4f7fb" : "#0b0d0f");
+    Store.set("rink_theme", t);
+  }
+  function currentTheme() { return document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark"; }
+
+  function buildNav(f, s) {
+    var nav = h("header", { cls: "nav" });
+    nav.appendChild(h("a", { cls: "logo", href: "#/", title: "Facilities", text: "LOGO", id: "logo" }));
+
+    // the facility menu
+    var fb = h("button", { cls: "menu", type: "button", id: "facMenu" }, [h("span", { text: f ? f.name : "Facility" })]);
+    var fm = makeMenu(fb, function () {
+      return (data.facilities || []).map(function (x) {
+        return { label: x.name, href: "#/f/" + x.id, current: !!f && x.id === f.id };
+      });
+    });
+    fm.el.classList.add("fac");
+    nav.appendChild(fm.el);
+
+    // the sheet menu, which has nothing to act on until a facility is chosen
+    var sb = h("button", { cls: "menu" + (f ? "" : " off"), type: "button", id: "sheetMenu", disabled: !f },
+      [h("span", { text: s ? (s.name || "Sheet") : "Sheet" })]);
+    var sm = makeMenu(sb, function () {
+      return ((f && f.sheets) || []).map(function (x) {
+        return { label: x.name || "Sheet", href: "#/f/" + f.id + "/s/" + x.id, current: !!s && x.id === s.id };
+      });
+    });
+    sm.el.classList.add("sheet");
+    nav.appendChild(sm.el);
+
+    // the app switch
+    var sw = h("span", { cls: "appsw" + (s ? "" : " off"), id: "appSw" });
+    ["ice", "glass"].forEach(function (a) {
+      sw.appendChild(h("a", { href: s ? appHref(a, f, s) : "#", "data-app": s ? a : null,
+                              text: a === "ice" ? "Ice" : "Glass" }));
+    });
+    nav.appendChild(sw);
+
+    // phone: one button that says where you are
+    var cb = h("button", { cls: "menu ctx", type: "button", id: "ctxBtn" },
+      [h("span", { text: f ? (f.name + (s && (f.sheets || []).length > 1 ? " · " + (s.name || "") : "")) : "Facilities" })]);
+    var cm = makeMenu(cb, function () {
+      var items = [{ hd: "Facility" }];
+      (data.facilities || []).forEach(function (x) { items.push({ label: x.name, href: "#/f/" + x.id, current: !!f && x.id === f.id }); });
+      if (f && (f.sheets || []).length) {
+        items.push({ hr: true }, { hd: "Sheet" });
+        f.sheets.forEach(function (x) { items.push({ label: x.name || "Sheet", href: "#/f/" + f.id + "/s/" + x.id, current: !!s && x.id === s.id }); });
+      }
+      return items;
+    });
+    nav.appendChild(cm.el);
+
+    nav.appendChild(h("span", { cls: "spacer" }));
+    if (statusEl) nav.appendChild(statusEl);
+    if (unlockEl) nav.appendChild(unlockEl);
+
+    // the account menu
+    var who = person();
+    var ab = h("button", { cls: "chipu", type: "button", id: "acctMenu" }, [h("span", { id: "whoName", text: who ? who.name : "Menu" })]);
+    acct = makeMenu(ab, function () {
+      var it = [{ hd: "Theme" },
+        { label: "Light", current: currentTheme() === "light", onclick: function () { theme("light"); acctRefresh(); } },
+        { label: "Dark", current: currentTheme() === "dark", onclick: function () { theme("dark"); acctRefresh(); } },
+        { hr: true }];
+      if (SYNC) {
+        if (person()) it.push({ label: "Switch user", onclick: function () { SYNC.switchUser(); } });
+        it.push({ label: "Sign out", onclick: function () { SYNC.signOut(); } });
+      }
+      return it;
+    }, true);
+    nav.appendChild(acct.el);
+    return nav;
+  }
+  function acctRefresh() { /* the theme is a stylesheet variable, so there is nothing to redraw */ }
+
+  function buildRail(f) {
+    var rail = h("aside", { cls: "rail", id: "rail", "aria-label": "Facilities" });
+    rail.appendChild(h("a", { href: "#/", text: "Facilities", "aria-current": route.page === "facilities" ? "true" : null }));
+    (data.facilities || []).forEach(function (x) {
+      rail.appendChild(h("h3", { text: x.name }));
+      (x.sheets || []).forEach(function (s) {
+        var st = status(data, x, s);
+        rail.appendChild(h("a", { cls: "subl", href: "#/f/" + x.id + "/s/" + s.id,
+          "aria-current": f && x.id === f.id && route.sid === s.id ? "true" : null }, [
+            st.over ? h("i", { cls: "dot", title: "overdue" }) : null, h("span", { text: s.name || "Sheet" })]));
+      });
+    });
+    if (isManager()) {
+      rail.appendChild(h("h3", { text: "Account" }));
+      rail.appendChild(h("a", { href: "#/staff", text: "Staff", "aria-current": route.page === "staff" ? "true" : null }));
+    }
+    return rail;
+  }
+
+  function buildTabs(f, s) {
+    var t = h("nav", { cls: "tabbar", id: "tabbar", "aria-label": "Main" });
+    t.appendChild(h("a", { href: "#/", text: "Facilities", "aria-current": route.page === "facilities" ? "true" : null }));
+    ["ice", "glass"].forEach(function (a) {
+      t.appendChild(h("a", { cls: s ? "" : "off", href: s ? appHref(a, f, s) : "#", "data-app": s ? a : null, text: a === "ice" ? "Ice" : "Glass" }));
+    });
+    var m = h("button", { type: "button", text: "Menu", onclick: function (e) { e.stopPropagation(); if (acct) acct.open(); } });
+    t.appendChild(m);
+    return t;
+  }
+
+  /* ---------- drawing ---------- */
+  function draw() {
+    var f = route.fid ? (data.facilities || []).filter(function (x) { return x.id === route.fid; })[0] : null;
+    var s = activeSheetOf(f);
+    closeMenu();
+    appEl = h("div", { cls: "app", "data-layout": layoutName });
+    appEl.appendChild(buildNav(f, s));
+    var body = h("div", { cls: "body" });
+    body.appendChild(buildRail(f));
+    pageEl = h("main", { id: "page" });
+    body.appendChild(pageEl);
+    appEl.appendChild(body);
+    appEl.appendChild(buildTabs(f, s));
+    root.replaceChildren(appEl);
+
+    if (notice) { pageEl.appendChild(h("div", { cls: "notice", role: "status", text: notice })); notice = ""; }
+    pageEl.appendChild(home.render(route, data, Shell));
+  }
+
+  async function refresh() {
+    if (busy) { again = true; return; }
+    busy = true;
+    try {
+      do {
+        again = false;
+        data = await load();
+        var r = resolve(parse(global.location.hash));
+        if (!r) {
+          notice = NOTICE;
+          global.history.replaceState(null, "", global.location.pathname + global.location.search + "#/");
+          r = { page: "facilities" };
+        }
+        route = r;
+        /* A facility or sheet address is where you are. */
+        if (route.fid) {
+          var f = data.facilities.filter(function (x) { return x.id === route.fid; })[0], s = activeSheetOf(f);
+          if (f && s && ((data.prefs || {}).activeSheet !== s.id || (data.prefs || {}).activeFacility !== f.id)) await setHere(f, s);
+        }
+        draw();
+      } while (again);
+    } finally { busy = false; }
+  }
+
+  /* ---------- starting ---------- */
+  async function mount(rootEl, homeApp) {
+    root = rootEl; home = homeApp;
+    root.appendChild(h("div", { cls: "boot", text: "Arena Management System" }));
+    measure();
+    global.addEventListener("resize", measure);
+    global.addEventListener("hashchange", refresh);
+    document.addEventListener("click", function (e) {
+      if (openMenu && !openMenu.drop.contains(e.target)) closeMenu();
+      var a = e.target.closest && e.target.closest("[data-app]");
+      if (a) {                                    // open an app on the sheet shown, which is where you are
+        e.preventDefault();
+        var f = data.facilities.filter(function (x) { return x.id === route.fid; })[0], s = activeSheetOf(f);
+        if (f && s) setHere(f, s).then(function () { global.location.href = a.getAttribute("href"); });
+      }
+    });
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeMenu(); });
+
+    if (SYNC) {
+      await Repo.load();                          // hydrate the snapshot, so collect() can report it
+      SYNC.attach({
+        kinds: ["facility", "sheet", "session"],
+        collect: function () { var m = Repo.outgoing(); return { facility: m.fac, sheet: m.sh, session: m.se }; },
+        apply: function (incoming) {
+          var res = Repo.merge({ facilities: incoming.facility || {}, sheets: incoming.sheet || {}, sessions: incoming.session || {} });
+          if (!res.taken) return 0;
+          Repo.persistMaps();
+          if (data) refresh();
+          return res.taken;
+        }
+      });
+      await SYNC.start({ title: "Arena Management System" });
+      await SYNC.verify();                         // catches a rotated code even when nothing needed syncing
+      statusEl = SYNC.statusEl();
+      unlockEl = SYNC.unlockEl ? SYNC.unlockEl() : null;
+      SYNC.lockControls(["#addFac", "#addSheet", "#addGo"]);
+      SYNC.onEditing(function () { /* the lock is a body class; the buttons grey on their own */ });
+    }
+    await refresh();
+  }
+
+  var Shell = {
+    mount: mount, refresh: refresh, go: go, h: h, status: status, setHere: setHere, appHref: appHref,
+    layout: function () { return layoutName; },
+    onLayout: function (cb) { layoutCbs.push(cb); cb(layoutName); },
+    route: function () { return route; }, data: function () { return data; },
+    activeSheetOf: activeSheetOf, canManage: canManage, isManager: isManager, notice: NOTICE,
+    parse: parse,
+    /* the width at which each layout starts, for the tests and for D3/D4 to ask */
+    breakpoints: { phoneMax: PHONE_MAX, ipadMax: IPAD_MAX }
+  };
+  global.Shell = Shell;
+})(this);

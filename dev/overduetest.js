@@ -70,7 +70,7 @@ await R(a => { state.activeFacility = a.f; state.activeSheet = a.s; buildHome();
 ok('and not where it says 30', !(await R(() => document.querySelector('#fleet .fl-row').className)).includes('over'));
 
 await R(a => Records.Repo.savePrefs({ activeSheet: a.s, activeFacility: a.f }), strict);
-await p.goto(B + '/index.html'); await sleep(2500);
+await p.goto(B + '/launcher.html'); await sleep(2500);
 const fleet = await R(() => fleetRows());
 const row = n => fleet.rows.find(r => r.f.name === n);
 ok('the launcher agrees: the strict rink is overdue', row('Strict Rink') && row('Strict Rink').over === true);
@@ -80,7 +80,7 @@ ok('and the relaxed one is not', row('Relaxed Rink') && row('Relaxed Rink').over
 await p.goto(B + '/ice.html'); await sleep(2000);
 await R(() => { delete state.facilities[1].settings.overdueDays; state.overdueDays = 5; persist(); });
 await sleep(1200);
-await p.goto(B + '/index.html'); await sleep(2500);
+await p.goto(B + '/launcher.html'); await sleep(2500);
 const fleet2 = await R(() => fleetRows());
 ok('a facility with no value of its own falls back to the device preference (5 days: overdue at 10)', fleet2.rows.find(r => r.f.name === 'Relaxed Rink').over === true);
 
@@ -95,7 +95,7 @@ await sleep(1200); await R(() => Sync.sync('t')); await sleep(2000);
 const srv = (await rows()).filter(r => r.kind === 'facility').find(r => r.body.name === 'Strict Rink');
 ok('editing it changes the facility and reaches the server', srv && srv.body.settings.overdueDays === 14, JSON.stringify(srv && srv.body.settings));
 ok('and not the other facility', (await rows()).filter(r => r.kind === 'facility').find(r => r.body.name === 'Relaxed Rink').body.settings.overdueDays !== 14);
-await p.goto(B + '/index.html'); await sleep(2500);
+await p.goto(B + '/launcher.html'); await sleep(2500);
 ok('so the launcher no longer calls the 10-day-old round overdue', (await R(() => fleetRows())).rows.find(r => r.f.name === 'Strict Rink').over === false);
 
 /* an idle device sends nothing */

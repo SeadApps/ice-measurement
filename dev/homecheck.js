@@ -74,7 +74,7 @@ const b = await chromium.launch();
 /* ---------------- the gate ---------------- */
 {
   const { ctx, p } = await device(b);
-  await p.goto(B + '/index.html'); await sleep(1200);
+  await p.goto(B + '/launcher.html'); await sleep(1200);
 
   ok('launcher gates a device that has never signed in', await p.isVisible('.sync-gate'));
 
@@ -106,7 +106,7 @@ const b = await chromium.launch();
      or an earlier block's rows arrive alongside what it was handed. */
   await fetch(B + '/__reset');
   const { ctx, p } = await device(b);
-  await p.goto(B + '/index.html'); await seedSession(p); await seed(p, V4);
+  await p.goto(B + '/launcher.html'); await seedSession(p); await seed(p, V4);
   await p.reload(); await sleep(1500);
 
   const ice = (await p.textContent('#statIce')).trim();
@@ -132,7 +132,7 @@ const b = await chromium.launch();
      or an earlier block's rows arrive alongside what it was handed. */
   await fetch(B + '/__reset');
   const { ctx, p } = await device(b);
-  await p.goto(B + '/index.html'); await seedSession(p); await seed(p, V4);
+  await p.goto(B + '/launcher.html'); await seedSession(p); await seed(p, V4);
   /* Rounds with readings in them, so the overdue rule has something to bite
      on. An empty session is a sheet nobody has actually been to. */
   await p.evaluate(d => localStorage.setItem('ice_v4_sessions', JSON.stringify({
@@ -203,7 +203,7 @@ const b = await chromium.launch();
      or an earlier block's rows arrive alongside what it was handed. */
   await fetch(B + '/__reset');
   const { ctx, p } = await device(b);
-  await p.goto(B + '/index.html'); await seedSession(p);
+  await p.goto(B + '/launcher.html'); await seedSession(p);
   await p.evaluate(t => {
     localStorage.setItem('ice_v4_facilities', JSON.stringify({
       f1: { id:'f1', name:'Conway Arena', ord:0, updatedAt:t } }));
@@ -224,7 +224,7 @@ const b = await chromium.launch();
      or an earlier block's rows arrive alongside what it was handed. */
   await fetch(B + '/__reset');
   const { ctx, p } = await device(b);
-  await p.goto(B + '/index.html'); await seedSession(p);
+  await p.goto(B + '/launcher.html'); await seedSession(p);
   await p.evaluate(() => localStorage.setItem('glass_record_v2', JSON.stringify({
     records: { legacy: { '069':{status:'plexi'}, '082':{status:'replace'} },
                rab12x: { '004':{status:'replace'} } },
@@ -244,7 +244,7 @@ const b = await chromium.launch();
      or an earlier block's rows arrive alongside what it was handed. */
   await fetch(B + '/__reset');
   const { ctx, p } = await device(b);
-  await p.goto(B + '/index.html'); await seedSession(p);
+  await p.goto(B + '/launcher.html'); await seedSession(p);
   await p.evaluate(() => localStorage.setItem('ice_sheet_v3', JSON.stringify({
     facilities: [{ id: 'f1', name: 'Conway', sheets: [{ id: 's1', name: 'Main', sessions: [] }] }] })));
   await p.reload(); await sleep(1500);
@@ -287,7 +287,7 @@ const b = await chromium.launch();
      or an earlier block's rows arrive alongside what it was handed. */
   await fetch(B + '/__reset');
   const { ctx, p } = await device(b);
-  await p.goto(B + '/index.html'); await seedSession(p);
+  await p.goto(B + '/launcher.html'); await seedSession(p);
   await p.reload(); await sleep(1500);
   const ice = (await p.textContent('#statIce')).trim();
   ok('a signed-in but empty device says where to load from', /Open Ice Manager/i.test(ice), ice);
@@ -310,7 +310,7 @@ const b = await chromium.launch();
 
   /* Added on the launcher, and it should go without Ice being opened at all. */
   const { ctx: c1, p: p1 } = await device(b);
-  await p1.goto(B + '/index.html'); await signInAtGate(p1); await sleep(2000);
+  await p1.goto(B + '/launcher.html'); await signInAtGate(p1); await sleep(2000);
   await p1.click('#addRink'); await sleep(400);
   await p1.selectOption('#arFac', '__new'); await sleep(200);
   await p1.fill('#arNewFac', 'Berlin Arena');
@@ -326,7 +326,7 @@ const b = await chromium.launch();
 
   /* And a second device sees it on the launcher, without opening Ice either. */
   const { ctx, p } = await device(b);
-  await p.goto(B + '/index.html'); await signInAtGate(p); await sleep(3500);
+  await p.goto(B + '/launcher.html'); await signInAtGate(p); await sleep(3500);
   const seen = await p.evaluate(() =>
     Object.values(JSON.parse(localStorage.getItem('ice_v4_sheets') || '{}')).map(s => s.name));
   ok('another device picks it up on the launcher', seen.indexOf('Rink 1') >= 0, JSON.stringify(seen));
@@ -348,7 +348,7 @@ const b = await chromium.launch();
      or an earlier block's rows arrive alongside what it was handed. */
   await fetch(B + '/__reset');
   const { ctx, p } = await device(b);
-  await p.goto(B + '/index.html'); await seedSession(p);
+  await p.goto(B + '/launcher.html'); await seedSession(p);
   /* Shaped the way Repo.save() writes them — ord on everything — so a
      round-trip through the store is a no-op and any restamp below is real. */
   await p.evaluate(t => {
@@ -461,7 +461,7 @@ const b = await chromium.launch();
   const { ctx, p } = await device(b);
   const errs = [];
   p.on('pageerror', e => errs.push(String(e).split('\n')[0]));
-  await p.goto(B + '/index.html'); await signInAtGate(p); await sleep(1500);
+  await p.goto(B + '/launcher.html'); await signInAtGate(p); await sleep(1500);
 
   await p.click('#addRink'); await sleep(300);
   await p.selectOption('#arFac', '__new'); await sleep(150);
@@ -570,7 +570,7 @@ const b = await chromium.launch();
      or an earlier block's rows arrive alongside what it was handed. */
   await fetch(B + '/__reset');
   const { ctx, p } = await device(b);
-  await p.goto(B + '/index.html'); await seedSession(p); await p.reload(); await sleep(900);
+  await p.goto(B + '/launcher.html'); await seedSession(p); await p.reload(); await sleep(900);
   ok('launcher is no longer called Rink Apps', (await p.title()) === 'Arena Management System', await p.title());
   const m = await p.evaluate(async () => (await (await fetch('manifest.json')).json()).name);
   ok('manifest is no longer called Rink Apps', m === 'Arena Management System', m);

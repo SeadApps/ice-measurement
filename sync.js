@@ -948,6 +948,17 @@
        shared account carries the data and nothing is stricter than it was. A person
        whose scope has not been fetched yet is not Management until it is. */
     canRestore: function () { return !person || scope === "*"; },
+    /* Adding or removing a facility or a sheet is Management's, on the same terms
+       as restoring: open before anybody signs in as a person, Management after. */
+    canManage: function () { return !person || scope === "*"; },
+    /* May this person see this facility? Everyone before people exist and
+       Management always; Staff only what they were given. A person whose scope has
+       not been fetched yet sees nothing until it is. This hides, it is not a security
+       boundary: the data may already be on the device. */
+    canSee: function (facilityId) {
+      if (!person || scope === "*") return true;
+      return !!scope && scope.split("|").indexOf(facilityId) >= 0;
+    },
     restoreMessage: "Only Management can restore a backup.",
     isSignedIn: function () { return !!session; },
     pending: pendingCount,

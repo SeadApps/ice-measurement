@@ -76,7 +76,7 @@ const b = await chromium.launch();
    the launcher, because the switcher puts all three one tap apart - a device
    that overflows on one of them overflows in the middle of a walk-round. */
 for (const w of [320, 390]) {
-  for (const page of ['index.html', 'ice.html', 'glass.html']) {
+  for (const page of ['index.html', 'launcher.html', 'ice.html', 'glass.html']) {
     const { ctx, p, errs } = await open(b, page, {
       viewport: { width: w, height: 800 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true
     });

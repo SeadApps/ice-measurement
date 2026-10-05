@@ -4,7 +4,11 @@ Static site on GitHub Pages: `seadapps.github.io/ice-measurement/`.
 No build step, no framework, no dependencies. Edit a file, push, done.
 
 ```
-index.html    launcher — gated; cards read this device's records, never the network
+index.html    the shell's page: loads shell.js and home.js and mounts them (D2)
+shell.js      the shell: address, chrome, the one writer of where you are
+shell.css     the Ice Board look for the chrome and its pages
+home.js       the shell's pages: Facilities, Sheets (holding pages for settings and Staff)
+launcher.html the old launcher, unlinked, kept as a fallback until D5 deletes it
 ice.html      Ice Manager  — thickness rounds, contour map, trends (multi-facility)
 glass.html    Glass Manager — 127 rink glass panels, condition record
 sync.js       shared: Supabase auth, pull/push, the access gate, the status pill
@@ -547,6 +551,9 @@ node dev/whotest.js        # 19 checks: nobody types their name; the server's st
 node dev/seedtest.js       # 20 checks: a fresh device's invented facility is a seed: never sent while untouched, sent whole when edited, dropped when real ones arrive
 node dev/bandmigrationtest.js # 31 checks: eighths keep every reading in its band (15 readings, defaults and 2,000 random edge sets); the migration; a settings edit reaches the server
 node dev/overduetest.js    # 16 checks: overdue days belong to the facility; Ice and the launcher agree
+node dev/routetest.js       # 40 checks: the shell's addresses, back/forward, a Staff person and a shared iPad, the apps follow where you are
+node dev/shelltest.js       # 91 checks: the chrome at 390/820/1024/1280, breakpoints, menus, theme, tab bar, rail
+node dev/facilitiestest.js  # 45 checks: Facilities and Sheets agree with Ice, trends, adding, nothing restamped, an empty device, people
 node dev/restoretest.js    # 12 checks: restoring a backup (Ice) or a record file (Glass) is Management's; Staff are told and nothing merges
 node dev/widthstest.js     # 25 checks: a facility's one-tap widths (default 43/48, no record until changed); only Management resolves or reopens a flag
 ```
@@ -565,9 +572,10 @@ node dev/widthstest.js     # 25 checks: a facility's one-tap widths (default 43/
 - A suite that edits as a signed-in person must lift the editing lock first
   (`document.body.classList.remove('sync-locked')`), as the suites about sync do;
   `controlstest` is the one that tests the lock itself.
-- A fresh device invents a phantom facility before its first pull (see the open item
-  below), which sorts ahead of the real one and shifts its `ord`. Tests that judge
-  "who last changed X" leave the facility out, or look a sheet up by id.
+- A fresh device's invented facility is a seed (see *Seeds*): it is not sent until it is
+  really edited and is dropped when real facilities arrive, so a test that needs the
+  device to *use* its own facility must make a real edit first. Tests that judge "who last
+  changed X" still look a sheet up by id rather than taking the first.
 
 **Run them one at a time.** They share the one fake server, and several assert
 what the server is holding — `synctest` prints its record count and checks it.
@@ -591,7 +599,44 @@ properly and it pulls A's records down before the import, so the merge under tes
 does nothing. Point it at `localhost:8299` instead: it keeps a session, so no
 gate, but it can never reach a server.
 
-## The launcher
+## The shell (D2)
+
+`index.html` is a thin page; `shell.js` mounts into it and `home.js` draws the pages. It
+replaces the launcher, which lives on as `launcher.html` (unlinked, still tested by
+`homecheck`) until D5.
+
+- **The address is the truth.** `#/` Facilities, `#/f/FID` that facility's sheets,
+  `#/f/FID/s/SID` the same with that sheet in hand, `#/f/FID/s/SID/settings` and `#/staff`
+  (holding pages until D2b). An address that names nothing, or something this person was not
+  given, lands on Facilities with the one message "That page is not available." and the address
+  is corrected; it never says which, so it does not reveal what exists.
+- **Where you are** is a device preference (`activeFacility`, `activeSheet`, `activeSession`)
+  and the shell is its only writer, through `Repo.savePrefs`. Opening a facility or sheet
+  address writes it; Facilities does not. Ice and Glass still read it from the preference;
+  mounting the bar inside them (and reading the address there) is the last D2 step.
+- **Layout follows the width**: up to 560 phone (tab bar, one context button), 561 to 1100 iPad
+  (the full bar), 1101 and up laptop (the bar plus a rail). `Shell.layout()` /
+  `Shell.onLayout()` / `Shell.breakpoints` are for D3 and D4 to ask.
+- **Nothing about the rinks is read or drawn before the gate is passed**, and the shell never
+  invents a facility: an empty device shows an empty Facilities page until the first pull.
+- **Hiding by person**: `Sync.canSee(facilityId)` filters every list, the menus, the rail and
+  the addresses. It hides, it is not a boundary (the data may already be on the device).
+  `Sync.canManage()` gates Add facility and Add sheet (Management, or nobody signed in as a
+  person yet); they also grey until the editing window is open, like every edit control.
+- **Reads and writes**: `Repo.read()`, `Repo.savePrefs()` and `Repo.addSheet()` only, so the
+  shell cannot restamp a record by looking. `Records.trendOf()` and `Records.glassSummary()`
+  are the shared readers behind the sheet rows; `Records.readingValue()` is the one reading
+  parser (checked against Ice's on every label).
+- **Not yet**: Sheet settings and Staff pages (D2b), the backup menu items and units in the
+  account menu, and the bar inside Ice and Glass. The Ice Board fonts are system stacks, so
+  the app stays offline-capable and makes no outside request.
+
+Suites: `routetest` (addresses, back/forward, Staff and the shared iPad, the apps follow),
+`shelltest` (the chrome at 390 to 1280, menus, theme, tab bar, rail), `facilitiestest`
+(cards and the Fleet table agree with Ice, trends, adding, nothing restamped, empty device,
+people).
+
+## The launcher (superseded by the shell; kept as `launcher.html` until D5)
 
 `index.html` is where you say which rink you are at; the tool comes second. You
 are *at* a rink doing work there, not hopping between arenas mid-task. It shows
@@ -866,17 +911,12 @@ where that facility has more than one surface, so Conway still reads
   pages are rebuilt (D3).
 - **No realtime.** Sync happens on open and on focus. Supabase realtime would
   make the desktop update while you watch; not needed so far.
-- **A fresh device invents a facility.** Ice falls back to `freshState()` when
-  it has no records, and that fabricated "Main facility" is persisted and pushed
-  before the first pull delivers the real ones — so every new device adds a
-  phantom rink to the shared list. It also leaves that device pointed at its own
-  invention, since `apply()` only repoints `activeFacility` when `facility()`
-  is falsy and it never is. That is why `facilitytest` now pins the active
-  facility before adding a sheet: without it, which facility wins comes down to
-  how two random ids sort. Pre-dates all of the launcher work. The access suites
-  trip over it too, and work around it: a new device's phantom facility sorts ahead
-  of the real one and shifts its `ord`, which really is a change and is stamped as
-  one. The shell (D2) must never create a facility on its own.
+- **A fresh device used to invent a facility (fixed).** Ice's `freshState()` made a "Main
+  facility" that was pushed before the first pull, adding a phantom rink to everyone's list
+  and shifting the real one's `ord`. The invention is a seed now (see *Seeds*): kept off
+  the wire until somebody really edits it, dropped when real facilities arrive. The shell
+  never creates a facility on its own. `facilitytest` still pins the active facility, as
+  belt and braces.
 - **The SQL in `supabase/` has not been run against a real database.** The README
   has the checklist, including the two behaviours the client depends on: the
   "editing is locked" wording, and what the auth service answers for a removed

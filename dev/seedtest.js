@@ -103,7 +103,7 @@ await D.ctx.close();
 await fetch(B + '/__reset');
 const L = await device(b);
 await L.p.goto(B + '/ice.html'); await signIn(L.p);
-await L.p.goto(B + '/index.html'); await sleep(3000);
+await L.p.goto(B + '/launcher.html'); await sleep(3000);
 await L.p.evaluate(() => Sync.sync && Sync.sync()); await sleep(1000);
 ok('the launcher does not send an invented facility', (await kinds()).length === 0, JSON.stringify((await kinds()).map(r => r.kind)));
 await L.ctx.close();
