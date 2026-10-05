@@ -173,6 +173,85 @@
   }
   function currentTheme() { return document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark"; }
 
+  /* ---------- backup, restore and units: the account menu's own work ---------- */
+  var toastTimer = null;
+  function toast(msg) {
+    var t = document.getElementById("toast");
+    /* On the body, not in the app: a sync that arrives redraws the app, and would take the message with it. */
+    if (!t) { t = h("div", { id: "toast", cls: "toast", role: "status" }); document.body.appendChild(t); }
+    t.textContent = msg; t.hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.hidden = true; }, 4500);
+  }
+  function backupAgo(iso) {
+    if (!iso) return "No backup yet";
+    var days = Math.floor((Date.now() - new Date(iso)) / 86400000);
+    return "Last backup: " + (days <= 0 ? "today" : days === 1 ? "yesterday" : days + " days ago");
+  }
+  /* Offer the file to the share sheet where there is one (iPad: email, AirDrop), else download it. */
+  async function saveFile(content, mime, name) {
+    var blob = new Blob([content], { type: mime });
+    if (navigator.share && navigator.canShare) {
+      var file = new File([blob], name, { type: mime });
+      if (navigator.canShare({ files: [file] })) {
+        try { await navigator.share({ files: [file], title: name }); return "shared"; }
+        catch (err) { if (err && err.name === "AbortError") return "cancelled"; }
+      }
+    }
+    var u = URL.createObjectURL(blob), a = document.createElement("a");
+    a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(u); }, 1500);
+    return "downloaded";
+  }
+  async function backUp() {
+    var obj = await Repo.exportAll({ only: canSee });           // only what this person may see
+    var name = "ice_sheet_backup_" + new Date().toISOString().slice(0, 10) + ".json";
+    var res = await saveFile(JSON.stringify(obj), "application/json", name);
+    if (res === "cancelled") return;
+    data.prefs = await Repo.savePrefs({ lastBackup: new Date().toISOString() });
+    toast(res === "shared" ? "Backup shared" : "Backup saved");
+  }
+  var fileIn = null;
+  function restore() {
+    if (SYNC && !SYNC.canRestore()) { toast(SYNC.restoreMessage); return; }
+    if (!canEdit()) { toast("Unlock to edit to restore a backup."); return; }
+    if (!fileIn) {
+      fileIn = h("input", { type: "file", id: "restoreFile", accept: ".json,application/json", hidden: true });
+      fileIn.addEventListener("change", function () {
+        var f = fileIn.files[0]; fileIn.value = "";
+        if (!f) return;
+        var rd = new FileReader();
+        rd.onload = function () { chooseRestore(rd.result); };
+        rd.readAsText(f);
+      });
+      document.body.appendChild(fileIn);                 // not the shell root: every redraw replaces that
+    }
+    fileIn.click();
+  }
+  /* The question is asked in the page, not in a browser dialog: those are unreliable on an
+     iPad home-screen app and cannot be tested the way the rest of the page can. */
+  function chooseRestore(textContent) {
+    var obj = null, pv = null;
+    try { obj = JSON.parse(textContent); pv = Repo.previewImport(obj); } catch (e) { pv = { ok: false }; }
+    if (!pv.ok) { toast("That doesn't look like a valid backup file."); return; }
+    var dlg = h("div", { cls: "dlg", id: "restoreDlg", role: "dialog", "aria-modal": "true", "aria-label": "Restore from backup" }, [
+      h("div", { cls: "dlgbox" }, [
+        h("h3", { text: "Merge this backup into your data?" }),
+        h("p", { id: "restoreCount", text: pv.rounds + " round" + (pv.rounds === 1 ? "" : "s") + " in the file. Nothing is deleted: where both copies changed the same round, the newer edit wins and readings from each are kept." }),
+        h("div", { cls: "foot" }, [
+          h("button", { cls: "btn", type: "button", id: "restoreYes", text: "Merge", onclick: async function () {
+            dlg.remove();
+            var res = await Repo.importAll(obj);
+            if (!res.ok) { toast("That doesn't look like a valid backup file."); return; }
+            await refresh();
+            if (res.taken && SYNC) SYNC.nudge();               // it should reach the other devices now
+            toast(res.taken ? "Merged " + res.taken + " change" + (res.taken === 1 ? "" : "s") : "Already up to date");
+          } }),
+          h("button", { cls: "btn ghost", type: "button", id: "restoreNo", text: "Cancel", onclick: function () { dlg.remove(); } })])])]);
+    (appEl || root).appendChild(dlg);
+    var yes = document.getElementById("restoreYes"); if (yes) yes.focus();
+  }
+  async function setUnit(u) { data.prefs = await Repo.savePrefs({ unit: u }); }
+
   function buildNav(f, s) {
     var nav = h("header", { cls: "nav" });
     nav.appendChild(h("a", { cls: "logo", href: "#/", title: "Facilities", text: "LOGO", id: "logo" }));
@@ -231,6 +310,13 @@
       var it = [{ hd: "Theme" },
         { label: "Light", current: currentTheme() === "light", onclick: function () { theme("light"); acctRefresh(); } },
         { label: "Dark", current: currentTheme() === "dark", onclick: function () { theme("dark"); acctRefresh(); } },
+        { hr: true }, { hd: "Units" },
+        { label: "Inches", current: ((data.prefs || {}).unit || "in") !== "mm", onclick: function () { setUnit("in"); } },
+        { label: "Millimetres", current: (data.prefs || {}).unit === "mm", onclick: function () { setUnit("mm"); } },
+        { hr: true }, { hd: "Data" },
+        { label: "Back up all data", onclick: function () { backUp(); } },
+        { label: "Restore from backup\u2026", onclick: function () { restore(); } },
+        { label: backupAgo((data.prefs || {}).lastBackup), disabled: true },
         { hr: true }];
       if (SYNC) {
         if (person()) it.push({ label: "Switch user", onclick: function () { SYNC.switchUser(); } });
@@ -368,7 +454,7 @@
   }
 
   var Shell = {
-    mount: mount, refresh: refresh, repaint: repaint, canEdit: canEdit, go: go, h: h, status: status, setHere: setHere, appHref: appHref,
+    mount: mount, refresh: refresh, repaint: repaint, toast: toast, backUp: backUp, canEdit: canEdit, go: go, h: h, status: status, setHere: setHere, appHref: appHref,
     layout: function () { return layoutName; },
     onLayout: function (cb) { layoutCbs.push(cb); cb(layoutName); },
     route: function () { return route; }, data: function () { return data; },

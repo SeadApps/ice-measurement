@@ -566,6 +566,7 @@ node dev/overduetest.js    # 16 checks: overdue days belong to the facility; Ice
 node dev/routetest.js       # 40 checks: the shell's addresses, back/forward, a Staff person and a shared iPad, the apps follow where you are
 node dev/shelltest.js       # 91 checks: the chrome at 390/820/1024/1280, breakpoints, menus, theme, tab bar, rail
 node dev/facilitiestest.js  # 45 checks: Facilities and Sheets agree with Ice, trends, adding, nothing restamped, an empty device, people
+node dev/backuptest.js      # 44 checks: backup and restore from the account menu, merging, old files, units, Ice and the shell make the same file, Staff cannot restore and never export what they may not see
 node dev/settingstest.js    # 68 checks: Sheet settings writes name and shape and nothing else; draft, validation, glass check, Staff read-only, remove and undo; Ice draws the new outline
 node dev/restoretest.js    # 12 checks: restoring a backup (Ice) or a record file (Glass) is Management's; Staff are told and nothing merges
 node dev/widthstest.js     # 25 checks: a facility's one-tap widths (default 43/48, no record until changed); only Management resolves or reopens a flag
@@ -651,7 +652,18 @@ replaces the launcher, which lives on as `launcher.html` (unlinked, still tested
   never the last one in a facility, with an in-page confirmation and an Undo; Management can
   bring any hidden sheet back from a *Removed sheets* list on the Sheets page
   (`Repo.restoreSheet`, `Repo.readRemoved`).
-- **Not yet**: the Staff page (D2b), the backup menu items and units in the
+- **The account menu** holds theme, units (inches or millimetres, the `unit` preference Ice
+  reads), and the data: *Back up all data*, *Restore from backup* and when the last backup was.
+  The work is in the store: `Repo.exportAll({only})` writes the format Ice has always written
+  (`rink-ice-v4`, so a backup from either place restores into the other), leaves out an invented
+  seed and every facility `only` rejects (the shell passes `Sync.canSee`: a file is the person's to
+  send anywhere, so it never carries a facility they may not see, even if it is on the device);
+  `Repo.previewImport(obj)` reads the record format and the older whole-state one and says what is
+  in it; `Repo.importAll(obj)` merges, newest wins, readings inside a round kept from both. Restore is
+  Management's (`Sync.canRestore`) and needs the editing window, and is confirmed in the page, not a
+  browser dialog; messages are a toast on the body, which a redraw cannot take away. Ice's own
+  backup buttons call the same functions. Glass's separate record file is still its own until D4.
+- **Not yet**: the Staff page (D2b), and the bar inside Ice and Glass. The
   account menu, and the bar inside Ice and Glass. The Ice Board fonts are system stacks, so
   the app stays offline-capable and makes no outside request.
 

@@ -1060,21 +1060,16 @@ $("shaveIn").addEventListener("input",e=>{let v=parseFloat(e.target.value);if(is
 $("resetBands").addEventListener("click",()=>{editSettings().edges=[...DEFAULT_EDGES];applySettings();buildSettings();});
 $("overdueIn").addEventListener("input",e=>{let v=parseInt(e.target.value,10);if(isNaN(v))return;editSettings().overdueDays=Math.max(1,Math.min(90,v));persist();});
 async function doBackupExport(){await Repo.save(state);
-  const res=await exportFile(JSON.stringify(Repo.snapshot()),"application/json","ice_sheet_backup_"+todayISO()+".json");
+  const res=await exportFile(JSON.stringify(await Repo.exportAll({only:SYNC?SYNC.canSee:null})),"application/json","ice_sheet_backup_"+todayISO()+".json");
   if(res!=="cancelled"){state.lastBackup=new Date().toISOString();persist();updateBackupStatus();updateBackupBanner();}}
 $("backupExport").addEventListener("click",doBackupExport);
 $("backupImport").addEventListener("click",()=>{if(SYNC&&!SYNC.canRestore()){flashNote(SYNC.restoreMessage);return;}$("backupFile").click();});
 $("backupFile").addEventListener("change",e=>{const f=e.target.files[0];if(!f)return;if(SYNC&&!SYNC.canRestore()){$("backupFile").value="";flashNote(SYNC.restoreMessage);return;}const rd=new FileReader();rd.onload=()=>{
   try{
     const obj=JSON.parse(rd.result);
-    let inc=null;
-    if(obj&&obj.format==="rink-ice-v4"&&obj.sessions){                 // a record backup
-      inc={facilities:obj.facilities||{},sheets:obj.sheets||{},sessions:obj.sessions||{}};
-    }else if(obj&&Array.isArray(obj.facilities)&&obj.facilities.length){ // an older whole-state backup
-      const d=decompose(obj),t=obj.exportedAt||nowISO(),stamp=o=>{const r={};for(const k in o)r[k]=Object.assign({},o[k],{updatedAt:t});return r;};
-      inc={facilities:stamp(d.fac),sheets:stamp(d.sh),sessions:stamp(d.se)};
-    }else throw 0;
-    const count=Object.keys(inc.sessions).length;
+    const pv=Repo.previewImport(obj);                                  // the record format, or the older whole-state one
+    if(!pv.ok)throw 0;
+    const inc=pv.inc,count=pv.rounds;
     if(!confirm("Merge this backup into your data?\n\n"+count+" round"+(count===1?"":"s")+" in the file. Nothing is deleted — where both copies changed the same round, the newer edit wins and readings from each are kept.")){$("backupFile").value="";return;}
     const res=Repo.merge(inc);
     state.facilities=res.facilities;

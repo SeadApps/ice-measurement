@@ -157,6 +157,15 @@ tr:last-child td{border-bottom:0}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 
+/* ---- the toast and the restore question ---- */
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);max-width:min(92vw,520px);background:var(--ink);color:var(--bg);
+  font:600 14px var(--sans);padding:12px 18px;border-radius:3px;z-index:30;box-shadow:0 8px 24px rgba(0,0,0,.3)}
+body:has(.app[data-layout="phone"]) .toast{bottom:76px}
+.dlg{position:fixed;inset:0;background:rgba(10,20,30,.55);display:grid;place-items:center;padding:16px;z-index:40}
+.dlgbox{background:var(--panel);border:1px solid var(--line-2);border-radius:3px;max-width:460px;width:100%;padding:20px 22px}
+.dlgbox h3{margin:0 0 8px;font:800 18px var(--sans);text-transform:uppercase;letter-spacing:.01em}
+.dlgbox p{margin:0 0 16px;color:var(--ink-dim);font-size:14px}
+
 /* ---- Sheet settings --------------------------------------------------------------------- */
 .card{background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:14px 16px;min-width:0}
 .eyebrow{font:600 13px var(--label);letter-spacing:.09em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:10px;

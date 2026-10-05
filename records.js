@@ -578,6 +578,42 @@
       await this.persistMaps();
       return {changed:true};
     },
+    /* ---------- backup ----------
+       One file holds every record on the device: the same format Ice has always written,
+       so a backup from any build restores into any other. It leaves out a facility that is
+       still only an invented seed, strips the marks, and, given `only` (a test on a facility
+       id), leaves out every facility the person is not allowed to see: a file is theirs to
+       send anywhere, and the data being on the device does not make it theirs to export. */
+    async exportAll(opts){
+      await this.load();
+      const only = opts && opts.only, m = this.outgoing(), t = treeOf(m.sh, m.se);
+      const keep = (kind, r) => !only || (t.facOfRec(kind, r) != null && only(t.facOfRec(kind, r)));
+      const out = {fac:{}, sh:{}, se:{}};
+      [["fac", m.fac], ["sh", m.sh], ["se", m.se]].forEach(([k, o]) => { for(const id in o) if(o[id] && keep(k, o[id])) out[k][id] = o[id]; });
+      return {format:"rink-ice-v4", exportedAt:nowISO(), facilities:out.fac, sheets:out.sh, sessions:out.se};
+    },
+    /* What a backup file would bring in, without bringing it. Understands the record format
+       and the older whole-state one. {ok:false} for anything else. */
+    previewImport(obj){
+      let inc = null;
+      if(obj && obj.format === "rink-ice-v4" && obj.sessions){
+        inc = {facilities:obj.facilities||{}, sheets:obj.sheets||{}, sessions:obj.sessions||{}};
+      } else if(obj && Array.isArray(obj.facilities) && obj.facilities.length){          // an older whole-state backup
+        const d = decompose(obj), t = obj.exportedAt || nowISO(), stamp = o => { const r = {}; for(const k in o) r[k] = Object.assign({}, o[k], {updatedAt:t}); return r; };
+        inc = {facilities:stamp(d.fac), sheets:stamp(d.sh), sessions:stamp(d.se)};
+      } else return {ok:false, error:"not a backup file"};
+      const live = o => Object.values(o).filter(r => r && !r.deleted).length;
+      return {ok:true, inc, rounds:Object.keys(inc.sessions).length, facilities:live(inc.facilities), sheets:live(inc.sheets)};
+    },
+    /* Merge a backup in, newest wins per record and readings inside a round kept from both. */
+    async importAll(obj){
+      const pv = this.previewImport(obj); if(!pv.ok) return pv;
+      await this.load();
+      const res = this.merge(pv.inc);
+      if(res.taken) await this.persistMaps();
+      return {ok:true, taken:res.taken, facilities:res.facilities, rounds:pv.rounds};
+    },
+
     /* The sheets that have been removed, for a page that offers to bring them back. Reads
        local storage and leaves the snapshot alone, like read(): it cannot write a thing. */
     async readRemoved(){
