@@ -61,7 +61,18 @@
     {id:"studio",name:"Studio — 185 × 85 ft",   L:185, W:85,  corner:25}
   ];
   const NHL_SIZE = () => ({...RINK_SIZES[0]});
-  const DEFAULT_EDGES = [0.6875,1.4375,1.5625,1.9375];
+  /* Band edges, flood and shave levels and the target are in eighths of an inch,
+     because that is what a reading is: sixteen labels in eighths, no sixteenth.
+     The old edges sat between the eighths (5/8 to 11/16 and so on), which is why
+     moving them to the eighth ABOVE keeps every reading in the band it is in now:
+     a reading is compared with "is it below this edge", so an edge anywhere in the
+     gap above the last reading it should exclude and at or below the first it
+     should include gives the same answer. Rounding up lands in that gap every
+     time. Today's 0.6875 / 1.4375 / 1.5625 / 1.9375 become 3/4, 1 1/2, 1 5/8, 2. */
+  const DEFAULT_EDGES = [0.75,1.5,1.625,2];
+  const eighthUp   = x => Math.ceil(x*8 - 1e-9)/8;
+  const eighthNear = x => Math.round(x*8)/8;
+  const SETTINGS_VERSION = 2;
   const uid = () => Math.random().toString(36).slice(2,9);
   const newSession = () => ({id:uid(),date:new Date().toISOString(),label:"",mode:"moderate",data:{},notes:{}});
 
@@ -117,7 +128,50 @@
 
   const newSheet = (n,size) => { const sz = size || NHL_SIZE();
     return {id:uid(),name:n||"Main sheet",size:sz,shape:shapeFromSize(sz),sessions:[newSession()]}; };
-  const defaultSettings = () => ({target:1.5,edges:[...DEFAULT_EDGES],tieAttention:true,floodBelow:1.25,shaveAbove:1.5625});
+  const defaultSettings = () => ({target:1.5,edges:[...DEFAULT_EDGES],tieAttention:true,floodBelow:1.25,shaveAbove:1.625,
+                                  overdueDays:7,settingsVersion:SETTINGS_VERSION});
+
+  /* ---------- reading a facility's settings ----------
+     settingsOf is the only way a page should read them. It gives the settings as
+     they will be once migrated, whether or not they have been, so a Staff device
+     (which may not write a facility) and a Management device that has not run the
+     migration yet classify every reading identically. It writes nothing and is
+     idempotent: on already-migrated settings it returns the same numbers.
+
+     overdueDays used to be a device preference. A facility that has none of its
+     own falls back to the device's, then to 7. */
+  const clampDays = n => Math.max(1, Math.min(90, Math.round(n)));
+  function settingsOf(settings, prefs){
+    const st = settings || {};
+    const ok = Array.isArray(st.edges) && st.edges.length === 4 && st.edges.every(v => isFinite(v));
+    const edges = ok ? st.edges.map(eighthUp) : [...DEFAULT_EDGES];
+    const pick = (v, dflt) => (v == null || !isFinite(v)) ? dflt : v;
+    const days = st.overdueDays != null && isFinite(st.overdueDays) ? st.overdueDays
+               : prefs && prefs.overdueDays != null && isFinite(prefs.overdueDays) ? prefs.overdueDays : 7;
+    return {
+      target: eighthNear(pick(st.target, 1.5)),
+      edges,
+      tieAttention: st.tieAttention !== false,
+      floodBelow: eighthUp(pick(st.floodBelow, edges[1])),
+      shaveAbove: eighthUp(pick(st.shaveAbove, edges[2])),
+      overdueDays: clampDays(days),
+      settingsVersion: SETTINGS_VERSION
+    };
+  }
+  /* Put a facility's settings into migrated form, in place, keeping any key this
+     code does not know about. Returns true if anything changed. Used by the
+     Management migration, and by the first real edit of a facility that has not
+     been migrated, so a stepper never writes one new number beside three old. */
+  function upgradeSettings(settings, prefs){
+    const next = settingsOf(settings, prefs);
+    let changed = false;
+    for(const k in next){
+      if(JSON.stringify(settings[k]) !== JSON.stringify(next[k])){ settings[k] = next[k]; changed = true; }
+    }
+    return changed;
+  }
+  const settingsNeedUpgrade = (settings, prefs) => upgradeSettings(JSON.parse(JSON.stringify(settings || {})), prefs);
+  const overdueDaysOf = (facility, prefs) => settingsOf(facility && facility.settings, prefs).overdueDays;
   const newFacility = n => {const sh=newSheet();return{id:uid(),name:n||"Main facility",settings:defaultSettings(),sheets:[sh]};};
 
   const nowISO = () => new Date().toISOString();
@@ -131,7 +185,7 @@
       /* fac names the facility a record belongs to, so the server can show it
          only to people given that facility. Everything here is derived from
          where the record sits, never typed, and bodyOf ignores it. */
-      fac[f.id]={id:f.id,name:f.name,settings:f.settings,ord:fi,fac:f.id};
+      fac[f.id]=detach({id:f.id,name:f.name,settings:f.settings,ord:fi,fac:f.id});
       (f.sheets||[]).forEach((x,si)=>{
         sh[x.id]={id:x.id,facilityId:f.id,name:x.name,size:x.size,ord:si,fac:f.id,
                   ...(x.shape?{shape:x.shape}:{})};   // carried, never derived here: see the shape notes above
@@ -168,9 +222,16 @@
      worked and only the nested maps went missing - and why this hid for so
      long. Detach them on the way into the snapshot and on the way back out, so
      a snapshot is genuinely a snapshot and neither side can reach the other's. */
+  /* A facility's settings are the same kind of nested object, and went unnoticed
+     for the same reason: they were shared with the snapshot, so a change to a
+     target or a band edge made save() compare an object with itself and the
+     facility was never restamped. It reached no other device until something else
+     about the facility changed. Detached with the rest, edges array included. */
+  const detachSettings = st => !st ? st : Object.assign({}, st, Array.isArray(st.edges) ? {edges: [...st.edges]} : {});
   const detach = r => !r ? r : Object.assign({}, r,
     r.data  ? {data:  Object.assign({}, r.data)}  : {},
-    r.notes ? {notes: Object.assign({}, r.notes)} : {});
+    r.notes ? {notes: Object.assign({}, r.notes)} : {},
+    r.settings ? {settings: detachSettings(r.settings)} : {});
 
   /* Stamp only what changed, and leave a tombstone for anything removed, so a
      delete on one device isn't undone by a merge from another. */
@@ -191,7 +252,7 @@
   function reassemble(fac,sh,se){
     const live=o=>Object.values(o).filter(r=>r&&!r.deleted);
     const byOrd=(a,b)=>(a.ord||0)-(b.ord||0)||String(a.id).localeCompare(String(b.id));
-    return live(fac).sort(byOrd).map(f=>Object.assign({},f,{
+    return live(fac).sort(byOrd).map(f=>Object.assign({},detach(f),{
       sheets:live(sh).filter(x=>x.facilityId===f.id).sort(byOrd).map(x=>Object.assign({},x,{
         /* Detached on the way out too: what a page is handed to edit must not
            be the snapshot's own object, or the alias comes straight back. */
@@ -441,6 +502,32 @@
       return {changed:true};
     },
 
+    /* What migrating the settings would do, without doing it. Management's
+       "preview, then approve" step, like the shapes. */
+    async previewSettings(){
+      const st = await this.read(); if(!st) return [];
+      const out = [];
+      st.facilities.forEach(f => {
+        const from = f.settings || {};
+        if(settingsNeedUpgrade(from, st.prefs)) out.push({id:f.id, name:f.name, from:Object.assign({}, from), to:settingsOf(from, st.prefs)});
+      });
+      return out;
+    },
+
+    /* Migrate every facility that has not been. Only those facilities are
+       restamped, and nothing inside a round. A second run finds none. The device's
+       own overdue-days preference is the fallback for a facility with none. */
+    async backfillSettings(){
+      const st = await this.load(); if(!st) return 0;
+      let n = 0;
+      st.facilities.forEach(f => {
+        if(!f.settings) f.settings = {};
+        if(upgradeSettings(f.settings, st)) n++;
+      });
+      if(n) await this.save(st);
+      return n;
+    },
+
     /* The glass builder measured the sheet and the person agreed to update it. */
     updateShape(sheetId, patch){ return this.updateSheet(sheetId, {shape: patch||{}}); },
 
@@ -450,7 +537,8 @@
 
   global.Records = { KEYS:K, PREF_KEYS, Store, Repo,
                      decompose, reassemble, nowISO, hasReadings, lastRound, isOverdue,
-                     RINK_SIZES, NHL_SIZE, DEFAULT_EDGES,
+                     RINK_SIZES, NHL_SIZE, DEFAULT_EDGES, SETTINGS_VERSION, eighthUp, eighthNear,
+                     settingsOf, upgradeSettings, settingsNeedUpgrade, overdueDaysOf,
                      STD_CORNER, shapeFromSize, shapeOf, sizeOf, compareShape, shapeProblem, SHAPE_TOLERANCE,
                      uid, newSession, newSheet, defaultSettings, newFacility };
 })(this);

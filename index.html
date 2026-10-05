@@ -308,7 +308,7 @@ async function fleetRows(){
   const rows = [];
   st.facilities.forEach(f => (f.sheets || []).forEach(s => {
     const last = Records.lastRound(st.sessions, s.id);
-    rows.push({ f: f, s: s, last: last, over: Records.isOverdue(last, st.prefs.overdueDays) });
+    rows.push({ f: f, s: s, last: last, over: Records.isOverdue(last, Records.overdueDaysOf(f, st.prefs)) });
   }));
   return { rows: rows, prefs: st.prefs, sessions: st.sessions };
 }

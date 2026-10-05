@@ -20,6 +20,7 @@ noticing.
 | 4b | (the Staff page, or the function directly) | Add everyone else, set their facilities, hand out codes. | yes |
 | 5 | `d1-04-tighten.sql` | One switch. The shared account can then only list names. | `d1-04-untighten.sql` |
 | - | `d1-05-restore-old-policies.sql` | Only if you want D1's policies gone entirely. | - |
+| D3 | `d3-01a-settings-preview.sql`, `d3-01b-settings-apply.sql` | Band edges, flood, shave and target to eighths, `overdueDays` onto the facility, `settingsVersion` 2. Timestamps are kept. Needs step 1 and the D3 client; any time after. | restores nothing, but the client reads the same numbers either way |
 
 ## The editing code
 
@@ -82,6 +83,11 @@ is something the fake server could only imitate.
 - [ ] A Staff person given one facility reads and writes only that one, cannot
       rewrite another facility's record by re-tagging it, and cannot write a
       `facility` or `sheet` record.
+- [ ] D3: `d3-01a` lists each facility's settings before and after. `app.settings_v2` agrees
+      with `Records.settingsOf` for the old defaults: edges `0.6875, 1.4375, 1.5625, 1.9375`
+      give `0.75, 1.5, 1.625, 2`, shave `1.5625` gives `1.625`. After `d3-01b` a second preview
+      shows nothing to change, no facility's `updated_at` moved, and one `_backfill` row
+      says how many were done. (This SQL has never been run; the JS twin is tested.)
 - [ ] A Staff person cannot set a flag to resolved, and cannot change a flag
       that is already resolved (reopen it or edit it); Management can do both.
       A `glass_widths` record in their own facility is theirs to write.

@@ -94,6 +94,24 @@ per-kind maps in local storage, and each carries its own timestamp.
 | `glass_widths` | `glass_record_v2` | the builder's one-tap widths for a facility, id = the facility id; reads 43 and 48 until somebody changes it, and no record exists before then |
 | — | `ice_v4_prefs` | **device-local, never synced** |
 
+**Settings are read through `Records.settingsOf(settings, prefs)`.** It gives a facility's
+settings as they will be once migrated: band edges, flood and shave rounded *up* to the
+next eighth (a reading is one of sixteen labels in eighths, so this keeps every reading in
+the band it is in now; the defaults become 3/4, 1 1/2, 1 5/8, 2), the target to the nearest
+eighth, `overdueDays` from the facility, then the device preference, then 7, and
+`settingsVersion` 2. It writes nothing and is idempotent, so a Staff device (which may not
+write a facility) and a Management device that has not migrated classify identically. Pages
+read through it (`EF()` in Ice); `Records.upgradeSettings(settings)` brings one facility's
+stored settings across in place and runs on the first real edit, so a stepper never writes one
+new number beside three old ones; `Repo.previewSettings()` / `backfillSettings()` and the
+server scripts `supabase/d3-01a`/`d3-01b` migrate in bulk. The one thing rounding up cannot
+keep is an edge above 2 inches against the legacy "2+" label (counted as 2.1).
+
+A facility's `settings` (and its `edges` array) are detached from the snapshot like a round's
+`data` and `notes`. Until that was done, editing a target or band edge made `save()` compare
+an object with itself, so the facility was never restamped and the edit reached no other
+device until something else about the facility changed.
+
 **Restoring a backup is Management's.** `Sync.canRestore()` is true when nobody is
 signed in as a person yet (the shared account carries the data, rollout step 3) or when
 the person's scope is `*`, and false otherwise, including while a person's scope has not
@@ -527,6 +545,8 @@ node dev/shapetest.js      # 69 checks: one shape per sheet, the migration, the 
 node dev/controlstest.js   # 35 checks: edit controls lock until unlocked; what only reads stays open
 node dev/whotest.js        # 19 checks: nobody types their name; the server's stamp is shown
 node dev/seedtest.js       # 20 checks: a fresh device's invented facility is a seed: never sent while untouched, sent whole when edited, dropped when real ones arrive
+node dev/bandmigrationtest.js # 31 checks: eighths keep every reading in its band (15 readings, defaults and 2,000 random edge sets); the migration; a settings edit reaches the server
+node dev/overduetest.js    # 16 checks: overdue days belong to the facility; Ice and the launcher agree
 node dev/restoretest.js    # 12 checks: restoring a backup (Ice) or a record file (Glass) is Management's; Staff are told and nothing merges
 node dev/widthstest.js     # 25 checks: a facility's one-tap widths (default 43/48, no record until changed); only Management resolves or reopens a flag
 ```

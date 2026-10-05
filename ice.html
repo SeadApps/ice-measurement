@@ -461,7 +461,7 @@
     </div>
     <div class="msec">
       <h3>Target &amp; bands · <span class="who" id="prefFac"></span></h3>
-      <div class="row"><label for="targetIn">Target thickness</label><input type="number" id="targetIn" step="0.0625" min="0.25" max="3"><span class="frac" id="targetFrac"></span></div>
+      <div class="row"><label for="targetIn">Target thickness</label><input type="number" id="targetIn" step="0.125" min="0.5" max="3"><span class="frac" id="targetFrac"></span></div>
       <div class="edges" id="edges"></div>
       <div class="row" style="margin-top:8px"><button class="mini" id="resetBands">Reset bands to default</button></div>
     </div>
@@ -469,8 +469,8 @@
       <h3>Needs attention</h3>
       <label class="check"><input type="checkbox" id="tieChk"> Match the color bands (flag anything not ideal)</label>
       <div id="manualAtt" style="margin-top:10px">
-        <div class="row"><label for="floodIn">Flood when below</label><input type="number" id="floodIn" step="0.0625" min="0.25" max="3"><span class="frac" id="floodFrac"></span></div>
-        <div class="row"><label for="shaveIn">Shave when at/above</label><input type="number" id="shaveIn" step="0.0625" min="0.25" max="3"><span class="frac" id="shaveFrac"></span></div></div>
+        <div class="row"><label for="floodIn">Flood when below</label><input type="number" id="floodIn" step="0.125" min="0.5" max="3"><span class="frac" id="floodFrac"></span></div>
+        <div class="row"><label for="shaveIn">Shave when at/above</label><input type="number" id="shaveIn" step="0.125" min="0.5" max="3"><span class="frac" id="shaveFrac"></span></div></div>
     </div>
     <div class="msec">
       <h3>Facilities</h3>
@@ -613,8 +613,8 @@ const css=getComputedStyle(document.documentElement);
 const BAND_META=[{key:"thin",c:"#d6453f",label:"Too thin"},{key:"low",c:"#e8b54a",label:"Thin"},{key:"ideal",c:"#eef4f6",label:"Ideal"},{key:"high",c:"#6aa9d6",label:"Thick"},{key:"thick",c:"#2c6aa3",label:"Too thick"}];
 let BANDS=[],BAND_RGB=[];
 const rgbOf=h=>{h=h.replace("#","");return[parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];};
-function buildBands(){const e=S().edges,lts=[e[0],e[1],e[2],e[3],Infinity];
-  const rngs=["< "+fmtSet(e[0]),fmtSet(e[0])+"–"+fmtSet(e[1]),"≈ "+fmtSet(S().target),fmtSet(e[2])+"–"+fmtSet(e[3]),fmtSet(e[3])+" +"];
+function buildBands(){const e=EF().edges,lts=[e[0],e[1],e[2],e[3],Infinity];
+  const rngs=["< "+fmtSet(e[0]),fmtSet(e[0])+"–"+fmtSet(e[1]),"≈ "+fmtSet(EF().target),fmtSet(e[2])+"–"+fmtSet(e[3]),fmtSet(e[3])+" +"];
   BANDS=BAND_META.map((m,i)=>({...m,lt:lts[i],color:m.c,rng:rngs[i]}));BAND_RGB=BANDS.map(b=>rgbOf(b.color));}
 const bandOf=v=>{for(const b of BANDS)if(v<b.lt)return b;return BANDS[BANDS.length-1];};
 
@@ -625,6 +625,12 @@ function freshState(){const f=newFacility();return{theme:"dark",unit:"in",lastBa
 
 const facility=()=>state.facilities.find(f=>f.id===state.activeFacility)||state.facilities[0];
 const S=()=>facility().settings;
+/* What the settings mean once migrated, read-only. Every page reads through this, so a device that
+   has not migrated a facility (Staff may not write one) classifies exactly like one that has. */
+const EF=()=>Records.settingsOf(S(),state);
+/* A stepper never writes one new number beside three old ones: the first real edit of a facility
+   that has not been migrated brings all its settings across, then applies the change. */
+const editSettings=()=>{Records.upgradeSettings(S(),state);return S();};
 const sheet=()=>{const f=facility();return f.sheets.find(s=>s.id===state.activeSheet)||f.sheets[0];};
 const session=()=>{const sh=sheet();return sh.sessions.find(s=>s.id===state.activeSession)||sh.sessions[0];};
 const data=()=>session().data, notes=()=>session().notes;
@@ -655,7 +661,7 @@ function idw(samples,fallback){const out=new Float32Array(NX*NY),pw=POW();
   for(let j=0;j<NY;j++){const fy=(j+0.5)/NY*W;for(let i=0;i<NX;i++){const fx=(i+0.5)/NX*L;let num=0,den=0,hit=null;
     for(let p=0;p<samples.length;p++){const dx=fx-samples[p].x,dy=fy-samples[p].y,d2=dx*dx+dy*dy;if(d2<0.25){hit=samples[p].v;break;}const w=1/Math.pow(d2,pw/2);num+=w*samples[p].v;den+=w;}
     out[i+j*NX]=hit!=null?hit:(den?num/den:fallback);}}return out;}
-function computeField(){const pts=[],d=data();for(const k in d){const[x,y]=k.split(",").map(Number);pts.push({x,y,v:decOf.get(d[k])});}field=idw(pts.concat(anchors(S().target)),S().target);}
+function computeField(){const pts=[],d=data();for(const k in d){const[x,y]=k.split(",").map(Number);pts.push({x,y,v:decOf.get(d[k])});}field=idw(pts.concat(anchors(EF().target)),EF().target);}
 function computeDelta(){const base=baselineSession();if(!base){deltaField=null;return;}const cur=data(),bd=base.data,pts=[];
   for(const k in cur){if(bd[k]!=null){const[x,y]=k.split(",").map(Number);pts.push({x,y,v:decOf.get(cur[k])-decOf.get(bd[k])});}}deltaField=pts.length?idw(pts.concat(anchors(0)),0):null;}
 
@@ -748,7 +754,7 @@ function showComplete(){const d=data(),rows=[];for(const k in d){const[x,y]=k.sp
   $("doneIdeal").innerHTML=ideal+'<small> / '+rows.length+'</small>';
   $("doneMin").textContent=fmtLabel(mn.lab);$("doneMinZone").textContent=mn.zone;
   $("doneMax").textContent=fmtLabel(mx.lab);$("doneMaxZone").textContent=mx.zone;
-  $("donePlan").innerHTML=`<b class="flood">Flood ${flood}</b> &nbsp;·&nbsp; <b class="shave">Shave ${shave}</b> &nbsp;·&nbsp; avg ${fmtDelta(avg-S().target)} vs target`;
+  $("donePlan").innerHTML=`<b class="flood">Flood ${flood}</b> &nbsp;·&nbsp; <b class="shave">Shave ${shave}</b> &nbsp;·&nbsp; avg ${fmtDelta(avg-EF().target)} vs target`;
   const base=baselineSession(),tr=$("doneTrend");
   if(base){let sumd=0,nd=0,thinner=0,thicker=0;for(const r of rows){const bv=base.data[r.x+","+r.y];if(bv!=null){const dd=r.v-decOf.get(bv);sumd+=dd;nd++;if(dd<-1e-9)thinner++;else if(dd>1e-9)thicker++;}}
     if(nd){tr.style.display="block";tr.innerHTML=`vs ${fmtDate(base.date)}: avg <b>${fmtDelta(sumd/nd)}</b> · ${thinner} thinner, ${thicker} thicker`;}else tr.style.display="none";}
@@ -783,7 +789,7 @@ function refresh(){if(selIdx>=POINTS.length)selIdx=0;if(guidedPos>=guidedOrder.l
   if(entryMode==="guided"){$("gposLab").textContent=`Point ${guidedPos+1} of ${tot} · ${zoneOf(POINTS[guidedOrder[guidedPos]])}`;$("gleftLab").textContent=`${cnt}/${tot} done`;$("gfill").style.width=(cnt/tot*100)+"%";}
   renderStats();if(viewMode==="3d")drawSurf();updateContourReadout();}
 function renderStats(){const d=data(),rows=[];for(const k in d){const[x,y]=k.split(",").map(Number);rows.push({x,y,zone:zoneOf({x,y}),lab:d[k],v:decOf.get(d[k])});}
-  $("targetNote").textContent="target "+fmtSet(S().target);
+  $("targetNote").textContent="target "+fmtSet(EF().target);
   if(!rows.length){$("stAvg").textContent="—";$("stIdeal").textContent="—";$("zL").textContent=$("zN").textContent=$("zR").textContent="—";
     setTag($("stMinTag"),null);$("stMinZone").textContent="";setTag($("stMaxTag"),null);$("stMaxZone").textContent="";$("plan").textContent="No readings yet — tap a point to start.";$("trendline").classList.remove("on");$("todo").innerHTML='<li class="empty">No readings yet.</li>';return;}
   const avg=rows.reduce((s,r)=>s+r.v,0)/rows.length;$("stAvg").innerHTML=fmtNumHTML(avg);
@@ -791,7 +797,7 @@ function renderStats(){const d=data(),rows=[];for(const k in d){const[x,y]=k.spl
   const za=[[],[],[]];rows.forEach(r=>za[thirdOf(r.x)].push(r.v));const zt=a=>a.length?fmtNum(a.reduce((x,y)=>x+y,0)/a.length):'—';
   $("zL").textContent=zt(za[0]);$("zN").textContent=zt(za[1]);$("zR").textContent=zt(za[2]);
   const mn=rows.reduce((a,b)=>b.v<a.v?b:a),mx=rows.reduce((a,b)=>b.v>a.v?b:a);setTag($("stMinTag"),mn);$("stMinZone").textContent=mn.zone;setTag($("stMaxTag"),mx);$("stMaxZone").textContent=mx.zone;
-  const fb=attFlood(),sa=attShave(),flood=rows.filter(r=>r.v<fb),shave=rows.filter(r=>r.v>=sa),deepest=flood.length?Math.max(...flood.map(r=>S().target-r.v)):0;
+  const fb=attFlood(),sa=attShave(),flood=rows.filter(r=>r.v<fb),shave=rows.filter(r=>r.v>=sa),deepest=flood.length?Math.max(...flood.map(r=>EF().target-r.v)):0;
   $("plan").innerHTML=`<b class="flood">Flood ${flood.length}</b>${flood.length?` · deepest −${fmtNum(deepest)}`:""} &nbsp;·&nbsp; <b class="shave">Shave ${shave.length}</b>`;
   const base=baselineSession(),tl=$("trendline");
   if(base){let thinner=0,thicker=0,sumd=0,nd=0;for(const r of rows){const bv=base.data[keyOf({x:r.x,y:r.y})];if(bv!=null){const dd=r.v-decOf.get(bv);sumd+=dd;nd++;if(dd<-1e-9)thinner++;else if(dd>1e-9)thicker++;}}
@@ -799,7 +805,7 @@ function renderStats(){const d=data(),rows=[];for(const k in d){const[x,y]=k.spl
   let html="";flood.sort((a,b)=>a.v-b.v).forEach(r=>{html+=`<li><span class="pip" style="background:${bandOf(r.v).color}"></span><span class="z">${r.zone}</span><span class="t">flood · ${fmtLabel(r.lab)}</span></li>`;});
   shave.sort((a,b)=>b.v-a.v).forEach(r=>{html+=`<li><span class="pip" style="background:${bandOf(r.v).color}"></span><span class="z">${r.zone}</span><span class="t">shave · ${fmtLabel(r.lab)}</span></li>`;});
   $("todo").innerHTML=html||'<li class="empty">All logged points are in range. Nice sheet.</li>';}
-const attFlood=()=>S().tieAttention?S().edges[1]:S().floodBelow, attShave=()=>S().tieAttention?S().edges[2]:S().shaveAbove;
+const attFlood=()=>EF().tieAttention?EF().edges[1]:EF().floodBelow, attShave=()=>EF().tieAttention?EF().edges[2]:EF().shaveAbove;
 function setTag(el,r){if(!r){el.textContent="—";el.style.background="transparent";el.style.color="";return;}const b=bandOf(r.v);el.textContent=fmtLabel(r.lab);el.style.background=b.color;el.style.color=(b.key==="ideal"||b.key==="low")?"#0d1620":"#fff";}
 
 /* ---------- nav / modes ---------- */
@@ -868,7 +874,7 @@ const renderToImage=W2=>{const c=document.createElement("canvas");c.width=W2;c.h
 $("expPng").addEventListener("click",()=>{const Wd=1760,Hd=980,pad=56,c=document.createElement("canvas");c.width=Wd;c.height=Hd;const x=c.getContext("2d");
   x.fillStyle="#0d1620";x.fillRect(0,0,Wd,Hd);x.fillStyle="#eaf3f8";x.font="800 30px system-ui,sans-serif";x.textAlign="left";x.textBaseline="alphabetic";
   x.fillText(facility().name+" — "+sheet().name+(viewMode==="trend"?" · TREND":""),pad,pad+18);x.fillStyle="#90a8b8";x.font="14px ui-monospace,Menlo,monospace";x.fillText(fmtDate(session().date),pad,pad+42);
-  x.fillStyle="#6fd6ec";x.textAlign="right";x.fillText(Object.keys(data()).length+" / "+POINTS.length+" · target "+fmtSet(S().target),Wd-pad,pad+42);x.textAlign="left";
+  x.fillStyle="#6fd6ec";x.textAlign="right";x.fillText(Object.keys(data()).length+" / "+POINTS.length+" · target "+fmtSet(EF().target),Wd-pad,pad+42);x.textAlign="left";
   const rw=Wd-pad*2,ry=pad+78;renderScene(x,pad,ry,rw,{labels:true,sel:false,contours:true,trend:viewMode==="trend"});const rh=W*(rw/L);let lx=pad,ly=ry+rh+44;x.font="600 14px ui-monospace,Menlo,monospace";x.textBaseline="middle";
   if(viewMode==="trend"){x.fillStyle="#eaf3f8";x.fillText("Change vs "+(baselineSession()?fmtDate(baselineSession().date):"previous"),pad,ly);}else for(const b of BANDS){x.fillStyle=b.color;x.fillRect(lx,ly-9,18,18);x.strokeStyle="#ffffff22";x.strokeRect(lx,ly-9,18,18);x.fillStyle="#eaf3f8";x.fillText(b.label,lx+26,ly-1);x.fillStyle="#90a8b8";x.fillText(b.rng,lx+26,ly+15);lx+=Math.max(180,x.measureText(b.label).width+96);}
   c.toBlob(blob=>{exportFile(blob,"image/png",fileStem()+".png");},"image/png");});
@@ -883,7 +889,7 @@ $("expPdf").addEventListener("click",()=>{const img=renderToImage(2000).toDataUR
     tables.push(`<table><thead><tr><th>Location</th><th>Reading</th><th>Note</th></tr></thead><tbody>`+
       chunk.map(r=>`<tr><td>${r.loc}</td><td>${r.bold?`<strong>${r.reading}</strong>`:r.reading}</td><td>${r.note}</td></tr>`).join("")+`</tbody></table>`);}
   $("printRoot").innerHTML=`<h1>${facility().name} — Ice Thickness Report</h1>`+
-    `<div class="pmeta">${sheet().name} · ${fmtDate(session().date)} · target ${fmtSet(S().target)} · ${rows.length}/${POINTS.length} logged</div>`+
+    `<div class="pmeta">${sheet().name} · ${fmtDate(session().date)} · target ${fmtSet(EF().target)} · ${rows.length}/${POINTS.length} logged</div>`+
     `<img src="${img}" class="pmap" alt="thickness map">`+
     `<div class="pstat"><strong>Average</strong> ${avg} &nbsp;·&nbsp; <strong>Zones</strong> L ${zt(za[0])} / N ${zt(za[1])} / R ${zt(za[2])} &nbsp;·&nbsp; <strong>Flood</strong> ${flood} below ${fmtSet(fb)} &nbsp;·&nbsp; <strong>Shave</strong> ${shave} at/above ${fmtSet(sa)}</div>`+
     `<div class="ptables">${tables.join("")}</div>`;
@@ -935,12 +941,12 @@ $("homeBtn").addEventListener("click",e=>{e.preventDefault();goHome();});
 function sessStats(s){const vals=Object.values(s.data).map(l=>decOf.get(l));if(!vals.length)return null;
   const avg=vals.reduce((a,b)=>a+b,0)/vals.length,ideal=vals.filter(v=>bandOf(v).key==="ideal").length,flood=vals.filter(v=>v<attFlood()).length;return{avg,ideal,n:vals.length,flood};}
 function sessStatsFor(s,f){const vals=Object.values(s.data).map(l=>decOf.get(l));if(!vals.length)return null;
-  const avg=vals.reduce((a,b)=>a+b,0)/vals.length,e=(f.settings&&f.settings.edges)||DEFAULT_EDGES;
-  const fb=(f.settings&&f.settings.tieAttention)?e[1]:((f.settings&&f.settings.floodBelow!=null)?f.settings.floodBelow:e[1]);
+  const avg=vals.reduce((a,b)=>a+b,0)/vals.length,ef=Records.settingsOf(f.settings,state),e=ef.edges;
+  const fb=ef.tieAttention?e[1]:ef.floodBelow;
   return{avg,flood:vals.filter(v=>v<fb).length,n:vals.length};}
 /* The launcher is where you say which rink you are at, and it holds the view
    across every facility. This screen is the one you are standing in. */
-function buildFleet(){const el=$("fleet");el.innerHTML="";let nSheets=0,nOver=0;const now=Date.now(),od=state.overdueDays??7;
+function buildFleet(){const el=$("fleet");el.innerHTML="";let nSheets=0,nOver=0;const now=Date.now(),od=Records.overdueDaysOf(facility(),state);
   [facility()].filter(Boolean).forEach(f=>{const grp=document.createElement("div");grp.className="fl-fac";
     const h=document.createElement("div");h.className="fl-fname";h.textContent=f.name;grp.appendChild(h);
     const rows=document.createElement("div");rows.className="fl-rows";
@@ -1005,7 +1011,7 @@ function drawHistory(withData){const c=$("histChart"),wrap=c.parentElement,cssW=
   const padL=8,padR=8,padT=14,padB=22,w=cssW-padL-padR,h=cssH-padT-padB;
   const inkDim=css.getPropertyValue("--ink-faint").trim()||"#5d7384",line=css.getPropertyValue("--line").trim()||"#273d4f";
   if(!withData.length){g.fillStyle=inkDim;g.font="12px "+(css.getPropertyValue("--sans")||"sans-serif");g.textAlign="center";g.fillText("No logged rounds yet — start one below.",cssW/2,cssH/2);return;}
-  const vals=withData.map(o=>o.st.avg),tgt=S().target;let lo=Math.min(tgt,...vals)-0.15,hi=Math.max(tgt,...vals)+0.15;if(hi-lo<0.4){const m=(hi+lo)/2;lo=m-0.25;hi=m+0.25;}
+  const vals=withData.map(o=>o.st.avg),tgt=EF().target;let lo=Math.min(tgt,...vals)-0.15,hi=Math.max(tgt,...vals)+0.15;if(hi-lo<0.4){const m=(hi+lo)/2;lo=m-0.25;hi=m+0.25;}
   const X=i=>padL+(withData.length===1?w/2:i/(withData.length-1)*w),Y=v=>padT+(1-(v-lo)/(hi-lo))*h;
   // target line
   g.strokeStyle=line;g.setLineDash([4,4]);g.beginPath();g.moveTo(padL,Y(tgt));g.lineTo(padL+w,Y(tgt));g.stroke();g.setLineDash([]);
@@ -1037,21 +1043,22 @@ $("gear").addEventListener("click",openSettings);$("gearHome").addEventListener(
 $("settingsDone").addEventListener("click",closeSettings);$("scrim").addEventListener("click",e=>{if(e.target===$("scrim"))closeSettings();});
 function buildSettings(){applyTheme();applyUnitButtons();
   $("prefFac").textContent=facility().name;$("prefFac2").textContent=facility().name;$("prefSheet").textContent=sheet().name;
-  $("overdueIn").value=state.overdueDays??7;
-  $("targetIn").value=S().target;$("targetFrac").textContent=fmtSet(S().target);
+  const ef=EF();
+  $("overdueIn").value=ef.overdueDays;
+  $("targetIn").value=ef.target;$("targetFrac").textContent=fmtSet(ef.target);
   const names=["Too thin below","Thin below","Ideal below","Thick below"],ed=$("edges");ed.innerHTML="";
-  S().edges.forEach((v,i)=>{const row=document.createElement("div");row.className="edge";
-    row.innerHTML=`<span class="sw" style="background:${BAND_META[i].c}"></span><span class="nm">${names[i]}</span><input type="number" step="0.0625" min="0.25" max="3" value="${v}"><span class="frac">${fmtSet(v)}</span>`;
-    const inp=row.querySelector("input"),frc=row.querySelector(".frac");inp.addEventListener("input",()=>{let nv=parseFloat(inp.value);if(isNaN(nv))return;S().edges[i]=nv;frc.textContent=fmtSet(nv);applySettings();});ed.appendChild(row);});
-  $("tieChk").checked=S().tieAttention;$("manualAtt").classList.toggle("on",!S().tieAttention);
-  $("floodIn").value=S().floodBelow;$("floodFrac").textContent=fmtSet(S().floodBelow);$("shaveIn").value=S().shaveAbove;$("shaveFrac").textContent=fmtSet(S().shaveAbove);
+  ef.edges.forEach((v,i)=>{const row=document.createElement("div");row.className="edge";
+    row.innerHTML=`<span class="sw" style="background:${BAND_META[i].c}"></span><span class="nm">${names[i]}</span><input type="number" step="0.125" min="0.5" max="3" value="${v}"><span class="frac">${fmtSet(v)}</span>`;
+    const inp=row.querySelector("input"),frc=row.querySelector(".frac");inp.addEventListener("input",()=>{let nv=parseFloat(inp.value);if(isNaN(nv))return;nv=Records.eighthNear(nv);editSettings().edges[i]=nv;frc.textContent=fmtSet(nv);applySettings();});ed.appendChild(row);});
+  $("tieChk").checked=ef.tieAttention;$("manualAtt").classList.toggle("on",!ef.tieAttention);
+  $("floodIn").value=ef.floodBelow;$("floodFrac").textContent=fmtSet(ef.floodBelow);$("shaveIn").value=ef.shaveAbove;$("shaveFrac").textContent=fmtSet(ef.shaveAbove);
   buildFacManage();buildSheetManage();buildRoundManage();updateBackupStatus();}
-$("targetIn").addEventListener("input",e=>{let v=parseFloat(e.target.value);if(isNaN(v))return;S().target=v;$("targetFrac").textContent=fmtSet(v);applySettings();});
-$("tieChk").addEventListener("change",e=>{S().tieAttention=e.target.checked;$("manualAtt").classList.toggle("on",!e.target.checked);applySettings();});
-$("floodIn").addEventListener("input",e=>{let v=parseFloat(e.target.value);if(isNaN(v))return;S().floodBelow=v;$("floodFrac").textContent=fmtSet(v);applySettings();});
-$("shaveIn").addEventListener("input",e=>{let v=parseFloat(e.target.value);if(isNaN(v))return;S().shaveAbove=v;$("shaveFrac").textContent=fmtSet(v);applySettings();});
-$("resetBands").addEventListener("click",()=>{S().edges=[...DEFAULT_EDGES];applySettings();buildSettings();});
-$("overdueIn").addEventListener("input",e=>{let v=parseInt(e.target.value,10);if(isNaN(v))return;state.overdueDays=Math.max(1,Math.min(90,v));persist();});
+$("targetIn").addEventListener("input",e=>{let v=parseFloat(e.target.value);if(isNaN(v))return;v=Records.eighthNear(v);editSettings().target=v;$("targetFrac").textContent=fmtSet(v);applySettings();});
+$("tieChk").addEventListener("change",e=>{editSettings().tieAttention=e.target.checked;$("manualAtt").classList.toggle("on",!e.target.checked);applySettings();});
+$("floodIn").addEventListener("input",e=>{let v=parseFloat(e.target.value);if(isNaN(v))return;v=Records.eighthNear(v);editSettings().floodBelow=v;$("floodFrac").textContent=fmtSet(v);applySettings();});
+$("shaveIn").addEventListener("input",e=>{let v=parseFloat(e.target.value);if(isNaN(v))return;v=Records.eighthNear(v);editSettings().shaveAbove=v;$("shaveFrac").textContent=fmtSet(v);applySettings();});
+$("resetBands").addEventListener("click",()=>{editSettings().edges=[...DEFAULT_EDGES];applySettings();buildSettings();});
+$("overdueIn").addEventListener("input",e=>{let v=parseInt(e.target.value,10);if(isNaN(v))return;editSettings().overdueDays=Math.max(1,Math.min(90,v));persist();});
 async function doBackupExport(){await Repo.save(state);
   const res=await exportFile(JSON.stringify(Repo.snapshot()),"application/json","ice_sheet_backup_"+todayISO()+".json");
   if(res!=="cancelled"){state.lastBackup=new Date().toISOString();persist();updateBackupStatus();updateBackupBanner();}}
@@ -1130,7 +1137,7 @@ function drawSurf(){const cw=surf.clientWidth,ch=surf.clientHeight;if(!cw)return
   sctx.strokeStyle="rgba(120,150,168,.4)";sctx.lineWidth=1;sctx.beginPath();[[0,0],[L,0],[L,W],[0,W]].forEach((c,i)=>{const p=project(c[0],c[1],0,cw,ch);i?sctx.lineTo(p[0],p[1]):sctx.moveTo(p[0],p[1]);});sctx.closePath();sctx.stroke();
   const quads=[];for(let j=0;j<SY;j++)for(let i=0;i<SX;i++){const v=(sample(i,j)+sample(i+1,j)+sample(i,j+1)+sample(i+1,j+1))/4,depth=Math.sin(azim)*(i/SX*L-L/2)+Math.cos(azim)*(j/SY*W-W/2);quads.push({i,j,v,depth});}
   quads.sort((a,b)=>a.depth-b.depth);
-  for(const q of quads){const{i,j}=q,z=v=>(v-S().target)*zScale,c00=sample(i,j),c10=sample(i+1,j),c11=sample(i+1,j+1),c01=sample(i,j+1),fx0=i/SX*L,fx1=(i+1)/SX*L,fy0=j/SY*W,fy1=(j+1)/SY*W;
+  for(const q of quads){const{i,j}=q,z=v=>(v-EF().target)*zScale,c00=sample(i,j),c10=sample(i+1,j),c11=sample(i+1,j+1),c01=sample(i,j+1),fx0=i/SX*L,fx1=(i+1)/SX*L,fy0=j/SY*W,fy1=(j+1)/SY*W;
     const p00=project(fx0,fy0,z(c00),cw,ch),p10=project(fx1,fy0,z(c10),cw,ch),p11=project(fx1,fy1,z(c11),cw,ch),p01=project(fx0,fy1,z(c01),cw,ch),b=bandOf(q.v),sh=Math.max(0,Math.min(1,0.55+(c10-c00+c11-c01)*0.6)),[r,g,bl]=rgbOf(b.color);
     sctx.fillStyle=`rgb(${r*sh|0},${g*sh|0},${bl*sh|0})`;sctx.beginPath();sctx.moveTo(p00[0],p00[1]);sctx.lineTo(p10[0],p10[1]);sctx.lineTo(p11[0],p11[1]);sctx.lineTo(p01[0],p01[1]);sctx.closePath();sctx.fill();sctx.strokeStyle="rgba(0,0,0,.10)";sctx.lineWidth=.5;sctx.stroke();}}
 function bindDrag(){surf.addEventListener("pointerdown",e=>{dragging=true;lastX=e.clientX;lastY=e.clientY;surf.setPointerCapture(e.pointerId);});
