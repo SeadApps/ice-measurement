@@ -87,6 +87,11 @@
      sheet on every device, and a device holding a stale copy would then look
      newest on all of them. */
   const cornerOf = s => s.Rft + s.Rin/12;
+  /* The boards a glass walk goes round: two sides, two ends, four quarter-corners. */
+  const perimeterOf = (L, W, R) => 2*(W - 2*R) + 2*(L - 2*R) + 2*Math.PI*R;
+  const shapePerimeter = s => perimeterOf(s.L, s.W, cornerOf(s));
+  /* Conway's glass survey, compiled into glass.html: 523.3599 ft of boards. */
+  const CONWAY_VERIFIED = 523.3599;
   function shapeFromSize(size){
     size = size || NHL_SIZE();
     /* Exactly 28 is the old preset's corner, the one that disagreed with the glass
@@ -203,7 +208,13 @@
      device holding a stale copy would then look newest on all of them. Records
      pick it up when they are next really edited; management's backfill tags
      the rest. */
-  const bodyOf=r=>{const c=Object.assign({},r);delete c.updatedAt;delete c.deleted;delete c.changedBy;delete c.fac;delete c.seed;return JSON.stringify(c);};
+  /* Compared with the keys in a fixed order. Postgres jsonb does not keep the order a
+     record was written in (it sorts keys by length, then by bytes), so a record pulled
+     from the real server comes back reordered. Compared as written, the first save on any
+     device after a pull would see every facility and sheet as changed and restamp the
+     lot, and nothing on screen would show it. */
+  const canon=v=>Array.isArray(v)?v.map(canon):(v&&typeof v==="object")?Object.keys(v).sort().reduce((o,k)=>{o[k]=canon(v[k]);return o;},{}):v;
+  const bodyOf=r=>{const c=Object.assign({},r);delete c.updatedAt;delete c.deleted;delete c.changedBy;delete c.fac;delete c.seed;return JSON.stringify(canon(c));};
 
   /* A session carries two nested maps - the readings and the per-point notes -
      and Object.assign copies only the reference to them. That left the snapshot
@@ -328,16 +339,31 @@
     const v2 = await rd("glass_record_v2");
     if(!v2) return {known:false};
     const bound = v2.boundSheetId === sheetId;
-    const layout = bound || !!((v2.specs && v2.specs[sheetId]) || (v2.built && v2.built[sheetId]));
+    const spec = v2.specs && v2.specs[sheetId], drawn = v2.built && v2.built[sheetId];
+    const layout = bound || !!(spec || drawn);
+    /* The boards the glass was last built and checked against: the walk's own
+       dimensions, the drawing's recorded perimeter, or Conway's survey. */
+    const verified = bound ? CONWAY_VERIFIED
+      : spec && isFinite(spec.L) && isFinite(spec.W) && isFinite(spec.R) ? perimeterOf(spec.L, spec.W, spec.R)
+      : drawn && drawn.rink && isFinite(drawn.rink.perimeter_ft) ? drawn.rink.perimeter_ft : null;
     let replace = 0, plexi = 0;
     (bound ? [sheetId,"legacy"] : [sheetId]).forEach(b => Object.values((v2.records||{})[b]||{}).forEach(r => {
       if(r && r.status === "replace") replace++; else if(r && r.status === "plexi") plexi++; }));
-    return {known:true, layout, replace, plexi};
+    return {known:true, layout, replace, plexi, verified};
   }
 
   const Repo = {
     async save(st,opts){
       const d=decompose(st);
+      /* A sheet that has been removed is no longer in anyone's state, so neither are its
+         rounds, and a save treats whatever is missing from the state as deleted. That would
+         tombstone every reading on a hidden sheet the next time any page saved. Rounds of a
+         hidden sheet are carried over exactly as they are, so removing a sheet really does
+         keep its readings, and bringing it back finds them. */
+      for(const id in SNAP.se){
+        const z=SNAP.se[id], sh=z&&!z.deleted&&SNAP.sh[z.sheetId];
+        if(sh&&sh.deleted&&sh.name&&!(id in d.se)) d.se[id]=z;
+      }
       SNAP={fac:stampChanges(d.fac,SNAP.fac),sh:stampChanges(d.sh,SNAP.sh),se:stampChanges(d.se,SNAP.se)};
       if(opts&&opts.seed) [SNAP.fac,SNAP.sh,SNAP.se].forEach(m=>{for(const id in m) if(m[id]&&!m[id].deleted) m[id].seed=true;});
       const prefs={};PREF_KEYS.forEach(k=>prefs[k]=st[k]);
@@ -536,6 +562,42 @@
       return {changed:true};
     },
 
+    /* Hide a sheet from every list without losing anything. The tombstone keeps the
+       sheet's whole body (name, shape, facility tag), and its rounds are left alone:
+       they stay live, just unreachable until it comes back. That is why this does not
+       go through save(), which would tombstone every round that is missing from the
+       state, readings and all. A facility keeps at least one sheet, because Ice
+       reaches straight for the first one. */
+    async removeSheet(sheetId){
+      await this.load();
+      const rec = SNAP.sh[sheetId];
+      if(!rec || rec.deleted) return {changed:false, error:"no such sheet"};
+      const live = Object.values(SNAP.sh).filter(x => x && !x.deleted && x.facilityId === rec.facilityId);
+      if(live.length < 2) return {changed:false, error:"a facility needs at least one sheet"};
+      SNAP.sh[sheetId] = Object.assign({}, rec, {deleted:true, updatedAt:nowISO()});
+      await this.persistMaps();
+      return {changed:true};
+    },
+    /* The sheets that have been removed, for a page that offers to bring them back. Reads
+       local storage and leaves the snapshot alone, like read(): it cannot write a thing. */
+    async readRemoved(){
+      const sh = await rd(K.sh);
+      return Object.values(sh || {}).filter(x => x && x.deleted && x.name && x.facilityId);
+    },
+    /* Bring a removed sheet back, with its rounds, if its facility is still there. */
+    async restoreSheet(sheetId){
+      await this.load();
+      const rec = SNAP.sh[sheetId];
+      if(!rec || !rec.deleted) return {changed:false, error:"that sheet is not removed"};
+      if(!rec.name || !rec.facilityId) return {changed:false, error:"that sheet cannot be brought back"};
+      const f = SNAP.fac[rec.facilityId];
+      if(!f || f.deleted) return {changed:false, error:"its facility is gone"};
+      const back = Object.assign({}, rec, {updatedAt:nowISO()}); delete back.deleted;
+      SNAP.sh[sheetId] = back;
+      await this.persistMaps();
+      return {changed:true};
+    },
+
     /* What migrating the settings would do, without doing it. Management's
        "preview, then approve" step, like the shapes. */
     async previewSettings(){
@@ -572,7 +634,7 @@
   global.Records = { KEYS:K, PREF_KEYS, Store, Repo,
                      decompose, reassemble, nowISO, hasReadings, lastRound, isOverdue,
                      RINK_SIZES, NHL_SIZE, DEFAULT_EDGES, SETTINGS_VERSION, eighthUp, eighthNear,
-                     readingValue, trendOf, glassSummary,
+                     readingValue, trendOf, glassSummary, perimeterOf, shapePerimeter,
                      settingsOf, upgradeSettings, settingsNeedUpgrade, overdueDaysOf,
                      STD_CORNER, shapeFromSize, shapeOf, sizeOf, compareShape, shapeProblem, SHAPE_TOLERANCE,
                      uid, newSession, newSheet, defaultSettings, newFacility };

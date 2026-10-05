@@ -36,6 +36,8 @@ async function seed(who) {
     rec('facility', 'f2', 'f2', { name: 'Flynn Rink', ord: 1, settings: set(3), updatedAt: ago(30) }),
     rec('sheet', 's2', 'f2', { facilityId: 'f2', name: 'Standard', ord: 0, size: sz, updatedAt: ago(30) }),
     rec('sheet', 's3', 'f2', { facilityId: 'f2', name: 'Mini', ord: 1, size: { L: 120, W: 60, corner: 20 }, updatedAt: ago(30) }),
+    /* every real sheet is made with an empty round, and Ice reaches straight for it */
+    rec('session', 'z4', 'f2', { sheetId: 's3', ord: 0, date: ago(1), mode: 'moderate', data: {}, notes: {}, updatedAt: ago(1) }),
     rec('session', 'z3', 'f2', { sheetId: 's2', ord: 0, date: ago(9), mode: 'moderate', data: { 1: '1 1/4"' }, notes: {}, updatedAt: ago(9) })]) });
   return res.ok;
 }
@@ -44,7 +46,7 @@ async function device(browser, width) {
   const ctx = await browser.newContext({ viewport: { width: width || 1280, height: 900 }, serviceWorkers: 'block' });
   await ctx.addInitScript(c => { window.__SYNC_CONFIG__ = c; }, { url: B, anon: 'test' });
   const p = await ctx.newPage();
-  p.on('pageerror', e => console.log('  !! pageerror: ' + String(e).split('\n')[0]));
+  p.on('pageerror', e => console.log('  !! pageerror: ' + String(e.stack || e).split('\n').slice(0, 4).join(' | ')));
   p.on('dialog', d => d.accept());
   return { ctx, p };
 }

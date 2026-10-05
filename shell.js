@@ -84,6 +84,10 @@
   var canSee = function (fid) { return !SYNC || SYNC.canSee(fid); };
   var canManage = function () { return !SYNC || SYNC.canManage(); };
   var person = function () { return SYNC ? SYNC.person() : null; };
+  /* Can this person change things right now? Management (or nobody signed in as a person
+     yet), and, once people exist, with the editing window open. A page greys its own
+     controls from this; the server enforces it regardless. */
+  function canEdit() { return canManage() && (!SYNC || !SYNC.person() || SYNC.isEditing()); }
   /* The Staff page needs people to exist and the person to be Management. */
   function isManager() { return !!(SYNC && SYNC.person() && SYNC.canManage()); }
 
@@ -96,7 +100,9 @@
       var sheets = facs[i].sheets || [];
       for (var j = 0; j < sheets.length; j++) glass[sheets[j].id] = await Records.glassSummary(sheets[j].id);
     }
-    return { prefs: (st && st.prefs) || {}, facilities: facs, sessions: (st && st.sessions) || [], glass: glass };
+    var live = {}; facs.forEach(function (f) { live[f.id] = true; });
+    var removed = (await Repo.readRemoved()).filter(function (r) { return live[r.facilityId]; });
+    return { prefs: (st && st.prefs) || {}, facilities: facs, sessions: (st && st.sessions) || [], glass: glass, removed: removed };
   }
 
   /* How a sheet is doing. The overdue rule is the store's, read from the
@@ -286,6 +292,16 @@
     pageEl.appendChild(home.render(route, data, Shell));
   }
 
+  /* Redraw the page and leave the chrome alone: for a page whose own state changed. */
+  function repaint() {
+    if (!pageEl || !data) return;
+    /* The data can have moved on since this route was resolved (a sheet was removed here or
+       on another device), so check it still names something before drawing it. */
+    if (!resolve(route)) { refresh(); return; }
+    pageEl.replaceChildren();
+    pageEl.appendChild(home.render(route, data, Shell));
+  }
+
   async function refresh() {
     if (busy) { again = true; return; }
     busy = true;
@@ -346,13 +362,13 @@
       statusEl = SYNC.statusEl();
       unlockEl = SYNC.unlockEl ? SYNC.unlockEl() : null;
       SYNC.lockControls(["#addFac", "#addSheet", "#addGo"]);
-      SYNC.onEditing(function () { /* the lock is a body class; the buttons grey on their own */ });
+      SYNC.onEditing(function () { repaint(); });          // the window opened or closed: controls that grey themselves redraw
     }
     await refresh();
   }
 
   var Shell = {
-    mount: mount, refresh: refresh, go: go, h: h, status: status, setHere: setHere, appHref: appHref,
+    mount: mount, refresh: refresh, repaint: repaint, canEdit: canEdit, go: go, h: h, status: status, setHere: setHere, appHref: appHref,
     layout: function () { return layoutName; },
     onLayout: function (cb) { layoutCbs.push(cb); cb(layoutName); },
     route: function () { return route; }, data: function () { return data; },

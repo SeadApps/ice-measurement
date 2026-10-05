@@ -103,6 +103,20 @@ function check(w, r){
   return null;
 }
 
+/* Postgres jsonb does not keep the order keys were written in: it stores them sorted by
+   length, then by bytes, and PostgREST hands them back that way. Returning bodies like
+   that is what makes a test able to notice code that depends on key order, which the
+   insertion-ordered objects of a plain fake never could. */
+function jsonb(v){
+  if (Array.isArray(v)) return v.map(jsonb);
+  if (v && typeof v === 'object'){
+    const o = {};
+    Object.keys(v).sort((a,b)=> a.length - b.length || (a < b ? -1 : a > b ? 1 : 0)).forEach(k => { o[k] = jsonb(v[k]); });
+    return o;
+  }
+  return v;
+}
+
 function authToken(user, kind, ttl){
   const at = 'at_'+Math.random().toString(36).slice(2), rt = 'rt_'+Math.random().toString(36).slice(2);
   tokens.set(at, {exp:Date.now()+ttl*1000, user, kind});
@@ -265,7 +279,7 @@ const server = http.createServer(async (req,res)=>{
         const key = r.kind+' '+r.id, old = rows.get(key);
         /* What the trigger does: the stamp comes from the session, never from
            the row, and a changedBy smuggled into the body is thrown away. */
-        const nb = Object.assign({}, r.body || {});
+        const nb = jsonb(Object.assign({}, r.body || {}));
         delete nb.changedBy; delete nb.changed_by;
         const person = w.kind === 'person' ? w.user : null;
         const row = {id:r.id, kind:r.kind, body:nb, deleted:!!r.deleted, updated_at:stamp(),

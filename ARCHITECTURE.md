@@ -124,6 +124,18 @@ button and again on the chosen file, say `Sync.restoreMessage`, and merge nothin
 backup can hold any facility, and the server would refuse a Staff person's writes to
 the ones they were not given record by record.
 
+**Hidden sheets keep their rounds.** A hidden sheet is not in anyone's state, so neither are its
+rounds, and `save()` treats whatever is missing from the state as deleted. `save()` therefore
+carries over, untouched, every round whose sheet is hidden; without that, the next page that saved
+(Ice, say) tombstoned every reading on the hidden sheet. `removeSheet` itself bypasses `save()` for
+the same reason.
+
+**Records are compared with their keys in a fixed order.** Postgres `jsonb` does not keep the order
+keys were written in (it sorts them by length, then bytes) and PostgREST returns them that way. Compared
+as written, the first save after a pull saw every facility and sheet as changed and restamped the lot,
+which no test could see because the fake server kept insertion order. `bodyOf` now canonicalises key
+order, and `dev/fake-supabase.js` returns bodies in `jsonb` order so a regression shows.
+
 **Seeds.** A device with no records invents a facility, a sheet and a round
 (`freshState()` in `ice.html`) so there is something to draw. That is where it
 starts, not something anybody observed, so `Repo.save(state, {seed:true})` marks
@@ -554,6 +566,7 @@ node dev/overduetest.js    # 16 checks: overdue days belong to the facility; Ice
 node dev/routetest.js       # 40 checks: the shell's addresses, back/forward, a Staff person and a shared iPad, the apps follow where you are
 node dev/shelltest.js       # 91 checks: the chrome at 390/820/1024/1280, breakpoints, menus, theme, tab bar, rail
 node dev/facilitiestest.js  # 45 checks: Facilities and Sheets agree with Ice, trends, adding, nothing restamped, an empty device, people
+node dev/settingstest.js    # 68 checks: Sheet settings writes name and shape and nothing else; draft, validation, glass check, Staff read-only, remove and undo; Ice draws the new outline
 node dev/restoretest.js    # 12 checks: restoring a backup (Ice) or a record file (Glass) is Management's; Staff are told and nothing merges
 node dev/widthstest.js     # 25 checks: a facility's one-tap widths (default 43/48, no record until changed); only Management resolves or reopens a flag
 ```
@@ -627,7 +640,18 @@ replaces the launcher, which lives on as `launcher.html` (unlinked, still tested
   shell cannot restamp a record by looking. `Records.trendOf()` and `Records.glassSummary()`
   are the shared readers behind the sheet rows; `Records.readingValue()` is the one reading
   parser (checked against Ice's on every label).
-- **Not yet**: Sheet settings and Staff pages (D2b), the backup menu items and units in the
+- **Sheet settings** (`#/f/FID/s/SID/settings`, reached from a button on each sheet row): the
+  sheet's name and shape, entered once for both apps. It keeps a draft while the numbers are
+  stepped and writes nothing until Save, which is one `Repo.updateSheet` (all or none). Corner
+  in half-inch steps, a bad corner or an empty name stops the save, and a glass check says when
+  the boards no longer match what the glass was built against (`Records.glassSummary().verified`
+  against `Records.shapePerimeter`; Conway's survey is 523.36 ft). Read-only for Staff and for
+  Management until the editing window opens; it redraws when the window opens or closes.
+  Remove hides a sheet (`Repo.removeSheet`: a tombstone that keeps the sheet's whole record),
+  never the last one in a facility, with an in-page confirmation and an Undo; Management can
+  bring any hidden sheet back from a *Removed sheets* list on the Sheets page
+  (`Repo.restoreSheet`, `Repo.readRemoved`).
+- **Not yet**: the Staff page (D2b), the backup menu items and units in the
   account menu, and the bar inside Ice and Glass. The Ice Board fonts are system stacks, so
   the app stays offline-capable and makes no outside request.
 

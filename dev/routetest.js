@@ -37,7 +37,7 @@ ok('with both of its sheets', (await G.p.$$('#sheetRows .srow')).length === 2);
 await at('#/f/f2/s/s3');
 ok('#/f/FID/s/SID is the same page with that sheet in hand', await page() === 'pageSheets' && /Mini/.test(await text(G.p, '#sheetMenu')), await text(G.p, '#sheetMenu'));
 await at('#/f/f2/s/s2/settings');
-ok('/settings is the sheet settings page', await page() === 'pageHolding' && /Sheet settings/.test(await text(G.p, '#page h2')));
+ok('/settings is the sheet settings page', await page() === 'pageSettings' && /Sheet settings/.test(await text(G.p, '#page h2')) && /Flynn Rink/.test(await text(G.p, '#page .crumb')));
 
 /* ---- an address that names nothing ---------------------------------------------------- */
 const msgs = [];
