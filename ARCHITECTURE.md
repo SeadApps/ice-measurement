@@ -444,8 +444,12 @@ An old sheet is *read* as though it had a shape (`Records.shapeOf`) and only gai
 one when deliberately migrated or edited, for the same reason `fac` is not derived
 on write. The old `size` stays on the record, in step, for a device on the older
 build. `Repo.previewShapes()` shows what a migration would do, `backfillShapes()`
-does it, and `updateShape()` is what the glass builder calls after comparing its
-own measurement (`compareShape()`) with the sheet's.
+does it. `Repo.updateSheet(id, {name?, shape?})` is the one way a sheet's own fields
+change (the Sheet settings page, D2): it validates everything first and applies
+nothing if any of it is bad, saves through `load()`/`save()` so only that sheet is
+restamped, and keeps `size` in step. `updateShape()` is a shape-only call to it, what
+the glass builder uses after comparing its own measurement (`compareShape()`) with
+the sheet's.
 
 ---
 
@@ -511,7 +515,7 @@ node dev/editlocktest.js   # 62 checks: writes refused until the editing code; t
 node dev/scopetest.js      # 53 checks: a Staff person sees and writes only their facilities; the tag; the per-person cursor
 node dev/activitytest.js   # 48 checks: one log row per write with old and new, append-only, Management only
 node dev/handovertest.js   # 40 checks: changing hands on a shared iPad, offline, and the idle sign-out
-node dev/shapetest.js      # 52 checks: one shape per sheet, the migration, the builder's compare and update
+node dev/shapetest.js      # 69 checks: one shape per sheet, the migration, the builder's compare and update, updateSheet
 node dev/controlstest.js   # 35 checks: edit controls lock until unlocked; what only reads stays open
 node dev/whotest.js        # 19 checks: nobody types their name; the server's stamp is shown
 node dev/seedtest.js       # 20 checks: a fresh device's invented facility is a seed: never sent while untouched, sent whole when edited, dropped when real ones arrive

@@ -400,27 +400,49 @@
       return n;
     },
 
-    /* The glass builder measured the sheet and the person agreed to update it.
-       An ordinary sheet edit: stamped, tagged and synced like any other, and
-       nothing inside a round is touched. The old size field is kept in step for
-       a device on the older build. */
-    async updateShape(sheetId, patch){
+    /* The one way a sheet's own fields change: its name and its shape. An
+       ordinary sheet edit, so it is stamped, tagged and synced like any other and
+       nothing inside a round is touched. It goes through load()/save() for the
+       reason addSheet() does: a write built on read() would restamp every record
+       on the device.
+
+       patch is {name?, shape?}, and shape may be partial - it is laid over the
+       sheet's current one. Nothing is applied unless all of it is valid, so a good
+       name never lands beside a shape that cannot be drawn. The older size field is
+       kept in step for a device on the older build. Returns {changed} or
+       {changed:false, error}. */
+    async updateSheet(sheetId, patch){
+      patch = patch || {};
       const st = await this.load(); if(!st) return {changed:false, error:"no records"};
       let sheet = null;
       st.facilities.forEach(f => (f.sheets||[]).forEach(x => { if(x.id === sheetId) sheet = x; }));
       if(!sheet) return {changed:false, error:"no such sheet"};
-      const cur = shapeOf(sheet), next = Object.assign({}, cur, patch||{});
-      const bad = shapeProblem(next);
-      if(bad) return {changed:false, error:bad};
-      const same = ["L","W","Rft","Rin","start","turn","flip"].every(k => cur[k] === next[k]);
-      if(same && sheet.shape) return {changed:false};
-      sheet.shape = next;
-      const preset = RINK_SIZES.find(r => r.L === next.L && r.W === next.W && Math.abs(r.corner - cornerOf(next)) < 1e-6);
-      sheet.size = preset ? Object.assign({}, preset)
-                          : {id:"custom", name:"Custom", L:next.L, W:next.W, corner:cornerOf(next)};
+      let changed = false;
+      if("name" in patch){
+        const name = typeof patch.name === "string" ? patch.name.trim() : "";
+        if(!name) return {changed:false, error:"a sheet needs a name"};
+        if(name !== sheet.name){ sheet.name = name; changed = true; }
+      }
+      if("shape" in patch){
+        const cur = shapeOf(sheet), next = Object.assign({}, cur, patch.shape||{});
+        const bad = shapeProblem(next);
+        if(bad) return {changed:false, error:bad};
+        const same = ["L","W","Rft","Rin","start","turn","flip"].every(k => cur[k] === next[k]);
+        if(!(same && sheet.shape)){
+          sheet.shape = next;
+          const preset = RINK_SIZES.find(r => r.L === next.L && r.W === next.W && Math.abs(r.corner - cornerOf(next)) < 1e-6);
+          sheet.size = preset ? Object.assign({}, preset)
+                              : {id:"custom", name:"Custom", L:next.L, W:next.W, corner:cornerOf(next)};
+          changed = true;
+        }
+      }
+      if(!changed) return {changed:false};
       await this.save(st);
       return {changed:true};
     },
+
+    /* The glass builder measured the sheet and the person agreed to update it. */
+    updateShape(sheetId, patch){ return this.updateSheet(sheetId, {shape: patch||{}}); },
 
     snapshot(){return {format:"rink-ice-v4",exportedAt:nowISO(),
       facilities:SNAP.fac,sheets:SNAP.sh,sessions:SNAP.se};}

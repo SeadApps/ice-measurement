@@ -163,6 +163,47 @@ await A.p.evaluate(()=>window.Sync.sync('t')); await sleep(2500);
 ok('on the server the readings were not rewritten', srvSess0===JSON.stringify((await rows()).filter(r=>r.kind==='session').map(r=>[r.id,r.updated_at]).sort()));
 ok('but the sheet was', (await rows()).find(r=>r.kind==='sheet').body.shape.L===200.25);
 
+/* ---- updateSheet: the name and the shape, through one path ------------------------ */
+const facId=Object.values(await store(A.p,'ice_v4_facilities')).filter(f=>!f.deleted)[0].id;
+const two=await R(fid=>window.Records.Repo.addSheet({facilityId:fid,name:'Second sheet'}),facId);
+await A.p.evaluate(()=>window.Sync.sync('t')); await sleep(1500);
+const sessOf=async sid=>JSON.stringify((await rows()).filter(r=>r.kind==='session'&&r.body.sheetId===sid).map(r=>[r.id,r.updated_at]).sort());
+const rounds0=await sessOf(id);
+const U=(sid,patch)=>R(a=>window.Records.Repo.updateSheet(a.sid,a.patch),{sid,patch});
+const b4=await stampsOf(), nm0=(await firstSheet(A.p)).name;
+let u=await U(id,{name:'  Rink 1  '});
+ok('renaming a sheet trims and saves the name', u.changed===true && (await sheetsOf(A.p))[id].name==='Rink 1', JSON.stringify(u));
+const af=await stampsOf(), mv=Object.keys(af).filter(k=>af[k]!==b4[k]);
+ok('only that sheet is restamped: not the other sheet, not a round, not the facility', mv.length===1 && mv[0]==='ice_v4_sheets'+id, JSON.stringify(mv));
+ok('the shape was left alone', (await sheetsOf(A.p))[id].shape.L===200.25);
+ok('the same name again changes nothing', (await U(id,{name:'Rink 1'})).changed===false && JSON.stringify(af)===JSON.stringify(await stampsOf()));
+ok('an empty name is refused, and so is a blank one', (await U(id,{name:''})).changed===false && (await U(id,{name:'   '})).changed===false && (await sheetsOf(A.p))[id].name==='Rink 1');
+ok('a name that is not text is refused', (await U(id,{name:42})).changed===false && (await U(id,{name:null})).changed===false);
+ok('an unknown sheet is refused', (await U('nope',{name:'x'})).changed===false);
+ok('an empty patch changes nothing', (await U(id,{})).changed===false && (await U(id)).changed===false);
+
+u=await U(id,{name:'Rink One',shape:{L:200,W:90,Rft:27,Rin:2.5}});
+const both=(await sheetsOf(A.p))[id];
+ok('name and shape change together in one save', u.changed===true && both.name==='Rink One' && both.shape.W===90 && both.shape.Rin===2.5, JSON.stringify(both.shape));
+ok('with the older size kept in step', near(both.size.W,90) && near(both.size.corner,27+2.5/12));
+const snap=JSON.stringify(await sheetsOf(A.p));
+u=await U(id,{name:'Should not stick',shape:{L:10,W:10,Rft:27,Rin:2}});
+ok('a good name beside a shape that cannot be drawn applies neither', u.changed===false && !!u.error && JSON.stringify(await sheetsOf(A.p))===snap, JSON.stringify(u));
+u=await U(id,{name:'Should not stick',shape:{Rin:2.25}});
+ok('nor beside a corner that is not in half inches', u.changed===false && JSON.stringify(await sheetsOf(A.p))===snap, JSON.stringify(u));
+ok('renaming one sheet leaves the other as it was', (await sheetsOf(A.p))[two.sheetId].name==='Second sheet');
+ok('updateShape is the same call as a shape-only updateSheet', (await R(sid=>window.Records.Repo.updateShape(sid,{L:200,W:90,Rft:27,Rin:2.5}),id)).changed===false);
+
+await A.p.evaluate(()=>window.Sync.sync('t')); await sleep(2500);
+const srvSheet=(await rows()).find(r=>r.kind==='sheet'&&r.id===id);
+ok('the rename and shape reach the server together', srvSheet.body.name==='Rink One' && srvSheet.body.shape.W===90 && srvSheet.body.fac===facId, JSON.stringify(srvSheet.body));
+ok('and its rounds were not rewritten', rounds0===await sessOf(id));
+const idle=JSON.stringify((await rows()).map(r=>[r.id,r.updated_at]).sort());
+await A.p.evaluate(()=>window.Sync.sync('t')); await sleep(1500);
+ok('an idle device afterwards restamps nothing', idle===JSON.stringify((await rows()).map(r=>[r.id,r.updated_at]).sort()));
+await U(id,{shape:{L:200.25,W:85,Rft:27,Rin:3},name:nm0});     // back to what the checks below expect
+await A.p.evaluate(()=>window.Sync.sync('t')); await sleep(2000);
+
 /* a second device receives the new shape and draws it */
 const D=await device(b,'D');
 await D.p.goto(B+'/ice.html'); await sleep(1200);
