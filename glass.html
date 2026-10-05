@@ -452,10 +452,9 @@ document.documentElement.setAttribute("data-theme",_t==="light"?"light":"dark");
 </div>
 
 <div class="rail" id="rail"></div>
-<div class="whoami">
-  <label for="who">Marked by</label>
-  <input id="who" type="text" placeholder="your name" autocomplete="name">
-  <span id="whonote"></span>
+<div class="whoami" id="whoami" style="display:none">
+  <label>Marked by</label>
+  <b id="whoname"></b>
 </div>
 
 <section class="card">
@@ -1339,7 +1338,14 @@ const Store = Records.Store;      // the same wrapper all three pages had a copy
 const KEY = 'glass_record_v2', KEY_V1 = 'glass_record_v1';
 function say(msg){ const n = document.getElementById('savenote'); if(n) n.textContent = msg; }
 function stamp(){ return new Date().toISOString().slice(0,10); }
-let who = '';
+/* Nobody types their name any more. The server stamps whoever is signed in on every change, and
+   this is only that name, for showing. Marks from before keep the name that was typed on them. */
+const whoName = () => { const p = window.Sync && window.Sync.person && window.Sync.person(); return p ? p.name : ''; };
+function paintWho(){
+  const n = whoName(), box = document.getElementById('whoami');
+  document.getElementById('whoname').textContent = n;
+  if(box) box.style.display = n ? '' : 'none';
+}
 let records = {};             // bucket -> panelId -> {status,note,by,at,updatedAt}
 let facilities = {};          // facilityId -> {id,name,ord} - the Ice app owns these
 let sheets = {};              // sheetId -> {id,facilityId,name,ord} - the Ice app owns these too
@@ -1456,14 +1462,16 @@ function addMovement(w, h, thk, mat, qty, note){
   if(!fac || !qty) return null;
   const id = mvId();
   SPARES[id] = {id, fac, w:+w, h:+h, thk:String(thk), mat:matOf({mat:mat}), qty:+qty,
-                note:note || '', by:who || '', at:stamp(), updatedAt:nowISO()};
+                note:note || '', changedBy:whoName(), at:stamp(), updatedAt:nowISO()};
   return id;
 }
 /* Undoing one is a tombstone rather than a deletion, or the next pull hands it
    straight back - the same rule the removed layouts follow. */
 function dropMovement(id){
   if(!SPARES[id]) return false;
-  SPARES[id] = {id, deleted:true, updatedAt:nowISO()};
+  /* The facility stays on the tombstone: without it the server could not tell
+     whose it was, and would show it to nobody but management. */
+  SPARES[id] = {id, fac:SPARES[id].fac, deleted:true, updatedAt:nowISO()};
   return true;
 }
 
@@ -1771,7 +1779,7 @@ async function loadSurfaces(){
 }
 
 const SYNC=(typeof Sync!=="undefined")?Sync:null;   // absent if sync.js failed to load; the page still works locally
-const snapshot = () => JSON.stringify({records, who, boundSheetId, pendingFacilityId, bindingAt,
+const snapshot = () => JSON.stringify({records, boundSheetId, pendingFacilityId, bindingAt,
                                        activeBucket, names: FACILITY_NAMES, at: LAYOUT_AT, gone: LAYOUT_GONE,
                                        counts: GLASS_COUNTS(), spares: SPARES,
                                        specs: BUILT_SPECS(), built: BUILT_DRAWN()});
@@ -1781,7 +1789,7 @@ async function restore(){
   let saved = null;
   try{ saved = JSON.parse(await Store.get(KEY) || 'null'); }catch(e){}
   if(saved && saved.records){
-    records = saved.records; who = saved.who || '';
+    records = saved.records;
     /* A device upgrading from the facility-bound build has boundFacilityId and
        no sheets yet. Hold it pending rather than guess - the next pull resolves
        it to that facility's first surface. */
@@ -1818,21 +1826,21 @@ async function restore(){
       for(const id in seed) seed[id].seed = true;
       records[LEGACY] = seed;
     }
-    who = (v1 && v1.who) || '';
     /* v1 is left untouched as a fallback, the same way the Ice app leaves
        ice_sheet_v3 alone after moving to records. */
   }
   const legacy = bucketOf(LEGACY);
   for(const id in legacy){ if(legacy[id] && !legacy[id].updatedAt) legacy[id].updatedAt = legacy[id].at || '1970-01-01'; }
   setBucket(activeBucket);
-  document.getElementById('who').value = who;
+  paintWho();
 }
 const nowISO = () => new Date().toISOString();
 const stampOf = r => (r && (r.updatedAt || r.at)) || '';   // full timestamp, else the older date-only field
 function set(id, patch, quiet){
   const was = (state[id] && state[id].status) || 'ok';
   const next = Object.assign({status:'ok',note:''}, state[id], patch,
-                             {by: who || '', at: stamp(), updatedAt: nowISO()});
+                             {changedBy: whoName(), at: stamp(), updatedAt: nowISO()});
+  delete next.by;              // the name typed on an earlier mark is not this person's
   delete next.seed;            // somebody has touched it, so it is an observation now
   state[id] = next;
   /* A pane fitted comes off the shelf, and which pile it comes off depends on
@@ -1878,7 +1886,7 @@ document.getElementById('csv').addEventListener('click', ()=>{
     rows.push([p.id.replace(/^0+/,''), p.section, p.width_in, glassHeightOf(p), p.thickness,
                STATUS[st(p.id)].label,
                covered ? 'From stock' : (patch ? 'Order — plexi to patch' : 'Order'),
-               nt(p.id), s.by||'', s.at||'']);
+               nt(p.id), s.changedBy||s.by||'', s.at||'']);
   });
   if(!cov.rows.length) rows.push(['—','Nothing flagged yet','','','','','','','','']);
   else {
@@ -1900,7 +1908,7 @@ document.getElementById('csv').addEventListener('click', ()=>{
 });
 document.getElementById('save').addEventListener('click', ()=>{
   grab(`conway-glass-record-${stamp()}.json`,
-       JSON.stringify({rink:facilityName(activeBucket), saved:stamp(), by:who, panels:state}, null, 2),
+       JSON.stringify({rink:facilityName(activeBucket), saved:stamp(), by:whoName(), panels:state}, null, 2),
        'application/json');
   say('Record file saved — send it on to whoever keeps the master.');
 });
@@ -1958,7 +1966,6 @@ document.getElementById('spAdd').addEventListener('click', ()=>{
   store(); spares(); table();
   say(`${qty > 0 ? 'Received' : 'Taken off'} ${Math.abs(qty)} × ${sizeLabel({w, h, thk, mat:spMat})}.`);
 });
-document.getElementById('who').addEventListener('input', e=>{ who = e.target.value.trim(); store(); });
 
 document.getElementById('q').addEventListener('input', table);
 document.addEventListener('keydown', e=>{ if(e.key==='Escape' && sel) select(sel); });
@@ -2386,7 +2393,8 @@ async function bldSave(){
         const m=records[bucket];
         for(const pid in m){
           if(m[pid] && m[pid].seed) continue;      // a starting point, not an observation
-          const rid=recId(bucket,pid); panels[rid]=Object.assign({}, m[pid], {id:rid});
+          const rid=recId(bucket,pid), fac=facilityOfBucket(bucket);
+          panels[rid]=Object.assign({}, m[pid], {id:rid}, fac?{fac:fac}:{});
         }
       }
       /* facilityId rides along beside sheetId so a device still on the
@@ -2397,6 +2405,7 @@ async function bldSave(){
         const sh=sheets[boundSheetId];
         binding[LEGACY]={id:LEGACY, sheetId:boundSheetId,
                          facilityId:(sh&&sh.facilityId)||null, updatedAt:bindingAt};
+        if(sh&&sh.facilityId) binding[LEGACY].fac=sh.facilityId;    // what the server filters on
       }
       /* The walk, not the drawing. Conway's layout is compiled into this file
          and is never sent; a rink with no spec has nothing to send. */
@@ -2406,10 +2415,14 @@ async function bldSave(){
         const lay=LAYOUTS[k];
         if(!lay || !lay.spec) continue;
         layouts[k]={id:k, name:FACILITY_NAMES[k]||'', spec:lay.spec, updatedAt:LAYOUT_AT[k]||''};
+        const lf=facilityOfBucket(k); if(lf) layouts[k].fac=lf;
       }
       /* Removals travel as tombstones. Dropping one quietly would only mean
          the next pull handed it back. */
-      for(const k in LAYOUT_GONE) layouts[k]={id:k, deleted:true, updatedAt:LAYOUT_GONE[k]};
+      for(const k in LAYOUT_GONE){
+        layouts[k]={id:k, deleted:true, updatedAt:LAYOUT_GONE[k]};
+        const gf=facilityOfBucket(k); if(gf) layouts[k].fac=gf;
+      }
       /* Movements go out whole, tombstones included. Each one is written once
          and never edited, so there is nothing here for two devices to contend
          over - which is the entire reason stock is kept this way. */
@@ -2503,7 +2516,8 @@ async function bldSave(){
         if(at.bucket===LEGACY && !GLASS.some(p=>p.id===at.pid)) continue;
         const m=bucketOf(at.bucket), cur=m[at.pid];
         if(!cur || stampOf(v) > stampOf(cur)){
-          m[at.pid]={status:v.status||'ok', note:v.note||'', by:v.by||'', at:v.at||'', updatedAt:v.updatedAt};
+          m[at.pid]=Object.assign({status:v.status||'ok', note:v.note||'', at:v.at||'', updatedAt:v.updatedAt},
+                                  v.by?{by:v.by}:{}, v.changedBy?{changedBy:v.changedBy}:{});
           taken++;
         }
       }
@@ -2520,6 +2534,11 @@ async function bldSave(){
   const hdr=document.querySelector('header');
   if(hdr){ hdr.insertBefore(SYNC.statusEl(), hdr.querySelector('.themeseg'));
            hdr.insertBefore(SYNC.signOutEl(), hdr.querySelector('.themeseg')); }
+  /* What changes a record. Selectors, so the panel card and the stock rows, which are rebuilt on
+     every selection, are covered too. Search, filters, printing and the plan itself stay open. */
+  SYNC.onStatus(paintWho);
+  SYNC.lockControls(['#addRink','[aria-label^="Remove this rink"]','.sbtn','#plabel','#ptag','#note','#noteClear',
+    '#noteSave','#load','#spSize','#spW','#spH','#spT','#spQty','#spNote','#spAdd','.sp-undo']);
   SYNC.start({title:'Arena Management System'});
 })();
 </script>

@@ -244,8 +244,10 @@ await L.p.evaluate(() => localStorage.removeItem('glass_record_v2'));
 await L.p.reload(); await sleep(1500);
 ok('the v1 record migrates into the legacy bucket',
    (await L.p.evaluate(() => (bucketOf('legacy')['007'] || {}).status)) === 'plexi');
-ok('and the marked-by name comes with it',
-   (await L.p.evaluate(() => who)) === 'Pete');
+/* The typed "marked by" name is retired: the server stamps whoever is signed in. An old record's
+   name is not adopted as an identity, and nobody is claimed while nobody is signed in. */
+ok('and the old typed name is not adopted as an identity',
+   (await L.p.evaluate(() => whoName())) === '' && !(await L.p.isVisible('.whoami')));
 ok('v1 is left in place as a fallback',
    await L.p.evaluate(() => !!localStorage.getItem('glass_record_v1')));
 await L.ctx.close();

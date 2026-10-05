@@ -13,7 +13,16 @@
     "resume": "node resume.js",
     "phone": "node phonetest.js",
     "schedule": "node scheduletest.js",
-    "spares": "node sparestest.js"
+    "spares": "node sparestest.js",
+    "stamp": "node stamptest.js",
+    "auth": "node authtest.js",
+    "editlock": "node editlocktest.js",
+    "scope": "node scopetest.js",
+    "activity": "node activitytest.js",
+    "handover": "node handovertest.js",
+    "shape": "node shapetest.js",
+    "controls": "node controlstest.js",
+    "who": "node whotest.js"
   },
   "devDependencies": {
     "playwright": "^1.49.0"

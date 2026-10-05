@@ -50,17 +50,72 @@
      sheets now, and a sheet it made has to be indistinguishable from one Ice
      made. The specific way that goes wrong is a sheet with no session in it:
      Ice reaches straight for sheets[0].sessions[0] when it boots. */
+  /* The standard corner is 27 ft 2 in. Ice's presets said 28 while the glass
+     survey of Conway solves to 27' 2", so the two apps drew different outlines
+     of the same ice. One value now. */
+  const STD_CORNER = 27 + 2/12;
   const RINK_SIZES = [
-    {id:"nhl",   name:"NHL — 200 × 85 ft",      L:200, W:85,  corner:28},
-    {id:"intl",  name:"Olympic — 200 × 100 ft", L:200, W:100, corner:28},
-    {id:"hybrid",name:"Hybrid — 200 × 90 ft",   L:200, W:90,  corner:28},
+    {id:"nhl",   name:"NHL — 200 × 85 ft",      L:200, W:85,  corner:STD_CORNER},
+    {id:"intl",  name:"Olympic — 200 × 100 ft", L:200, W:100, corner:STD_CORNER},
+    {id:"hybrid",name:"Hybrid — 200 × 90 ft",   L:200, W:90,  corner:STD_CORNER},
     {id:"studio",name:"Studio — 185 × 85 ft",   L:185, W:85,  corner:25}
   ];
   const NHL_SIZE = () => ({...RINK_SIZES[0]});
   const DEFAULT_EDGES = [0.6875,1.4375,1.5625,1.9375];
   const uid = () => Math.random().toString(36).slice(2,9);
   const newSession = () => ({id:uid(),date:new Date().toISOString(),label:"",mode:"moderate",data:{},notes:{}});
-  const newSheet = (n,size) => ({id:uid(),name:n||"Main sheet",size:size||NHL_SIZE(),sessions:[newSession()]});
+
+  /* ---------- the shape of a sheet ----------
+     One outline per sheet, drawn the same in Ice and Glass: length, width,
+     corner radius (feet and inches), where the glass walk starts, and which way
+     the building faces. It replaces the size, which stays on the record for a
+     device on the older build.
+
+     An old sheet is READ as though it had a shape, and only gains one when it is
+     deliberately migrated or edited. Writing it on every save would restamp every
+     sheet on every device, and a device holding a stale copy would then look
+     newest on all of them. */
+  const cornerOf = s => s.Rft + s.Rin/12;
+  function shapeFromSize(size){
+    size = size || NHL_SIZE();
+    /* Exactly 28 is the old preset's corner, the one that disagreed with the glass
+       survey, so it moves to the standard. Any other corner was somebody's choice. */
+    const c = size.corner===28 ? STD_CORNER : (+size.corner || STD_CORNER);
+    const inches = Math.round(c*12);
+    return {L:+size.L||200, W:+size.W||85, Rft:Math.floor(inches/12), Rin:inches%12,
+            start:"zam", turn:false, flip:false};
+  }
+  const shapeOf = sh => (sh && sh.shape && sh.shape.L)
+    ? Object.assign({start:"zam",turn:false,flip:false}, sh.shape)
+    : shapeFromSize(sh && sh.size);
+  /* What Ice's geometry takes: the old size object, with its numbers from the shape. */
+  const sizeOf = sh => { const s = shapeOf(sh);
+    return Object.assign({}, (sh && sh.size) || {}, {L:s.L, W:s.W, corner:cornerOf(s)}); };
+
+  /* How far a measured shape is from the sheet's, for the glass builder. "Small"
+     is the call between keeping the sheet's size and offering to update it:
+     within half a foot on the length and width, three inches on the corner. */
+  const SHAPE_TOLERANCE = {L:0.5, W:0.5, R:0.25};
+  function compareShape(sheet, measured, tol){
+    tol = Object.assign({}, SHAPE_TOLERANCE, tol||{});
+    const dL = measured.L - sheet.L, dW = measured.W - sheet.W, dR = cornerOf(measured) - cornerOf(sheet);
+    const differs = [];
+    if(Math.abs(dL) > 1e-9) differs.push("L");
+    if(Math.abs(dW) > 1e-9) differs.push("W");
+    if(Math.abs(dR) > 1e-9) differs.push("R");
+    return {dL, dW, dR, differs, same: !differs.length,
+            small: Math.abs(dL) <= tol.L + 1e-9 && Math.abs(dW) <= tol.W + 1e-9 && Math.abs(dR) <= tol.R + 1e-9};
+  }
+  /* A shape that can be drawn: positive, whole inches, and a corner that fits. */
+  function shapeProblem(s){
+    if(!(s.L > 0 && s.W > 0)) return "a sheet needs a length and a width";
+    if(!(s.Rft >= 0 && s.Rin >= 0 && s.Rin < 12 && s.Rin === Math.floor(s.Rin))) return "the corner is in feet and whole inches";
+    if(!(2*cornerOf(s) < Math.min(s.L, s.W))) return "that corner is too big for a sheet this size";
+    return "";
+  }
+
+  const newSheet = (n,size) => { const sz = size || NHL_SIZE();
+    return {id:uid(),name:n||"Main sheet",size:sz,shape:shapeFromSize(sz),sessions:[newSession()]}; };
   const defaultSettings = () => ({target:1.5,edges:[...DEFAULT_EDGES],tieAttention:true,floodBelow:1.25,shaveAbove:1.5625});
   const newFacility = n => {const sh=newSheet();return{id:uid(),name:n||"Main facility",settings:defaultSettings(),sheets:[sh]};};
 
@@ -72,15 +127,28 @@
   function decompose(st){
     const fac={},sh={},se={};
     (st.facilities||[]).forEach((f,fi)=>{
-      fac[f.id]={id:f.id,name:f.name,settings:f.settings,ord:fi};
+      /* fac names the facility a record belongs to, so the server can show it
+         only to people given that facility. Everything here is derived from
+         where the record sits, never typed, and bodyOf ignores it. */
+      fac[f.id]={id:f.id,name:f.name,settings:f.settings,ord:fi,fac:f.id};
       (f.sheets||[]).forEach((x,si)=>{
-        sh[x.id]={id:x.id,facilityId:f.id,name:x.name,size:x.size,ord:si};
-        (x.sessions||[]).forEach((z,zi)=>{ se[z.id]=detach(Object.assign({},z,{sheetId:x.id,ord:zi})); });
+        sh[x.id]={id:x.id,facilityId:f.id,name:x.name,size:x.size,ord:si,fac:f.id,
+                  ...(x.shape?{shape:x.shape}:{})};   // carried, never derived here: see the shape notes above
+        (x.sessions||[]).forEach((z,zi)=>{ se[z.id]=detach(Object.assign({},z,{sheetId:x.id,ord:zi,fac:f.id})); });
       });
     });
     return {fac,sh,se};
   }
-  const bodyOf=r=>{const c=Object.assign({},r);delete c.updatedAt;delete c.deleted;return JSON.stringify(c);};
+  /* changedBy is metadata the server stamps and hands back on every pull, like
+     updatedAt. If it counted as content, every pull would look like an edit and
+     every device would re-send what it had just received.
+
+     fac is derived from where a record sits. If it counted, the first save on
+     any device after this change would restamp every record it holds - and a
+     device holding a stale copy would then look newest on all of them. Records
+     pick it up when they are next really edited; management's backfill tags
+     the rest. */
+  const bodyOf=r=>{const c=Object.assign({},r);delete c.updatedAt;delete c.deleted;delete c.changedBy;delete c.fac;return JSON.stringify(c);};
 
   /* A session carries two nested maps - the readings and the per-point notes -
      and Object.assign copies only the reference to them. That left the snapshot
@@ -110,7 +178,7 @@
     for(const id in next){
       const p=prev[id];
       out[id]=(p&&!p.deleted&&bodyOf(p)===bodyOf(next[id]))
-        ? Object.assign({},next[id],{updatedAt:p.updatedAt||t})
+        ? Object.assign({},next[id],{updatedAt:p.updatedAt||t},p.changedBy?{changedBy:p.changedBy}:{})
         : Object.assign({},next[id],{updatedAt:t});
     }
     for(const id in prev){ if(!(id in next)) out[id]=prev[id].deleted?prev[id]:{id,deleted:true,updatedAt:t}; }
@@ -259,6 +327,50 @@
        backup is made of. */
     maps(){ return {fac:SNAP.fac, sh:SNAP.sh, se:SNAP.se}; },
 
+    /* What migrating the old sizes would do, without doing it. For the
+       "preview, then approve" step: nothing is written. */
+    async previewShapes(){
+      const st = await this.read(); if(!st) return [];
+      const out = [];
+      st.facilities.forEach(f => (f.sheets||[]).forEach(x => {
+        if(!x.shape) out.push({id:x.id, name:x.name, from:Object.assign({}, x.size||{}), to:shapeFromSize(x.size)});
+      }));
+      return out;
+    },
+
+    /* Give every sheet without one its shape. Goes through load()/save() like
+       every other write, so only the sheets are restamped and Ice's readings are
+       not touched. Returns how many it migrated; a second run finds none. */
+    async backfillShapes(){
+      const st = await this.load(); if(!st) return 0;
+      let n = 0;
+      st.facilities.forEach(f => (f.sheets||[]).forEach(x => { if(!x.shape){ x.shape = shapeFromSize(x.size); n++; } }));
+      if(n) await this.save(st);
+      return n;
+    },
+
+    /* The glass builder measured the sheet and the person agreed to update it.
+       An ordinary sheet edit: stamped, tagged and synced like any other, and
+       nothing inside a round is touched. The old size field is kept in step for
+       a device on the older build. */
+    async updateShape(sheetId, patch){
+      const st = await this.load(); if(!st) return {changed:false, error:"no records"};
+      let sheet = null;
+      st.facilities.forEach(f => (f.sheets||[]).forEach(x => { if(x.id === sheetId) sheet = x; }));
+      if(!sheet) return {changed:false, error:"no such sheet"};
+      const cur = shapeOf(sheet), next = Object.assign({}, cur, patch||{});
+      const bad = shapeProblem(next);
+      if(bad) return {changed:false, error:bad};
+      const same = ["L","W","Rft","Rin","start","turn","flip"].every(k => cur[k] === next[k]);
+      if(same && sheet.shape) return {changed:false};
+      sheet.shape = next;
+      const preset = RINK_SIZES.find(r => r.L === next.L && r.W === next.W && Math.abs(r.corner - cornerOf(next)) < 1e-6);
+      sheet.size = preset ? Object.assign({}, preset)
+                          : {id:"custom", name:"Custom", L:next.L, W:next.W, corner:cornerOf(next)};
+      await this.save(st);
+      return {changed:true};
+    },
+
     snapshot(){return {format:"rink-ice-v4",exportedAt:nowISO(),
       facilities:SNAP.fac,sheets:SNAP.sh,sessions:SNAP.se};}
   };
@@ -266,5 +378,6 @@
   global.Records = { KEYS:K, PREF_KEYS, Store, Repo,
                      decompose, reassemble, nowISO, hasReadings, lastRound, isOverdue,
                      RINK_SIZES, NHL_SIZE, DEFAULT_EDGES,
+                     STD_CORNER, shapeFromSize, shapeOf, sizeOf, compareShape, shapeProblem, SHAPE_TOLERANCE,
                      uid, newSession, newSheet, defaultSettings, newFacility };
 })(this);

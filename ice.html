@@ -825,15 +825,15 @@ function updateSmoothReadout(){$("smoothCount").textContent=SMOOTH_LABELS[(state
 $("smoothSlider").addEventListener("input",e=>{state.smoothIdx=+e.target.value;persist();computeField();computeDelta();if(viewMode==="3d")drawSurf();else drawLive();updateSmoothReadout();updateContourReadout();});
 
 /* ---------- round controls ---------- */
-$("sessSel").addEventListener("change",e=>{state.activeSession=e.target.value;compareId=null;clearUndo();selIdx=0;hideSel=false;applyGeometry(sheet().size,session().mode);computeField();computeDelta();buildSessSel();refresh();persist();});
+$("sessSel").addEventListener("change",e=>{state.activeSession=e.target.value;compareId=null;clearUndo();selIdx=0;hideSel=false;applyGeometry(Records.sizeOf(sheet()),session().mode);computeField();computeDelta();buildSessSel();refresh();persist();});
 function changeMode(mode){const s=session();if(mode===(s.mode||"moderate"))return;
   const valid=new Set(pointsForMode(mode).map(keyOf)),cur=s.data,orphan=Object.keys(cur).filter(k=>!valid.has(k));
   if(orphan.length&&!confirm(`Switch to ${MODES[mode].label} (${MODES[mode].n} spots)? ${orphan.length} existing reading(s) fall outside that grid and will be removed.`)){$("modeSel").value=s.mode||"moderate";return;}
   if(orphan.length){pushUndo();orphan.forEach(k=>{delete cur[k];delete s.notes[k];});}
-  s.mode=mode;selIdx=0;guidedPos=0;applyGeometry(sheet().size,mode);computeField();computeDelta();buildSessSel();refresh();persist();flashNote(MODES[mode].label+" · "+MODES[mode].n+" spots");}
+  s.mode=mode;selIdx=0;guidedPos=0;applyGeometry(Records.sizeOf(sheet()),mode);computeField();computeDelta();buildSessSel();refresh();persist();flashNote(MODES[mode].label+" · "+MODES[mode].n+" spots");}
 $("modeSel").addEventListener("change",e=>changeMode(e.target.value));
 $("cmpSel").addEventListener("change",e=>{compareId=e.target.value||null;computeDelta();drawLive();renderStats();persist();});
-$("newRound").addEventListener("click",()=>openNewRound(s=>{compareId=null;clearUndo();selIdx=0;guidedPos=0;applyGeometry(sheet().size,s.mode);computeField();computeDelta();buildSessSel();refresh();persist();flashNote("round added "+fmtDay(s.date));}));
+$("newRound").addEventListener("click",()=>openNewRound(s=>{compareId=null;clearUndo();selIdx=0;guidedPos=0;applyGeometry(Records.sizeOf(sheet()),s.mode);computeField();computeDelta();buildSessSel();refresh();persist();flashNote("round added "+fmtDay(s.date));}));
 
 /* ---------- CSV / files ---------- */
 $("expCsv").addEventListener("click",async()=>{const d=data(),nt=notes(),unitCol=isMM()?"thickness_mm":"thickness_in";let csv=`x_ft,y_ft,${unitCol},zone,note\n`;
@@ -923,7 +923,7 @@ $("backupWarnBtn").addEventListener("click",doBackupExport);
 
 /* ---------- screens ---------- */
 const appEl=$("app");
-function enterWork(view){state.screen="work";compareId=null;clearUndo();hideSel=false;applyGeometry(sheet().size,session().mode);buildBands();buildChips();computeField();computeDelta();
+function enterWork(view){state.screen="work";compareId=null;clearUndo();hideSel=false;applyGeometry(Records.sizeOf(sheet()),session().mode);buildBands();buildChips();computeField();computeDelta();
   $("home").style.display="none";appEl.classList.add("live");buildSessSel();sizeLive();setView(view||"map");refresh();persist();}
 function goHome(){state.screen="home";appEl.classList.remove("live");$("home").style.display="block";buildHome();persist();}
 /* The ≡ is gone; the switcher carries both jobs now. Crossing to Glass is a
@@ -1076,18 +1076,18 @@ $("backupFile").addEventListener("change",e=>{const f=e.target.files[0];if(!f)re
     if(!sheet())state.activeSheet=facility().sheets[0].id;
     if(!session())state.activeSession=sheet().sessions[0].id;
     compareId=null;clearUndo();
-    applyGeometry(sheet().size,session().mode);buildBands();buildChips();persist();closeSettings();goHome();
+    applyGeometry(Records.sizeOf(sheet()),session().mode);buildBands();buildChips();persist();closeSettings();goHome();
     flashNote(res.taken?("merged "+res.taken+" change"+(res.taken===1?"":"s")):"already up to date");
   }catch(err){alert("That doesn't look like a valid Ice Sheet backup file.");}
   $("backupFile").value="";};rd.readAsText(f);});
 function applySettings(){buildBands();buildChips();buildLegend();computeField();if(state.screen==="work"){drawLive();renderStats();}else buildHome();persist();}
 function buildFacManage(){const el=$("facManage");el.innerHTML="";state.facilities.forEach(f=>{const row=document.createElement("div");row.className="mrow";
   const inp=document.createElement("input");inp.value=f.name;inp.addEventListener("input",()=>{f.name=inp.value||"Facility";persist();if(state.screen!=="work")buildHome();else buildSessSel();});
-  const del=document.createElement("button");del.className="del";del.textContent="✕";del.title="Delete facility";del.addEventListener("click",()=>{if(state.facilities.length<=1){flashNote("keep at least one facility");return;}if(confirm(`Delete "${f.name}" and all its sheets?`)){state.facilities=state.facilities.filter(x=>x.id!==f.id);if(state.activeFacility===f.id){state.activeFacility=state.facilities[0].id;state.activeSheet=facility().sheets[0].id;state.activeSession=facility().sheets[0].sessions[0].id;}buildBands();buildSettings();persist();if(state.screen==="work"){applyGeometry(sheet().size,session().mode);computeField();computeDelta();buildSessSel();refresh();}else buildHome();}});
+  const del=document.createElement("button");del.className="del";del.textContent="✕";del.title="Delete facility";del.addEventListener("click",()=>{if(state.facilities.length<=1){flashNote("keep at least one facility");return;}if(confirm(`Delete "${f.name}" and all its sheets?`)){state.facilities=state.facilities.filter(x=>x.id!==f.id);if(state.activeFacility===f.id){state.activeFacility=state.facilities[0].id;state.activeSheet=facility().sheets[0].id;state.activeSession=facility().sheets[0].sessions[0].id;}buildBands();buildSettings();persist();if(state.screen==="work"){applyGeometry(Records.sizeOf(sheet()),session().mode);computeField();computeDelta();buildSessSel();refresh();}else buildHome();}});
   row.appendChild(inp);row.appendChild(del);el.appendChild(row);});}
 function buildSheetManage(){const el=$("sheetManage");el.innerHTML="";facility().sheets.forEach(sh=>{const row=document.createElement("div");row.className="mrow";
   const inp=document.createElement("input");inp.value=sh.name;inp.addEventListener("input",()=>{sh.name=inp.value||"Sheet";persist();if(state.screen!=="work")buildHome();else buildSessSel();});
-  const del=document.createElement("button");del.className="del";del.textContent="✕";del.title="Delete sheet";del.addEventListener("click",()=>{if(facility().sheets.length<=1){flashNote("keep at least one sheet");return;}if(confirm(`Delete "${sh.name}"?`)){facility().sheets=facility().sheets.filter(x=>x.id!==sh.id);if(state.activeSheet===sh.id){state.activeSheet=facility().sheets[0].id;state.activeSession=facility().sheets[0].sessions[0].id;}buildSettings();persist();if(state.screen==="work"){applyGeometry(sheet().size,session().mode);computeField();computeDelta();buildSessSel();refresh();}else buildHome();}});
+  const del=document.createElement("button");del.className="del";del.textContent="✕";del.title="Delete sheet";del.addEventListener("click",()=>{if(facility().sheets.length<=1){flashNote("keep at least one sheet");return;}if(confirm(`Delete "${sh.name}"?`)){facility().sheets=facility().sheets.filter(x=>x.id!==sh.id);if(state.activeSheet===sh.id){state.activeSheet=facility().sheets[0].id;state.activeSession=facility().sheets[0].sessions[0].id;}buildSettings();persist();if(state.screen==="work"){applyGeometry(Records.sizeOf(sheet()),session().mode);computeField();computeDelta();buildSessSel();refresh();}else buildHome();}});
   row.appendChild(inp);row.appendChild(del);el.appendChild(row);});}
 $("addFacBtn").addEventListener("click",()=>{addFacility();buildSettings();});
 $("addSheetBtn").addEventListener("click",()=>openAddSheet(()=>buildSettings()));
@@ -1162,7 +1162,7 @@ async function boot(){state=await Repo.load();
   if(state.contourIdx==null)state.contourIdx=2;$("contourSlider").value=state.contourIdx;
   if(state.contoursOn==null)state.contoursOn=true;$("contourOn").checked=state.contoursOn;$("contourSlider").disabled=!state.contoursOn;$("contourBar").classList.toggle("off",!state.contoursOn);
   if(state.smoothIdx==null)state.smoothIdx=2;$("smoothSlider").value=state.smoothIdx;
-  applyGeometry(sheet().size,session().mode);applyTheme();applyUnitButtons();buildBands();buildChips();bindDrag();
+  applyGeometry(Records.sizeOf(sheet()),session().mode);applyTheme();applyUnitButtons();buildBands();buildChips();bindDrag();
   /* Pick up where this device left off — coming back from another app in the suite
      lands on the sheet you were working, not the front screen. Ice in the
      switcher still goes back to them. */
@@ -1182,7 +1182,7 @@ boot().then(()=>{
       if(!sheet())state.activeSheet=facility().sheets[0].id;
       if(!session())state.activeSession=sheet().sessions[0].id;
       Repo.save(state);
-      if(state.screen==="work"){applyGeometry(sheet().size,session().mode);computeField();computeDelta();buildSessSel();refresh();}
+      if(state.screen==="work"){applyGeometry(Records.sizeOf(sheet()),session().mode);computeField();computeDelta();buildSessSel();refresh();}
       else buildHome();
       return res.taken;
     }
@@ -1190,6 +1190,12 @@ boot().then(()=>{
   const bar=document.querySelector("#home .home-bar");
   if(bar){ bar.insertBefore(SYNC.statusEl(), bar.querySelector(".themeseg"));
            bar.insertBefore(SYNC.signOutEl(), bar.querySelector(".themeseg")); }
+  /* What changes a record. Selectors, so controls built on the fly are covered too. Theme, units,
+     view switches, exports and the map itself are device preferences or reading, and stay open. */
+  SYNC.lockControls(["#logNew","#newRound","#roundCreate","#sheetCreate","#addFacBtn","#addSheetBtn",".fac.add",
+    "#resetBands","#undoBtn","#clearBtn","#impBtn","#backupImport","#noteInput",".chip[data-opt]",".chip.clear",
+    "#targetIn","#floodIn","#shaveIn","#tieChk","#edges input","#facManage input","#facManage .del",
+    "#sheetManage input","#sheetManage .del","#roundManage input","#roundManage .del",".rdel"]);
   SYNC.start({title:"Arena Management System"});
 });
 
