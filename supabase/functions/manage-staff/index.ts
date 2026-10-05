@@ -8,6 +8,7 @@
 //
 // Actions (POST JSON {action, ...}):
 //   list                                    -> {people:[{login,name,role,active,facilities,last_sign_in}]}
+//   codes                                   -> {access, editing}          when each shared code was last changed
 //   add        {name, role, facilities[]}   -> {login, code}          code is shown once
 //   update     {login, name?, role?, facilities?}
 //   reset_code {login}                      -> {code}                 shown once
@@ -77,6 +78,12 @@ Deno.serve(async (req) => {
         const { data, error } = await admin.rpc("admin_list_staff");
         if (error) throw error;
         return reply(200, { people: data });
+      }
+
+      case "codes": {
+        const { data, error } = await admin.rpc("admin_code_times");
+        if (error) throw error;
+        return reply(200, data);             // {access, editing}: when each was last changed, or null
       }
 
       case "add": {
@@ -159,6 +166,7 @@ Deno.serve(async (req) => {
         if (!uid) return fail(500, "The shared account was not found.");
         const { error } = await admin.auth.admin.updateUserById(uid as string, { password: code });
         if (error) throw error;
+        await admin.rpc("admin_note_access_code");
         return reply(200, { ok: true });     // every device is asked again, within the hour
       }
 

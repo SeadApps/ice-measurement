@@ -716,8 +716,7 @@
     var el = document.createElement("div");
     el.className = "sync-gate";
     document.body.appendChild(el);
-    var head = '<div class="sync-bd"><h2><i>[ ◊ ]</i> ' + (title || "Arena Management System") + '</h2>'
-             + '<p>Conway Arena &middot; Nashua, NH</p></div>';
+    var head = '<div class="sync-bd"><h2><i>[ ◊ ]</i> ' + (title || "Arena Management System") + '</h2></div>';
     function show(inner) {
       el.innerHTML = '<div class="sync-box">' + head + (notice ? '<div class="sync-note">' + notice + '</div>' : "") + inner + '</div>';
       notice = "";

@@ -51,6 +51,7 @@ const b=await chromium.launch();
 await fetch(B+'/__reset');
 let D=await device(b,'D1'); await open(D);
 ok('a new device is stopped at the access code', await D.p.isVisible('.sync-gate #sg-code'));
+ok('which says nothing about any facility before the code', !/Nashua|Conway Arena/.test(await D.p.textContent('.sync-gate')), await D.p.textContent('.sync-gate'));
 await access(D.p,'wrong');
 ok('a wrong access code is refused', (await errText(D.p)).includes("doesn't match"));
 ok('and does not go on to Who are you?', (await names(D.p)).length===0);

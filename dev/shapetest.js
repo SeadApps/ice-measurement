@@ -48,6 +48,13 @@ s=await mig({L:200,W:100,corner:28}); ok('so do the Olympic and hybrid sizes', s
 s=await mig({L:185,W:85,corner:25});  ok('a corner that was not the old default is kept', s.Rft===25 && s.Rin===0 && s.L===185);
 s=await mig({L:200,W:85,corner:27});  ok('including one a builder rounded to 27\'', s.Rft===27 && s.Rin===0);
 s=await mig({L:200,W:85,corner:27+2/12}); ok('and one already exact', s.Rft===27 && s.Rin===2);
+s=await mig({L:200,W:85,corner:27+2.5/12}); ok('a half-inch corner is kept as it is', s.Rft===27 && s.Rin===2.5, JSON.stringify(s));
+s=await mig({L:200,W:85,corner:27+2.4/12}); ok('and anything between rounds to the nearest half inch', s.Rft===27 && s.Rin===2.5, JSON.stringify(s));
+s=await mig({L:200,W:85,corner:24.999}); ok('a corner just under a whole foot carries into the feet', s.Rft===25 && s.Rin===0, JSON.stringify(s));
+const sp=r=>R(x=>window.Records.shapeProblem(x),r);
+ok('a half-inch corner can be drawn', (await sp({L:200,W:85,Rft:27,Rin:2.5}))==='');
+ok('a quarter inch cannot', (await sp({L:200,W:85,Rft:27,Rin:2.25}))!=='');
+ok('nor twelve inches, nor a part of a foot', (await sp({L:200,W:85,Rft:27,Rin:12}))!=='' && (await sp({L:200,W:85,Rft:27.5,Rin:0}))!=='');
 s=await mig(null); ok('a sheet with no size at all reads as the standard one', s.L===200 && s.W===85 && s.Rft===27 && s.Rin===2);
 const pre=await R(()=>window.Records.RINK_SIZES.map(x=>[x.id,x.corner]));
 ok('the presets use the new corner', pre.filter(p=>p[0]!=='studio').every(p=>near(p[1],STD)) && near(pre.find(p=>p[0]==='studio')[1],25), JSON.stringify(pre));

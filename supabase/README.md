@@ -82,6 +82,12 @@ is something the fake server could only imitate.
 - [ ] A Staff person given one facility reads and writes only that one, cannot
       rewrite another facility's record by re-tagging it, and cannot write a
       `facility` or `sheet` record.
+- [ ] A Staff person cannot set a flag to resolved, and cannot change a flag
+      that is already resolved (reopen it or edit it); Management can do both.
+      A `glass_widths` record in their own facility is theirs to write.
+- [ ] `manage-staff` `codes` returns `{access, editing}`. After `set_editing_code`
+      and `set_access_code` each has a fresh time; before either has been
+      changed since step 1 it is null (a code set by hand has no row).
 - [ ] **Removing a person signs their device out.** After `remove`, their next
       token refresh must come back as HTTP 400 or 401, which is what the client
       treats as "signed out". If the hosted auth answers 403 for a banned user

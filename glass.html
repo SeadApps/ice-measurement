@@ -1374,6 +1374,27 @@ let activeBucket = LEGACY;
 let SPARES = {};              // movementId -> {id,fac,w,h,thk,mat,qty,note,by,at,updatedAt,deleted}
 let spMat = 'tempered';       // which pile the record form is pointed at
 
+/* The builder's one-tap widths, one record per facility, shared by all its
+   sheets. A facility that has never saved a list reads the defaults and has no
+   record: sending the defaults would stamp every facility on every device for
+   nothing. The record appears the first time somebody really changes the list,
+   and newest wins. */
+const DEFAULT_WIDTHS = [43, 48];
+let WIDTHS = {};              // facilityId -> {id,fac,widths:[inches],updatedAt}
+const cleanWidths = list => [...new Set((list || []).map(Number).filter(w => w > 0 && isFinite(w)))].sort((a, b) => a - b);
+function widthsOf(fac){
+  const r = WIDTHS[fac];
+  return r && Array.isArray(r.widths) ? r.widths.slice() : DEFAULT_WIDTHS.slice();
+}
+/* Returns false when the list is what the facility already reads, or there is
+   no facility to put it under. */
+function setWidths(fac, list){
+  const w = cleanWidths(list);
+  if(!fac || JSON.stringify(w) === JSON.stringify(widthsOf(fac))) return false;
+  WIDTHS[fac] = {id:fac, fac, widths:w, updatedAt:nowISO()};
+  return true;
+}
+
 const mvId = () => 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
 /* The shelf carries both, and they are not interchangeable: a plexi pane is
@@ -1781,7 +1802,7 @@ async function loadSurfaces(){
 const SYNC=(typeof Sync!=="undefined")?Sync:null;   // absent if sync.js failed to load; the page still works locally
 const snapshot = () => JSON.stringify({records, boundSheetId, pendingFacilityId, bindingAt,
                                        activeBucket, names: FACILITY_NAMES, at: LAYOUT_AT, gone: LAYOUT_GONE,
-                                       counts: GLASS_COUNTS(), spares: SPARES,
+                                       counts: GLASS_COUNTS(), spares: SPARES, widths: WIDTHS,
                                        specs: BUILT_SPECS(), built: BUILT_DRAWN()});
 function store(){ Store.set(KEY, snapshot()); say('Saved'); if(SYNC) SYNC.nudge(); }
 
@@ -1802,6 +1823,7 @@ async function restore(){
     LAYOUT_AT = saved.at || {};
     LAYOUT_GONE = saved.gone || {};
     SPARES = saved.spares || {};
+    WIDTHS = saved.widths || {};
     const specs = saved.specs || {};
     for(const k in specs){
       if(k === LEGACY) continue;
@@ -2386,7 +2408,7 @@ async function bldSave(){
     /* facility and sheet are pulled, never pushed - the Ice app owns those
        records, and collect() deliberately omits them so nothing here can
        restamp one. */
-    kinds:['facility','sheet','glass_panel','glass_binding','glass_layout','glass_spare'],
+    kinds:['facility','sheet','glass_panel','glass_binding','glass_layout','glass_spare','glass_widths'],
     collect:()=>{
       const panels={};
       for(const bucket in records){
@@ -2428,7 +2450,9 @@ async function bldSave(){
          over - which is the entire reason stock is kept this way. */
       const spares={};
       for(const id in SPARES){ const m=SPARES[id]; if(m) spares[id]=Object.assign({}, m, {id:id}); }
-      return {glass_panel:panels, glass_binding:binding, glass_layout:layouts, glass_spare:spares};
+      const widths={};
+      for(const id in WIDTHS){ const v=WIDTHS[id]; if(v) widths[id]=Object.assign({}, v, {id:id}); }
+      return {glass_panel:panels, glass_binding:binding, glass_layout:layouts, glass_spare:spares, glass_widths:widths};
     },
     apply:(incoming)=>{
       let taken=0;
@@ -2497,6 +2521,17 @@ async function bldSave(){
         if(cur && (v.updatedAt||'') <= (cur.updatedAt||'')) continue;
         SPARES[id]= v.deleted ? {id:id, deleted:true, updatedAt:v.updatedAt||''}
                               : Object.assign({}, v, {id:id});
+        taken++;
+      }
+
+      /* A removed facility's list goes with it; otherwise newest wins. */
+      const wd=incoming.glass_widths||{};
+      for(const id in wd){
+        const v=wd[id], cur=WIDTHS[id];
+        if(v.deleted){ if(cur){ delete WIDTHS[id]; taken++; } continue; }
+        if(!Array.isArray(v.widths)) continue;
+        if(cur && (v.updatedAt||'') <= (cur.updatedAt||'')) continue;
+        WIDTHS[id]={id:id, fac:v.fac||id, widths:cleanWidths(v.widths), updatedAt:v.updatedAt||''};
         taken++;
       }
 

@@ -81,7 +81,7 @@
     /* Exactly 28 is the old preset's corner, the one that disagreed with the glass
        survey, so it moves to the standard. Any other corner was somebody's choice. */
     const c = size.corner===28 ? STD_CORNER : (+size.corner || STD_CORNER);
-    const inches = Math.round(c*12);
+    const inches = Math.round(c*24)/2;                 // to the nearest half inch
     return {L:+size.L||200, W:+size.W||85, Rft:Math.floor(inches/12), Rin:inches%12,
             start:"zam", turn:false, flip:false};
   }
@@ -106,10 +106,11 @@
     return {dL, dW, dR, differs, same: !differs.length,
             small: Math.abs(dL) <= tol.L + 1e-9 && Math.abs(dW) <= tol.W + 1e-9 && Math.abs(dR) <= tol.R + 1e-9};
   }
-  /* A shape that can be drawn: positive, whole inches, and a corner that fits. */
+  /* A shape that can be drawn: positive, a corner in half-inch steps, and a
+     corner that fits. */
   function shapeProblem(s){
     if(!(s.L > 0 && s.W > 0)) return "a sheet needs a length and a width";
-    if(!(s.Rft >= 0 && s.Rin >= 0 && s.Rin < 12 && s.Rin === Math.floor(s.Rin))) return "the corner is in feet and whole inches";
+    if(!(s.Rft >= 0 && s.Rin >= 0 && s.Rin < 12 && s.Rft === Math.floor(s.Rft) && s.Rin*2 === Math.floor(s.Rin*2))) return "the corner is in feet and half inches";
     if(!(2*cornerOf(s) < Math.min(s.L, s.W))) return "that corner is too big for a sheet this size";
     return "";
   }

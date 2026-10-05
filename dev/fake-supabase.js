@@ -95,7 +95,11 @@ function check(w, r){
   if (!fac && !isMgmt(w)) return 'untagged records are Management only';
   if (!mayFacility(w, fac)) return 'not your facility';
   if (!isMgmt(w) && SETTINGS_KINDS.includes(r.kind)) return 'settings are Management only';
-  if (!isMgmt(w) && r.kind === 'flag' && r.body && r.body.status === 'resolved') return 'only Management resolves a flag';
+  /* Resolved is Management's to set, and so is taking it back: a Staff write
+     over a resolved flag (reopening it, or editing it) is refused. */
+  if (!isMgmt(w) && r.kind === 'flag' &&
+      ((r.body && r.body.status === 'resolved') || (old && old.body && old.body.status === 'resolved')))
+    return 'only Management resolves or reopens a flag';
   return null;
 }
 

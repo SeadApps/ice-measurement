@@ -80,8 +80,9 @@ select id as sheet_id, body ->> 'name' as name,
        body #>> '{size,L}' as length, body #>> '{size,W}' as width,
        body #>> '{size,corner}' as old_corner_ft,
        case when (body #>> '{size,corner}')::numeric = 28 then '27 ft 2 in'
-            else (floor((body #>> '{size,corner}')::numeric))::int || ' ft '
-                 || round(((body #>> '{size,corner}')::numeric - floor((body #>> '{size,corner}')::numeric)) * 12)::int || ' in'
+            else floor(round((body #>> '{size,corner}')::numeric * 24) / 24)::int || ' ft '
+                 || ((round((body #>> '{size,corner}')::numeric * 24)
+                      - 24 * floor(round((body #>> '{size,corner}')::numeric * 24) / 24)) / 2.0) || ' in'
        end as new_corner
 from public.records
 where kind = 'sheet' and not deleted and body -> 'shape' is null and body -> 'size' is not null;

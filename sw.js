@@ -1,6 +1,7 @@
 // Bump CACHE_VERSION whenever you change any file listed below — there's no build
 // step, so this string is the only thing that retires the previous cache.
-const CACHE_VERSION = "arena-v9";   // v9: D1 — two-step sign-in, editing lock, facility tags, sheet shape; sync.js, records.js, ice.html, glass.html
+const CACHE_VERSION = "arena-v10";  // v10: D1 follow-ups — half-inch corners, glass widths record, gate without a facility name; sync.js, records.js, glass.html
+// v9: D1 — two-step sign-in, editing lock, facility tags, sheet shape; sync.js, records.js, ice.html, glass.html
 const PRECACHE_URLS = [
   "./", "index.html", "ice.html", "glass.html", "sync.js", "records.js",
   "manifest.json", "icon-192.png", "icon-512.png"

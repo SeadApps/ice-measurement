@@ -36,11 +36,13 @@ begin
            'L',     (r.body #>> '{size,L}')::numeric,
            'W',     (r.body #>> '{size,W}')::numeric,
            -- the old preset's 28 ft is the one that disagreed with the glass survey
+           -- to the nearest half inch, taken over the whole corner so 24.99 ft
+           -- carries into the feet instead of making 12 inches
            'Rft',   case when (r.body #>> '{size,corner}')::numeric = 28 then 27
-                         else floor((r.body #>> '{size,corner}')::numeric)::int end,
+                         else floor(round((r.body #>> '{size,corner}')::numeric * 24) / 24)::int end,
            'Rin',   case when (r.body #>> '{size,corner}')::numeric = 28 then 2
-                         else round(((r.body #>> '{size,corner}')::numeric
-                                     - floor((r.body #>> '{size,corner}')::numeric)) * 12)::int end,
+                         else (round((r.body #>> '{size,corner}')::numeric * 24)
+                               - 24 * floor(round((r.body #>> '{size,corner}')::numeric * 24) / 24)) / 2.0 end,
            'start', 'zam', 'turn', false, 'flip', false))
    where r.kind = 'sheet' and not r.deleted
      and r.body -> 'shape' is null and r.body #>> '{size,L}' is not null

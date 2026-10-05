@@ -67,8 +67,11 @@ create index if not exists unlock_failures_idx on app.unlock_failures (user_id, 
 
 create table if not exists app.codes (                 -- a hash of the editing code, never the code
   name text primary key,
-  hash text not null
+  hash text                                            -- null for 'access': that code lives in the auth system
 );
+-- When each shared code was last changed, for the Staff page. A code set by
+-- hand before this existed has no row until it is next changed.
+alter table app.codes add column if not exists changed_at timestamptz not null default now();
 
 alter table app.settings        enable row level security;
 alter table app.staff           enable row level security;
@@ -188,8 +191,9 @@ begin
       if new.kind in ('facility', 'sheet') then
         raise exception 'settings are Management only' using errcode = '42501';
       end if;
-      if new.kind = 'flag' and new.body ->> 'status' = 'resolved' then
-        raise exception 'only Management resolves a flag' using errcode = '42501';
+      if new.kind = 'flag' and (new.body ->> 'status' = 'resolved'
+         or (tg_op = 'UPDATE' and old.body ->> 'status' = 'resolved')) then
+        raise exception 'only Management resolves or reopens a flag' using errcode = '42501';
       end if;
     end if;
   end if;
@@ -425,18 +429,35 @@ begin
     raise exception 'an editing code needs at least 8 characters';
   end if;
   insert into app.codes (name, hash) values ('editing', extensions.crypt(p_code, extensions.gen_salt('bf')))
-    on conflict (name) do update set hash = excluded.hash;
+    on conflict (name) do update set hash = excluded.hash, changed_at = now();
   delete from app.unlocks;                          -- the old code's windows end with it
 end $$;
+
+-- The access code is the shared account's password, so the auth system holds
+-- it; this only notes when it was changed.
+create or replace function public.admin_note_access_code() returns void
+language sql volatile security definer set search_path = '' as $$
+  insert into app.codes (name, hash) values ('access', null)
+    on conflict (name) do update set changed_at = now()
+$$;
+
+create or replace function public.admin_code_times() returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object(
+    'access',  (select changed_at from app.codes where name = 'access'),
+    'editing', (select changed_at from app.codes where name = 'editing'))
+$$;
 
 revoke all on function public.admin_role_of(uuid), public.admin_user_id(text), public.admin_list_staff(),
                        public.admin_save_staff(uuid, text, text, text, text[]),
                        public.admin_set_active(text, boolean), public.admin_user_of(text),
-                       public.admin_set_editing_code(text) from public, anon, authenticated;
+                       public.admin_set_editing_code(text), public.admin_note_access_code(),
+                       public.admin_code_times() from public, anon, authenticated;
 grant execute on function public.admin_role_of(uuid), public.admin_user_id(text), public.admin_list_staff(),
                           public.admin_save_staff(uuid, text, text, text, text[]),
                           public.admin_set_active(text, boolean), public.admin_user_of(text),
-                          public.admin_set_editing_code(text) to service_role;
+                          public.admin_set_editing_code(text), public.admin_note_access_code(),
+                          public.admin_code_times() to service_role;
 
 commit;
 

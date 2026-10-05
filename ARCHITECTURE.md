@@ -91,6 +91,7 @@ per-kind maps in local storage, and each carries its own timestamp.
 | `glass_binding` | `glass_record_v2` | `sheetId` — which ice surface the Conway panels are the glass for |
 | `glass_layout` | `glass_record_v2` | the walk a built rink was made from; the drawing is regenerated |
 | `glass_spare` | `glass_record_v2` | one **movement** of spare glass in or out, against a facility — not a stock level |
+| `glass_widths` | `glass_record_v2` | the builder's one-tap widths for a facility, id = the facility id; reads 43 and 48 until somebody changes it, and no record exists before then |
 | — | `ice_v4_prefs` | **device-local, never synced** |
 
 Every record also carries `fac` (the facility it belongs to) and, coming back from the
@@ -491,14 +492,15 @@ node dev/phonetest.js      # 42 checks: no page scrolls sideways on a phone, tap
 node dev/scheduletest.js   # 31 checks: the schedule opens on what needs attention, and print still carries all 127
 node dev/sparestest.js     # 46 checks: spare stock is a ledger per facility, tempered and plexi are different piles, and fitting a pane deducts the right one
 node dev/stamptest.js      # 25 checks: the server stamps who changed a record; a pulled stamp never looks like an edit
-node dev/authtest.js       # 56 checks: the two-step gate, a rotated code, a removed person, first sign-in offline, the rollout
+node dev/authtest.js       # 57 checks: the two-step gate, a rotated code, a removed person, first sign-in offline, the rollout
 node dev/editlocktest.js   # 62 checks: writes refused until the editing code; the window ends, extends, closes; the unlock button
 node dev/scopetest.js      # 53 checks: a Staff person sees and writes only their facilities; the tag; the per-person cursor
 node dev/activitytest.js   # 48 checks: one log row per write with old and new, append-only, Management only
 node dev/handovertest.js   # 40 checks: changing hands on a shared iPad, offline, and the idle sign-out
-node dev/shapetest.js      # 46 checks: one shape per sheet, the migration, the builder's compare and update
+node dev/shapetest.js      # 52 checks: one shape per sheet, the migration, the builder's compare and update
 node dev/controlstest.js   # 35 checks: edit controls lock until unlocked; what only reads stays open
 node dev/whotest.js        # 19 checks: nobody types their name; the server's stamp is shown
+node dev/widthstest.js     # 25 checks: a facility's one-tap widths (default 43/48, no record until changed); only Management resolves or reopens a flag
 ```
 
 848 checks in all. Tests point `window.__SYNC_CONFIG__` at the fake via
