@@ -1056,8 +1056,8 @@ async function doBackupExport(){await Repo.save(state);
   const res=await exportFile(JSON.stringify(Repo.snapshot()),"application/json","ice_sheet_backup_"+todayISO()+".json");
   if(res!=="cancelled"){state.lastBackup=new Date().toISOString();persist();updateBackupStatus();updateBackupBanner();}}
 $("backupExport").addEventListener("click",doBackupExport);
-$("backupImport").addEventListener("click",()=>$("backupFile").click());
-$("backupFile").addEventListener("change",e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{
+$("backupImport").addEventListener("click",()=>{if(SYNC&&!SYNC.canRestore()){flashNote(SYNC.restoreMessage);return;}$("backupFile").click();});
+$("backupFile").addEventListener("change",e=>{const f=e.target.files[0];if(!f)return;if(SYNC&&!SYNC.canRestore()){$("backupFile").value="";flashNote(SYNC.restoreMessage);return;}const rd=new FileReader();rd.onload=()=>{
   try{
     const obj=JSON.parse(rd.result);
     let inc=null;

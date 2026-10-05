@@ -943,6 +943,12 @@
     /* Who is signed in: {id, name}, or null while the shared account is still
        doing the work. The server stamps their name on what they change. */
     person: function () { return person; },
+    /* Restoring a backup writes records for whichever facilities are in the file, so
+       it is Management's. Before anybody is signed in as a person (rollout step 3) the
+       shared account carries the data and nothing is stricter than it was. A person
+       whose scope has not been fetched yet is not Management until it is. */
+    canRestore: function () { return !person || scope === "*"; },
+    restoreMessage: "Only Management can restore a backup.",
     isSignedIn: function () { return !!session; },
     pending: pendingCount,
     /* A pill the pages can drop into a header. */

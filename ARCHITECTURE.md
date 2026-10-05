@@ -94,6 +94,14 @@ per-kind maps in local storage, and each carries its own timestamp.
 | `glass_widths` | `glass_record_v2` | the builder's one-tap widths for a facility, id = the facility id; reads 43 and 48 until somebody changes it, and no record exists before then |
 | — | `ice_v4_prefs` | **device-local, never synced** |
 
+**Restoring a backup is Management's.** `Sync.canRestore()` is true when nobody is
+signed in as a person yet (the shared account carries the data, rollout step 3) or when
+the person's scope is `*`, and false otherwise, including while a person's scope has not
+been fetched. Ice's *Restore from backup* and Glass's *Load record* check it on the
+button and again on the chosen file, say `Sync.restoreMessage`, and merge nothing. A
+backup can hold any facility, and the server would refuse a Staff person's writes to
+the ones they were not given record by record.
+
 **Seeds.** A device with no records invents a facility, a sheet and a round
 (`freshState()` in `ice.html`) so there is something to draw. That is where it
 starts, not something anybody observed, so `Repo.save(state, {seed:true})` marks
@@ -519,6 +527,7 @@ node dev/shapetest.js      # 69 checks: one shape per sheet, the migration, the 
 node dev/controlstest.js   # 35 checks: edit controls lock until unlocked; what only reads stays open
 node dev/whotest.js        # 19 checks: nobody types their name; the server's stamp is shown
 node dev/seedtest.js       # 20 checks: a fresh device's invented facility is a seed: never sent while untouched, sent whole when edited, dropped when real ones arrive
+node dev/restoretest.js    # 12 checks: restoring a backup (Ice) or a record file (Glass) is Management's; Staff are told and nothing merges
 node dev/widthstest.js     # 25 checks: a facility's one-tap widths (default 43/48, no record until changed); only Management resolves or reopens a flag
 ```
 
