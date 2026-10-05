@@ -135,6 +135,8 @@ const P=await device(b,'P');
 await P.p.goto(B+'/ice.html'); await sleep(1200);
 await signIn(P.p,'pete','pete-code-1');
 await unlockUI(P.p); await sleep(1500);
+/* The device pulls 'late' and has no invention of its own now, so Pete makes a facility of his own for Ice to write. */
+await P.p.evaluate(()=>{ const f=newFacility('Pete Rink'); state.facilities.push(f); state.activeFacility=f.id; state.activeSheet=f.sheets[0].id; state.activeSession=f.sheets[0].sessions[0].id; persist(); buildHome(); }); await sleep(800);
 await P.p.click('.fl-row'); await sleep(700);
 await P.p.click('#newRound'); await sleep(300); await P.p.click('#roundCreate'); await sleep(3500);
 let all=await rows();
@@ -172,8 +174,10 @@ await G.p.click('#pnl-045'); await G.p.click('.sbtn[data-s="replace"]'); await s
 all=await rows();
 const gp=all.filter(x=>x.kind==='glass_panel'), gb=all.filter(x=>x.kind==='glass_binding');
 ok('Glass wrote the panel mark ('+gp.length+')', gp.length>0);
-ok('tagged with the facility its surface is in', gp.every(x=>x.facility_id===fac.id), JSON.stringify(gp.map(x=>x.facility_id)));
-ok('and the binding too', gb.length>0 && gb.every(x=>x.facility_id===fac.id), JSON.stringify(gb.map(x=>x.facility_id)));
+/* Glass binds to the first surface it knows, which is no longer always Ice's own facility. */
+const gfac=await G.p.evaluate(()=>sheets[boundSheetId].facilityId);
+ok('tagged with the facility its surface is in', !!gfac && gp.every(x=>x.facility_id===gfac), JSON.stringify(gp.map(x=>x.facility_id)));
+ok('and the binding too', gb.length>0 && gb.every(x=>x.facility_id===gfac), JSON.stringify(gb.map(x=>x.facility_id)));
 ok('nothing in the building is untagged', all.every(x=>!!x.facility_id), JSON.stringify(all.filter(x=>!x.facility_id).map(x=>x.kind)));
 
 /* A Staff device given only another facility holds none of this. */

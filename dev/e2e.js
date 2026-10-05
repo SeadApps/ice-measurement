@@ -86,6 +86,8 @@ pb.on('dialog',d=>d.accept());
 await pb.goto(B); await pb.waitForTimeout(1400);
 const before=await pb.textContent('body');
 ok('device B starts on its own data', before.includes('Main facility') && !before.includes('Conway Arena'));
+/* An untouched invention is dropped when real data arrives, so B has to have really used its facility. */
+await pb.evaluate(()=>{ session().data['3']='1 1/2"'; persist(); }); await pb.waitForTimeout(600);
 
 await pb.click('#gearHome'); await pb.waitForTimeout(500);
 await pb.setInputFiles('#backupFile', file);

@@ -149,7 +149,7 @@
      device holding a stale copy would then look newest on all of them. Records
      pick it up when they are next really edited; management's backfill tags
      the rest. */
-  const bodyOf=r=>{const c=Object.assign({},r);delete c.updatedAt;delete c.deleted;delete c.changedBy;delete c.fac;return JSON.stringify(c);};
+  const bodyOf=r=>{const c=Object.assign({},r);delete c.updatedAt;delete c.deleted;delete c.changedBy;delete c.fac;delete c.seed;return JSON.stringify(c);};
 
   /* A session carries two nested maps - the readings and the per-point notes -
      and Object.assign copies only the reference to them. That left the snapshot
@@ -178,9 +178,12 @@
     const out={},t=nowISO();
     for(const id in next){
       const p=prev[id];
+      /* seed is a mark on the record, never part of it. It survives only while the
+         record is exactly what was fabricated; the first real change drops it. */
+      const base=Object.assign({},next[id]); delete base.seed;
       out[id]=(p&&!p.deleted&&bodyOf(p)===bodyOf(next[id]))
-        ? Object.assign({},next[id],{updatedAt:p.updatedAt||t},p.changedBy?{changedBy:p.changedBy}:{})
-        : Object.assign({},next[id],{updatedAt:t});
+        ? Object.assign(base,{updatedAt:p.updatedAt||t},p.changedBy?{changedBy:p.changedBy}:{},p.seed?{seed:true}:{})
+        : Object.assign(base,{updatedAt:t});
     }
     for(const id in prev){ if(!(id in next)) out[id]=prev[id].deleted?prev[id]:{id,deleted:true,updatedAt:t}; }
     return out;
@@ -213,10 +216,35 @@
     return days > (overdueDays == null ? 7 : overdueDays);
   }
 
+  /* ---------- seeds ----------
+     A device with no records invents a facility, a sheet and a round so there is
+     something to draw. That is where it starts, not something anybody observed -
+     the same distinction Glass keeps for its survey notes. It is marked, kept off
+     the wire while it is untouched, and dropped when real facilities arrive.
+     Sent early, it added a phantom facility to everybody's list and shifted the
+     real one's order.
+
+     A tree is a facility with its sheets and their rounds. It is only a seed while
+     every record in it is still marked: one real edit anywhere sends the whole
+     tree, so a round never arrives under a sheet the server has not seen. */
+  function treeOf(sh, se){
+    const facOfSheet=id=>sh[id]&&sh[id].facilityId;
+    return {facOfSheet, facOfRec:(kind,r)=>kind==="fac"?r.id:kind==="sh"?r.facilityId:facOfSheet(r.sheetId)};
+  }
+  function seedTrees(){
+    const {fac,sh,se}=SNAP, t=treeOf(sh,se), real=new Set(), seen=new Set();
+    [["fac",fac],["sh",sh],["se",se]].forEach(([k,m])=>{
+      for(const id in m){ const r=m[id]; if(!r) continue; const f=t.facOfRec(k,r);
+        if(f!=null) seen.add(f);
+        if(!r.seed) real.add(f==null?"\u0000"+id:f); } });
+    return new Set([...seen].filter(f=>!real.has(f)));
+  }
+
   const Repo = {
-    async save(st){
+    async save(st,opts){
       const d=decompose(st);
       SNAP={fac:stampChanges(d.fac,SNAP.fac),sh:stampChanges(d.sh,SNAP.sh),se:stampChanges(d.se,SNAP.se)};
+      if(opts&&opts.seed) [SNAP.fac,SNAP.sh,SNAP.se].forEach(m=>{for(const id in m) if(m[id]&&!m[id].deleted) m[id].seed=true;});
       const prefs={};PREF_KEYS.forEach(k=>prefs[k]=st[k]);
       await Promise.all([Store.set(K.fac,JSON.stringify(SNAP.fac)),Store.set(K.sh,JSON.stringify(SNAP.sh)),
                          Store.set(K.se,JSON.stringify(SNAP.se)),Store.set(K.prefs,JSON.stringify(prefs))]);
@@ -309,6 +337,17 @@
           }else if(newer){dst[id]=b;taken++;}
         }
       };
+      /* Real facilities are arriving, so an untouched fabricated one has no reason
+         to stay. It was never sent, so nothing needs a tombstone. */
+      if(Object.values(inc.facilities||{}).some(f=>f&&!f.deleted)){
+        const gone=seedTrees();
+        if(gone.size){
+          const t=treeOf(SNAP.sh,SNAP.se);
+          for(const id in SNAP.se) if(gone.has(t.facOfSheet(SNAP.se[id].sheetId))){ delete SNAP.se[id]; taken++; }
+          for(const id in SNAP.sh) if(gone.has(SNAP.sh[id].facilityId)){ delete SNAP.sh[id]; taken++; }
+          for(const id in SNAP.fac) if(gone.has(id)){ delete SNAP.fac[id]; taken++; }
+        }
+      }
       fold(SNAP.fac,inc.facilities||{},false);
       fold(SNAP.sh ,inc.sheets    ||{},false);
       fold(SNAP.se ,inc.sessions  ||{},true);
@@ -327,6 +366,17 @@
     /* The per-kind maps as last written — what sync collects, and what a
        backup is made of. */
     maps(){ return {fac:SNAP.fac, sh:SNAP.sh, se:SNAP.se}; },
+
+    /* What sync sends: the maps without any tree that is still only a seed, and
+       without the mark itself. */
+    outgoing(){
+      const gone=seedTrees(), t=treeOf(SNAP.sh,SNAP.se), out={fac:{},sh:{},se:{}};
+      [["fac",SNAP.fac],["sh",SNAP.sh],["se",SNAP.se]].forEach(([k,m])=>{
+        for(const id in m){ const r=m[id]; if(!r) continue;
+          if(gone.has(t.facOfRec(k,r))) continue;
+          const c=Object.assign({},r); delete c.seed; out[k][id]=c; } });
+      return out;
+    },
 
     /* What migrating the old sizes would do, without doing it. For the
        "preview, then approve" step: nothing is written. */

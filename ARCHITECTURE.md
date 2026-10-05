@@ -94,6 +94,20 @@ per-kind maps in local storage, and each carries its own timestamp.
 | `glass_widths` | `glass_record_v2` | the builder's one-tap widths for a facility, id = the facility id; reads 43 and 48 until somebody changes it, and no record exists before then |
 | — | `ice_v4_prefs` | **device-local, never synced** |
 
+**Seeds.** A device with no records invents a facility, a sheet and a round
+(`freshState()` in `ice.html`) so there is something to draw. That is where it
+starts, not something anybody observed, so `Repo.save(state, {seed:true})` marks
+the three records `seed`. The mark is never part of a record's content (`bodyOf`
+ignores it), survives saves only while the record is unchanged, and goes with the
+first real edit. `Repo.outgoing()` is what sync collects: it leaves out any
+facility tree (facility, its sheets, their rounds) in which every record is still a
+seed, and strips the mark from the rest, so one real edit sends the whole tree and a
+round never arrives under a sheet the server has not seen. `Repo.merge()` drops an
+untouched seed tree as soon as incoming data contains a live facility. Before this a
+fresh device pushed its invention before its first pull and every device's list
+gained a phantom "Main facility". Anything new that can fabricate a record on a
+device must go through the same mark.
+
 Every record also carries `fac` (the facility it belongs to) and, coming back from the
 server, `changedBy`. Both are metadata the comparison in `bodyOf()` ignores: see
 *Access, people and the activity log*.
@@ -500,6 +514,7 @@ node dev/handovertest.js   # 40 checks: changing hands on a shared iPad, offline
 node dev/shapetest.js      # 52 checks: one shape per sheet, the migration, the builder's compare and update
 node dev/controlstest.js   # 35 checks: edit controls lock until unlocked; what only reads stays open
 node dev/whotest.js        # 19 checks: nobody types their name; the server's stamp is shown
+node dev/seedtest.js       # 20 checks: a fresh device's invented facility is a seed: never sent while untouched, sent whole when edited, dropped when real ones arrive
 node dev/widthstest.js     # 25 checks: a facility's one-tap widths (default 43/48, no record until changed); only Management resolves or reopens a flag
 ```
 

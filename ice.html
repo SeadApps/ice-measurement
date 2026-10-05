@@ -1147,13 +1147,16 @@ function migrateV1(o){const st=freshState();st.facilities[0].sheets[0].sessions[
 async function boot(){state=await Repo.load();
   if(!state){const v2=await Store.get(V2);if(v2){try{state=migrateV2(JSON.parse(v2));}catch(e){}}}
   if(!state){const v1=await Store.get(V1);if(v1){try{state=migrateV1(JSON.parse(v1));}catch(e){}}}
-  if(!state)state=freshState();
+  let invented=false;
+  if(!state){state=freshState();invented=true;}
   if(!state.theme)state.theme="dark";
   const sharedTheme=await Store.get("rink_theme");   // kept in step with glass.html
   if(sharedTheme==="light"||sharedTheme==="dark")state.theme=sharedTheme;else Store.set("rink_theme",state.theme);
   if(!state.unit)state.unit="in";
   if(state.lastBackup===undefined)state.lastBackup=null;
-  if(!state.facilities||!state.facilities.length)state=freshState();
+  if(!state.facilities||!state.facilities.length){state=freshState();invented=true;}
+  /* Invented, not observed: marked so it stays off the wire until somebody really edits it. */
+  if(invented)await Repo.save(state,{seed:true});
   if(!facility())state.activeFacility=state.facilities[0].id;
   if(!sheet())state.activeSheet=facility().sheets[0].id;
   if(!session())state.activeSession=sheet().sessions[0].id;
@@ -1171,7 +1174,7 @@ boot().then(()=>{
   if(!SYNC) return;
   SYNC.attach({
     kinds:["facility","sheet","session"],
-    collect:()=>{const m=Repo.maps();return {facility:m.fac, sheet:m.sh, session:m.se};},
+    collect:()=>{const m=Repo.outgoing();return {facility:m.fac, sheet:m.sh, session:m.se};},
     apply:(incoming)=>{
       const res=Repo.merge({facilities:incoming.facility||{}, sheets:incoming.sheet||{}, sessions:incoming.session||{}});
       if(!res.taken) return 0;

@@ -464,7 +464,7 @@ async function paintAll(){
   await Records.Repo.load();    // hydrate the snapshot, so collect() can report it
   Sync.attach({
     kinds: ['facility', 'sheet', 'session'],
-    collect: () => { const m = Records.Repo.maps();
+    collect: () => { const m = Records.Repo.outgoing();
                      return { facility: m.fac, sheet: m.sh, session: m.se }; },
     apply: (incoming) => {
       const res = Records.Repo.merge({ facilities: incoming.facility || {},

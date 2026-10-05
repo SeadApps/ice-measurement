@@ -28,7 +28,11 @@ const rpc=(t,fn,body)=>fetch(B+'/rest/v1/rpc/'+fn,{method:'POST',headers:H(t),bo
 const has=async id=>(await rows()).some(r=>r.id===id);
 
 async function device(browser,name){
-  const ctx=await browser.newContext({viewport:{width:1280,height:900}});
+  /* No service worker: here the fake server shares the page's origin, so the worker's
+     cache-first rule answers a repeated identical pull from its cache. Supabase is
+     cross-origin in production, which the worker leaves alone. A device that has sent
+     nothing pulls with the same cursor every time, which is how this showed up. */
+  const ctx=await browser.newContext({viewport:{width:1280,height:900},serviceWorkers:'block'});
   await ctx.addInitScript(c=>{window.__SYNC_CONFIG__=c;}, {url:B, anon:'test'});
   const p=await ctx.newPage();
   p.on('pageerror',e=>console.log('  !! '+name+' pageerror: '+String(e).split('\n')[0]));
@@ -132,6 +136,8 @@ await P.p.goto(B+'/ice.html'); await sleep(1200);
 await signIn(P.p,'pete','pete-code-1');
 
 ok('a person signs in locked', !(await editing(P.p)));
+/* A fresh device holds only an invented facility, which is not work. Take a reading. */
+await P.p.evaluate(()=>{ session().data['3']='1 1/2"'; persist(); }); await sleep(3000);
 ok('what they do is kept on the device', (await pending(P.p))>0);
 ok('and is not on the server', (await rows()).length===0);
 ok('the status says why it is waiting', /unlock/i.test(await pill(P.p)), await pill(P.p));
