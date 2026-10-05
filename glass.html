@@ -6,6 +6,7 @@
 <meta name="theme-color" content="#0d1620">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="shellbar.css">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Glass Manager">
 <title>Conway Arena Rink Glass</title>
@@ -63,15 +64,9 @@ header{display:flex;flex-wrap:wrap;align-items:center;gap:14px;padding-bottom:16
 .themeseg button[aria-pressed="true"]{background:var(--accent);color:#06222b}
 .themeseg button+button{border-left:1px solid var(--line)}
 .themeseg button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
-/* ---------- app switcher (shared with ice.html) ---------- */
-.appsw{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--surface)}
-.appsw a{display:flex;align-items:center;text-decoration:none;color:var(--ink-2);font:inherit;font-size:12.5px;
-  font-weight:600;padding:8px 14px;white-space:nowrap}
-.appsw a+a{border-left:1px solid var(--line)}
-.appsw a:hover{color:var(--ink);background:var(--surface-2)}
-.appsw a[aria-current="page"]{background:var(--surface-2);color:var(--ink)}
-.appsw a.mk{font-family:var(--mono);color:var(--accent);padding:8px 11px;font-size:13px}
-.appsw a:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+/* ---------- the shared bar (shell.js) is drawn into #shellbar, styled by shellbar.css ---------- */
+#shellbar{position:relative;z-index:50}
+@media print{#shellbar{display:none!important}}
 .specstrip{display:flex;gap:26px;flex-wrap:wrap;align-items:flex-end;justify-content:space-between}
 .specs{display:flex;gap:26px;flex-wrap:wrap}
 .spec{display:flex;flex-direction:column;gap:1px}
@@ -419,26 +414,19 @@ footer{font-size:12.5px;color:var(--ink-3);text-align:center;font-family:var(--m
 try{var _t=localStorage.getItem("rink_theme");}catch(e){}
 document.documentElement.setAttribute("data-theme",_t==="light"?"light":"dark");</script>
 
+<div id="shellbar"></div>
 <div class="wrap">
 <header>
   <div class="brand">
     <h1><span class="mark">[ &#9633; ]</span> Glass Manager</h1>
     <span class="sub">rink glass &middot; panel schedule &amp; condition</span>
   </div>
-  <nav class="appsw" aria-label="Apps">
-    <a class="mk" href="index.html" title="All apps">&#9671;</a>
-    <a href="ice.html">Ice</a>
-    <a href="glass.html" aria-current="page">Glass</a>
-  </nav>
   <span class="rinkwrap" id="rinkWrap" hidden>
     <select class="rinkpick" id="rinkPick" aria-label="Rink" hidden></select>
     <button type="button" class="rinkdel" id="rinkDel" hidden
             title="Remove this rink's glass" aria-label="Remove this rink's glass">&times;</button>
   </span>
   <button type="button" class="bld-x" id="addRink">+ Add a rink</button>
-  <div class="themeseg" role="group" aria-label="Theme">
-    <button type="button" id="thLight">Light</button><button type="button" id="thDark">Dark</button>
-  </div>
 </header>
 
 <div class="specstrip">
@@ -544,6 +532,7 @@ document.documentElement.setAttribute("data-theme",_t==="light"?"light":"dark");
 
 <script src="sync.js"></script>
 <script src="records.js"></script>
+<script src="shell.js"></script>
 <div class="bld" id="builder" hidden role="dialog" aria-modal="true" aria-labelledby="bldTitle">
   <div class="bld-box">
     <div class="bld-head">
@@ -1749,6 +1738,7 @@ async function switchRink(b){
     const patch = {activeSheet: sid}, sh = sheets[sid];
     if(sh && sh.facilityId) patch.activeFacility = sh.facilityId;
     await Records.Repo.savePrefs(patch);
+    if(typeof Shell !== 'undefined' && patch.activeFacility) Shell.setAddress(patch.activeFacility, sid);
   }
   defaultScope();
   buildPlan(); rail(); totals(); table(); detail(); paint(); paintFacility(); spares();
@@ -2004,13 +1994,10 @@ document.addEventListener('keydown', e=>{ if(e.key==='Escape' && sel) select(sel
 function applyTheme(t){
   document.documentElement.setAttribute('data-theme', t);
   document.querySelector('meta[name=theme-color]').setAttribute('content', t==='light' ? '#eaeff3' : '#0d1620');
-  th.light.setAttribute('aria-pressed', String(t==='light'));
-  th.dark.setAttribute('aria-pressed', String(t==='dark'));
 }
-const th = {light: document.getElementById('thLight'), dark: document.getElementById('thDark')};
 function setTheme(t){ applyTheme(t); Store.set('rink_theme', t); }
-th.light.addEventListener('click', ()=>setTheme('light'));
-th.dark.addEventListener('click',  ()=>setTheme('dark'));
+/* The shared bar changes the theme; Glass hears it as an event. */
+window.addEventListener('shell:prefs', e => { const d = e.detail || {}; if(d.theme) setTheme(d.theme); });
 
 /* ---------------- the rink builder ----------------
 
@@ -2384,10 +2371,14 @@ async function bldSave(){
   applyTheme(document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark');
   await restore();
   const st = await loadSurfaces();
+  /* The address says which rink you are at (the shared bar and the shell's pages write it), and
+     the stored preference is only the fallback. */
+  const here = (typeof Shell !== 'undefined') ? await Shell.whereFromAddress().catch(() => null) : null;
+  if(here){ launcherSheet = here.sid; launcherFacility = here.fid; }
   /* The launcher says which rink you are at, so open on it. Only where this
      device actually has that surface's glass - otherwise stay put rather than
      show an empty plan for a rink nobody has walked. */
-  const want = st && st.prefs && st.prefs.activeSheet;
+  const want = (here && here.sid) || (st && st.prefs && st.prefs.activeSheet);
   /* Glass's own switcher writes this same preference, so the two normally
      agree. They cannot agree about Conway on a device that has never synced -
      nothing there names Conway's surface - so a stored choice of it stands
@@ -2574,15 +2565,38 @@ async function bldSave(){
       return taken;
     }
   });
-  const hdr=document.querySelector('header');
-  if(hdr){ hdr.insertBefore(SYNC.statusEl(), hdr.querySelector('.themeseg'));
-           hdr.insertBefore(SYNC.signOutEl(), hdr.querySelector('.themeseg')); }
   /* What changes a record. Selectors, so the panel card and the stock rows, which are rebuilt on
      every selection, are covered too. Search, filters, printing and the plan itself stay open. */
   SYNC.onStatus(paintWho);
   SYNC.lockControls(['#addRink','[aria-label^="Remove this rink"]','.sbtn','#plabel','#ptag','#note','#noteClear',
     '#noteSave','#load','#spSize','#spW','#spH','#spT','#spQty','#spNote','#spAdd','.sp-undo']);
-  SYNC.start({title:'Arena Management System'});
+  SYNC.start({title:'Arena Management System'}).then(() => {
+    if(typeof Shell === 'undefined') return;
+    const sid0 = (activeBucket === LEGACY) ? boundSheetId : activeBucket, sh0 = sid0 && sheets[sid0];
+    return Shell.mountBar(document.getElementById('shellbar'), {app:'glass'}).then(() => Shell.whereFromAddress().catch(() => null)).then(w => {
+      /* An address that names a sheet with no glass is left as the person chose it, and Glass says so,
+         rather than rewriting it to the glass it happens to be showing. */
+      if(w && w.sid !== sid0 && !LAYOUTS[w.sid] && !(boundSheetId && w.sid === boundSheetId)){
+        sayTool('No glass has been built for ' + ((sheets[w.sid] && sheets[w.sid].name) || 'that sheet') + ' yet. Use + Add a rink to walk it.');
+      } else if(sh0 && sh0.facilityId) Shell.setAddress(sh0.facilityId, sid0);
+    });
+  });
+  /* A sheet chosen in the bar's menus is an address change. Glass follows it to that sheet's glass
+     if there is any; if there is none it says so and keeps showing the glass it has. */
+  window.addEventListener('hashchange', async () => {
+    const w = await Shell.whereFromAddress().catch(() => null);
+    if(!w){                                       // an address that names nothing goes back to where Glass is
+      const sid1 = (activeBucket === LEGACY) ? boundSheetId : activeBucket, sh1 = sid1 && sheets[sid1];
+      if(sh1 && sh1.facilityId) Shell.setAddress(sh1.facilityId, sid1);
+      return;
+    }
+    Shell.setAddress(w.fid, w.sid);               // and a facility alone is filled out to a sheet
+    launcherSheet = w.sid; launcherFacility = w.fid;
+    const b = LAYOUTS[w.sid] ? w.sid : (boundSheetId && w.sid === boundSheetId ? LEGACY : null);
+    if(b){ await switchRink(b); fillRinks(); return; }
+    fillRinks();
+    sayTool('No glass has been built for ' + ((sheets[w.sid] && sheets[w.sid].name) || 'that sheet') + ' yet. Use + Add a rink to walk it.');
+  });
 })();
 </script>
 

@@ -51,9 +51,10 @@ ok('prefs hold no rink data',       !('facilities' in st.prefs));
 const body=await p.textContent('body');
 ok('home renders after reload',     /fleet overview/i.test(body));
 
-// the theme toggle still round-trips through the shared key
-await p.click('#thLight'); await p.waitForTimeout(400);
+// the theme is chosen in the shared bar's account menu, and still round-trips through the shared key
+await p.click('#shellbar #acctMenu'); await p.click('#shellbar .dropdown .it:has-text("Light")'); await p.waitForTimeout(400);
 ok('theme still saves',             (await p.evaluate(()=>localStorage.getItem('rink_theme')))==='light');
+ok('and Ice, which holds its own copy, took it',  await p.evaluate(()=>state.theme)==='light');
 
 /* ---------------- the switcher, on a tablet ---------------- */
 
@@ -64,16 +65,16 @@ await p.waitForTimeout(400);
 if(await p.isVisible('.fl-row')) { await p.click('.fl-row'); await p.waitForTimeout(700); }
 ok('the workspace is open', await p.evaluate(()=>state.screen==='work'));
 ok('the switcher is there at tablet width',
-   await p.evaluate(()=>{const s=document.querySelector('.app .appsw');
+   await p.evaluate(()=>{const s=document.querySelector('#shellbar .appsw');
      return !!s && getComputedStyle(s).display!=='none';}));
 ok('and Glass is one click away',
-   await p.evaluate(()=>!!document.querySelector('.app .appsw a[href="glass.html"]')));
+   await p.evaluate(()=>!!document.querySelector('#shellbar .appsw a[href^="glass.html"]')));
 /* The bar loses a button rather than the route home: Ice's own entry in the
    switcher was a link to the page you are already on. */
 ok('the hamburger is gone',
    await p.evaluate(()=>!document.querySelector('#app .iconbtn[title="Home"]')));
 await p.click('#homeBtn'); await p.waitForTimeout(500);
-ok('its own name in the switcher goes back to the sheets',
+ok('the Sheets button goes back to the sheets',
    await p.evaluate(()=>state.screen==='home'));
 ok('without leaving the app', /ice\.html/.test(p.url()), p.url());
 await p.setViewportSize({width:1280, height:900});

@@ -27,6 +27,7 @@
   var data = null, route = { page: "facilities" }, notice = "";
   var statusEl = null, unlockEl = null, busy = false, again = false;
   var openMenu = null, acct = null;
+  var barApp = null, barHost = null, globalsOn = false;     // set when the bar is mounted inside Ice or Glass
 
   /* ---------- small DOM helper ---------- */
   function h(tag, p, kids) {
@@ -46,11 +47,19 @@
   /* ---------- the layout follows the width, not the device ---------- */
   function layoutFor(w) { return w <= PHONE_MAX ? "phone" : w <= IPAD_MAX ? "ipad" : "laptop"; }
   function measure() {
-    var n = layoutFor(global.innerWidth);
-    if (n === layoutName && appEl && appEl.dataset.layout === n) return;
+    var n = layoutFor(global.innerWidth), el = appEl || barHost;
+    if (n === layoutName && el && el.dataset.layout === n) return;
     layoutName = n;
     if (appEl) appEl.dataset.layout = n;
+    [].forEach.call(document.querySelectorAll(".sb[data-layout]"), function (e) { e.dataset.layout = n; });
+    fitBar();
     layoutCbs.forEach(function (cb) { try { cb(n); } catch (e) {} });
+  }
+
+  /* Inside Ice and Glass the page below the bar needs to know how tall it is. */
+  function fitBar() {
+    if (!barHost) return;
+    global.requestAnimationFrame(function () { document.documentElement.style.setProperty("--shellbar-h", barHost.offsetHeight + "px"); });
   }
 
   /* ---------- the address ---------- */
@@ -170,6 +179,7 @@
     var m = document.querySelector("meta[name=theme-color]");
     if (m) m.setAttribute("content", t === "light" ? "#f4f7fb" : "#0b0d0f");
     Store.set("rink_theme", t);
+    global.dispatchEvent(new CustomEvent("shell:prefs", { detail: { theme: t } }));      // an app holds its own copy and must hear it
   }
   function currentTheme() { return document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark"; }
 
@@ -178,7 +188,7 @@
   function toast(msg) {
     var t = document.getElementById("toast");
     /* On the body, not in the app: a sync that arrives redraws the app, and would take the message with it. */
-    if (!t) { t = h("div", { id: "toast", cls: "toast", role: "status" }); document.body.appendChild(t); }
+    if (!t) { t = h("div", { id: "toast", cls: "toast sb", role: "status" }); document.body.appendChild(t); }
     t.textContent = msg; t.hidden = false;
     clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.hidden = true; }, 4500);
   }
@@ -210,6 +220,16 @@
     data.prefs = await Repo.savePrefs({ lastBackup: new Date().toISOString() });
     toast(res === "shared" ? "Backup shared" : "Backup saved");
   }
+  /* A question asked in the page, not in a browser dialog. */
+  function askYesNo(title, body, yesLabel, onYes) {
+    var dlg = h("div", { cls: "dlg sb", id: "askDlg", role: "dialog", "aria-modal": "true", "aria-label": title }, [
+      h("div", { cls: "dlgbox" }, [h("h3", { text: title }), h("p", { text: body }),
+        h("div", { cls: "sbfoot" }, [
+          h("button", { cls: "sbx", type: "button", id: "askYes", text: yesLabel, onclick: function () { dlg.remove(); onYes(); } }),
+          h("button", { cls: "sbx ghost", type: "button", id: "askNo", text: "Cancel", onclick: function () { dlg.remove(); } })])])]);
+    document.body.appendChild(dlg);
+    var yes = document.getElementById("askYes"); if (yes) yes.focus();
+  }
   var fileIn = null;
   function restore() {
     if (SYNC && !SYNC.canRestore()) { toast(SYNC.restoreMessage); return; }
@@ -233,12 +253,12 @@
     var obj = null, pv = null;
     try { obj = JSON.parse(textContent); pv = Repo.previewImport(obj); } catch (e) { pv = { ok: false }; }
     if (!pv.ok) { toast("That doesn't look like a valid backup file."); return; }
-    var dlg = h("div", { cls: "dlg", id: "restoreDlg", role: "dialog", "aria-modal": "true", "aria-label": "Restore from backup" }, [
+    var dlg = h("div", { cls: "dlg sb", id: "restoreDlg", role: "dialog", "aria-modal": "true", "aria-label": "Restore from backup" }, [
       h("div", { cls: "dlgbox" }, [
         h("h3", { text: "Merge this backup into your data?" }),
         h("p", { id: "restoreCount", text: pv.rounds + " round" + (pv.rounds === 1 ? "" : "s") + " in the file. Nothing is deleted: where both copies changed the same round, the newer edit wins and readings from each are kept." }),
-        h("div", { cls: "foot" }, [
-          h("button", { cls: "btn", type: "button", id: "restoreYes", text: "Merge", onclick: async function () {
+        h("div", { cls: "sbfoot" }, [
+          h("button", { cls: "sbx", type: "button", id: "restoreYes", text: "Merge", onclick: async function () {
             dlg.remove();
             var res = await Repo.importAll(obj);
             if (!res.ok) { toast("That doesn't look like a valid backup file."); return; }
@@ -246,24 +266,31 @@
             if (res.taken && SYNC) SYNC.nudge();               // it should reach the other devices now
             toast(res.taken ? "Merged " + res.taken + " change" + (res.taken === 1 ? "" : "s") : "Already up to date");
           } }),
-          h("button", { cls: "btn ghost", type: "button", id: "restoreNo", text: "Cancel", onclick: function () { dlg.remove(); } })])])]);
-    (appEl || root).appendChild(dlg);
+          h("button", { cls: "sbx ghost", type: "button", id: "restoreNo", text: "Cancel", onclick: function () { dlg.remove(); } })])])]);
+    document.body.appendChild(dlg);
     var yes = document.getElementById("restoreYes"); if (yes) yes.focus();
   }
-  async function setUnit(u) { data.prefs = await Repo.savePrefs({ unit: u }); }
+  async function setUnit(u) {
+    data.prefs = await Repo.savePrefs({ unit: u });
+    global.dispatchEvent(new CustomEvent("shell:prefs", { detail: { unit: u } }));
+  }
+
+  /* Where a menu item goes: on the shell's own pages, an address on the page; inside an app,
+     the same address on that app's page, which the app reads. */
+  function link(fid, sid) { return (barApp ? barApp + ".html" : "") + "#/f/" + fid + (sid ? "/s/" + sid : ""); }
 
   function buildNav(f, s) {
-    var nav = h("header", { cls: "nav" });
-    nav.appendChild(h("a", { cls: "logo", href: "#/", title: "Facilities", text: "LOGO", id: "logo" }));
+    var nav = h("header", { cls: "nav sb" + (barApp ? " sb-app" : ""), "data-layout": layoutName });
+    nav.appendChild(h("a", { cls: "logo", href: barApp ? "index.html" : "#/", title: "Facilities", text: "LOGO", id: "logo" }));
 
     // the facility menu
     var fb = h("button", { cls: "menu", type: "button", id: "facMenu" }, [h("span", { text: f ? f.name : "Facility" })]);
     var fm = makeMenu(fb, function () {
       return (data.facilities || []).map(function (x) {
-        return { label: x.name, href: "#/f/" + x.id, current: !!f && x.id === f.id };
+        return { label: x.name, href: link(x.id), current: !!f && x.id === f.id };
       });
     });
-    fm.el.classList.add("fac");
+    fm.el.classList.add("mfac");
     nav.appendChild(fm.el);
 
     // the sheet menu, which has nothing to act on until a facility is chosen
@@ -271,16 +298,17 @@
       [h("span", { text: s ? (s.name || "Sheet") : "Sheet" })]);
     var sm = makeMenu(sb, function () {
       return ((f && f.sheets) || []).map(function (x) {
-        return { label: x.name || "Sheet", href: "#/f/" + f.id + "/s/" + x.id, current: !!s && x.id === s.id };
+        return { label: x.name || "Sheet", href: link(f.id, x.id), current: !!s && x.id === s.id };
       });
     });
-    sm.el.classList.add("sheet");
+    sm.el.classList.add("msheet");
     nav.appendChild(sm.el);
 
     // the app switch
     var sw = h("span", { cls: "appsw" + (s ? "" : " off"), id: "appSw" });
     ["ice", "glass"].forEach(function (a) {
-      sw.appendChild(h("a", { href: s ? appHref(a, f, s) : "#", "data-app": s ? a : null,
+      var here = barApp === a;                                   // the app you are in is marked, and goes nowhere
+      sw.appendChild(h("a", { href: s ? appHref(a, f, s) : "#", "data-app": (s && !here) ? a : null, "aria-current": here ? "true" : null,
                               text: a === "ice" ? "Ice" : "Glass" }));
     });
     nav.appendChild(sw);
@@ -290,10 +318,10 @@
       [h("span", { text: f ? (f.name + (s && (f.sheets || []).length > 1 ? " · " + (s.name || "") : "")) : "Facilities" })]);
     var cm = makeMenu(cb, function () {
       var items = [{ hd: "Facility" }];
-      (data.facilities || []).forEach(function (x) { items.push({ label: x.name, href: "#/f/" + x.id, current: !!f && x.id === f.id }); });
+      (data.facilities || []).forEach(function (x) { items.push({ label: x.name, href: link(x.id), current: !!f && x.id === f.id }); });
       if (f && (f.sheets || []).length) {
         items.push({ hr: true }, { hd: "Sheet" });
-        f.sheets.forEach(function (x) { items.push({ label: x.name || "Sheet", href: "#/f/" + f.id + "/s/" + x.id, current: !!s && x.id === s.id }); });
+        f.sheets.forEach(function (x) { items.push({ label: x.name || "Sheet", href: link(f.id, x.id), current: !!s && x.id === s.id }); });
       }
       return items;
     });
@@ -308,7 +336,7 @@
     var ab = h("button", { cls: "chipu", type: "button", id: "acctMenu" }, [h("span", { id: "whoName", text: who ? who.name : "Menu" })]);
     acct = makeMenu(ab, function () {
       var it = [];
-      if (isManager()) it.push({ hd: "Account" }, { label: "Staff", href: "#/staff", current: route.page === "staff" }, { hr: true });
+      if (isManager()) it.push({ hd: "Account" }, { label: "Staff", href: (barApp ? "index.html" : "") + "#/staff", current: route.page === "staff" }, { hr: true });
       it.push({ hd: "Theme" },
         { label: "Light", current: currentTheme() === "light", onclick: function () { theme("light"); acctRefresh(); } },
         { label: "Dark", current: currentTheme() === "dark", onclick: function () { theme("dark"); acctRefresh(); } },
@@ -320,9 +348,15 @@
         { label: "Restore from backup\u2026", onclick: function () { restore(); } },
         { label: backupAgo((data.prefs || {}).lastBackup), disabled: true },
         { hr: true });
+      /* Restoring merges records into storage under a page that holds its own copy and would
+         save it straight back over them, so inside an app it stays where it is safe: on the shell's
+         pages (and Ice's own Preferences, which fixes up its state afterwards). */
+      if (barApp) it = it.filter(function (x) { return !/^Restore from backup/.test(x.label || ""); });
       if (SYNC) {
         if (person()) it.push({ label: "Switch user", onclick: function () { SYNC.switchUser(); } });
-        it.push({ label: "Sign out", onclick: function () { SYNC.signOut(); } });
+        it.push({ label: "Sign out", onclick: function () {
+          askYesNo("Sign out of this device?", "You\u2019ll need the access code to get back in. Anything saved on this device stays where it is.", "Sign out",
+            function () { SYNC.signOut(); }); } });
       }
       return it;
     }, true);
@@ -414,13 +448,10 @@
     } finally { busy = false; }
   }
 
-  /* ---------- starting ---------- */
-  async function mount(rootEl, homeApp) {
-    root = rootEl; home = homeApp;
-    root.appendChild(h("div", { cls: "boot", text: "Arena Management System" }));
-    measure();
+  /* The listeners both the shell's pages and the bar inside an app need, once. */
+  function installGlobals() {
+    if (globalsOn) return; globalsOn = true;
     global.addEventListener("resize", measure);
-    global.addEventListener("hashchange", refresh);
     document.addEventListener("click", function (e) {
       if (openMenu && !openMenu.drop.contains(e.target)) closeMenu();
       var a = e.target.closest && e.target.closest("[data-app]");
@@ -431,6 +462,68 @@
       }
     });
     document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeMenu(); });
+  }
+
+  /* ---------- the bar inside Ice and Glass ----------
+     An app hands over an element and the bar is drawn there; the app's own page is untouched
+     below it. The app reads where you are from the address (whereFromAddress), keeps the address
+     in step when it changes sheet itself (setAddress), and hears a change of sheet from the bar's
+     menus as an ordinary hashchange. A theme or unit chosen in the bar reaches it as "shell:prefs",
+     because the app holds its own copy and would otherwise save the old one back. */
+  async function barData() {
+    var st = await Repo.read();
+    return { prefs: (st && st.prefs) || {}, facilities: ((st && st.facilities) || []).filter(function (f) { return canSee(f.id); }),
+             sessions: (st && st.sessions) || [], glass: {}, removed: [] };
+  }
+  /* The facility and sheet the address names, if this person may have them: {fid, sid}, else null.
+     A facility with no sheet named means the sheet you were last on there, or its first. */
+  async function whereFromAddress() {
+    var r = parse(global.location.hash);
+    if (r.page !== "sheets" || !r.fid) return null;
+    var d = await barData(), f = d.facilities.filter(function (x) { return x.id === r.fid; })[0];
+    if (!f) return null;
+    var sheets = f.sheets || [], s = r.sid ? sheets.filter(function (x) { return x.id === r.sid; })[0]
+      : (sheets.filter(function (x) { return x.id === (d.prefs || {}).activeSheet; })[0] || sheets[0]);
+    return s ? { fid: f.id, sid: s.id } : null;
+  }
+  async function paintBar() {
+    if (!barHost) return;
+    data = await barData();
+    var r = parse(global.location.hash), f = null, s = null;
+    if (r.fid) f = data.facilities.filter(function (x) { return x.id === r.fid; })[0] || null;
+    if (!f) f = data.facilities.filter(function (x) { return x.id === data.prefs.activeFacility; })[0] || data.facilities[0] || null;
+    if (f && r.sid) s = (f.sheets || []).filter(function (x) { return x.id === r.sid; })[0] || null;
+    if (f && !s) s = (f.sheets || []).filter(function (x) { return x.id === data.prefs.activeSheet; })[0] || (f.sheets || [])[0] || null;
+    route = { page: "sheets", fid: f ? f.id : null, sid: s ? s.id : null };
+    closeMenu();
+    barHost.replaceChildren(buildNav(f, s));
+    fitBar();
+  }
+  /* The app changed sheet itself (a row on its own home screen): put that in the address, and
+     in where-you-are, without a navigation. Called on every save, so it is cheap when nothing moved. */
+  function setAddress(fid, sid) {
+    if (!barHost || !fid || !sid) return;
+    var want = "#/f/" + fid + "/s/" + sid;
+    if (global.location.hash === want) return;
+    global.history.replaceState(null, "", global.location.pathname + global.location.search + want);
+    paintBar();
+  }
+  async function mountBar(host, opts) {
+    barHost = host; barApp = (opts && opts.app) || null;
+    host.dataset.layout = layoutName;
+    if (SYNC) { statusEl = SYNC.statusEl(); unlockEl = SYNC.unlockEl ? SYNC.unlockEl() : null; }
+    installGlobals(); measure();
+    global.addEventListener("hashchange", paintBar);
+    await paintBar();
+  }
+
+  /* ---------- starting ---------- */
+  async function mount(rootEl, homeApp) {
+    root = rootEl; home = homeApp;
+    root.appendChild(h("div", { cls: "boot", text: "Arena Management System" }));
+    measure();
+    installGlobals();
+    global.addEventListener("hashchange", refresh);
 
     if (SYNC) {
       await Repo.load();                          // hydrate the snapshot, so collect() can report it
@@ -456,7 +549,7 @@
   }
 
   var Shell = {
-    mount: mount, refresh: refresh, repaint: repaint, toast: toast, backUp: backUp, canEdit: canEdit, go: go, h: h, status: status, setHere: setHere, appHref: appHref,
+    mount: mount, mountBar: mountBar, whereFromAddress: whereFromAddress, setAddress: setAddress, refresh: refresh, repaint: repaint, toast: toast, backUp: backUp, canEdit: canEdit, go: go, h: h, status: status, setHere: setHere, appHref: appHref,
     layout: function () { return layoutName; },
     onLayout: function (cb) { layoutCbs.push(cb); cb(layoutName); },
     route: function () { return route; }, data: function () { return data; },

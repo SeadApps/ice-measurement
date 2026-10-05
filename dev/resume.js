@@ -41,7 +41,7 @@ await p.goto('http://localhost:8200/glass.html'); await p.waitForTimeout(900);
 ok('glass app loads', (await p.$$('.pnl')).length===127);
 
 // ...and back again via the tab
-await p.click('.appsw a[href="ice.html"]'); await p.waitForTimeout(1600);
+await p.click('#shellbar .appsw a:has-text("Ice")'); await p.waitForTimeout(1600);
 ok('returns straight to the sheet, not home', await p.isVisible('#rink') && !(await p.isVisible('#home')));
 ok('same sheet as before ('+sheetName.trim()+')', (await p.$eval('#wsName',e=>e.textContent)).trim()===sheetName.trim());
 ok('and the same view (Trend)', await p.$eval('#viewTrend',e=>e.getAttribute('aria-pressed'))==='true');
@@ -50,7 +50,7 @@ ok('and the same view (Trend)', await p.$eval('#viewTrend',e=>e.getAttribute('ar
 await p.click('#homeBtn'); await p.waitForTimeout(700);
 ok('home button still goes home', await p.isVisible('#home'));
 await p.goto('http://localhost:8200/glass.html'); await p.waitForTimeout(700);
-await p.click('.appsw a[href="ice.html"]'); await p.waitForTimeout(1500);
+await p.click('#shellbar .appsw a:has-text("Ice")'); await p.waitForTimeout(1500);
 ok('having chosen home, it stays home', await p.isVisible('#home'));
 
 // a plain reload behaves the same way

@@ -4,6 +4,7 @@
 <meta name="theme-color" content="#0d1620">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="shellbar.css">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Ice Sheet">
@@ -269,17 +270,9 @@
   .themeseg button[aria-pressed="true"]{background:var(--frost);color:#06222b}
   .themeseg button+button{border-left:1px solid var(--line)}
 
-  /* ---------- app switcher (shared with glass.html) ---------- */
-  .appsw{display:inline-flex;height:var(--ctl);border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--panel);flex:none}
-  .appsw a{display:flex;align-items:center;text-decoration:none;color:var(--ink-dim);font:inherit;font-size:12.5px;
-    font-weight:600;padding:0 14px;white-space:nowrap}
-  .appsw a+a{border-left:1px solid var(--line)}
-  .appsw a:hover{color:var(--ink);background:var(--panel-2)}
-  .appsw a[aria-current="page"]{background:var(--panel-2);color:var(--ink)}
-  .appsw a.mk{font-family:var(--mono);color:var(--frost);padding:8px 11px;font-size:13px}
-  .appsw a.mk:hover{background:var(--panel-2)}
-  .appsw a:focus-visible{outline:2px solid var(--frost);outline-offset:-2px}
-  @media print{.appsw{display:none!important}}
+  /* ---------- the shared bar (shell.js) is drawn into #shellbar, styled by shellbar.css ---------- */
+  #shellbar{position:relative;z-index:50}
+  @media print{#shellbar{display:none!important}}
 
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
   input[type=file]{display:none}
@@ -295,13 +288,12 @@
     #printRoot td strong{font-weight:700}}
 </style>
 
+<div id="shellbar"></div>
+
 <!-- ===================== HOME ===================== -->
 <div id="home">
   <div class="home-bar">
     <div class="brand"><h1><span class="mark">[ ◊ ]</span> Ice Sheet</h1><span class="sub">ice thickness · multi-facility</span></div>
-    <nav class="appsw" aria-label="Apps"><a class="mk" href="index.html" title="All apps">&#9671;</a><a href="ice.html" aria-current="page">Ice</a><a href="glass.html">Glass</a></nav>
-    <div class="themeseg" role="group" aria-label="Theme"><button id="thLight">Light</button><button id="thDark">Dark</button></div>
-    <button class="iconbtn unit" id="unitHomeBtn" title="Switch units" aria-label="Switch units">in</button>
     <button class="iconbtn" id="gearHome" title="Preferences" aria-label="Preferences">⚙</button>
   </div>
 
@@ -342,7 +334,7 @@
 <!-- ===================== WORKSPACE ===================== -->
 <div class="app" id="app">
   <header class="bar">
-    <nav class="appsw" aria-label="Apps"><a class="mk" href="index.html" title="All apps">&#9671;</a><a href="ice.html" id="homeBtn" aria-current="page" title="Back to the sheets">Ice</a><a href="glass.html">Glass</a></nav>
+    <button class="iconbtn" id="homeBtn" title="Back to the sheets" aria-label="Back to the sheets" style="width:auto;padding:0 12px">&larr; Sheets</button>
     <div class="brand-mini"><b id="wsName">Sheet</b><span class="sub" id="wsFac"></span></div>
     <div class="count-pill" id="countPill"><b id="countNum">0</b> / <span id="countTot">33</span> logged</div>
     <div class="seg" role="group" aria-label="View">
@@ -350,8 +342,6 @@
       <button id="viewTrend" aria-pressed="false">Trend</button>
       <button id="view3d" aria-pressed="false">3D</button>
     </div>
-    <button class="iconbtn" id="themeBtn" title="Toggle theme" aria-label="Toggle theme">☾</button>
-    <button class="iconbtn unit" id="unitBtn" title="Switch units" aria-label="Switch units">in</button>
     <button class="iconbtn" id="gear" title="Preferences" aria-label="Preferences">⚙</button>
   </header>
 
@@ -543,6 +533,7 @@
 
 <script src="sync.js"></script>
 <script src="records.js"></script>
+<script src="shell.js"></script>
 <script>
 "use strict";
 /* ---------- geometry (per-sheet rink size) ---------- */
@@ -637,6 +628,10 @@ const data=()=>session().data, notes=()=>session().notes;
 function baselineSession(){const sh=sheet();if(compareId){const s=sh.sessions.find(s=>s.id===compareId);if(s)return s;}
   const ord=[...sh.sessions].sort((a,b)=>new Date(b.date)-new Date(a.date));const ai=ord.findIndex(s=>s.id===session().id);return ord[ai+1]||null;}
 
+/* The shared bar changes the theme and the unit. Ice holds its own copy of both and would save
+   the old one straight back, so it takes them from the event. */
+window.addEventListener("shell:prefs",e=>{const d=e.detail||{};if(d.theme&&state&&d.theme!==state.theme)setTheme(d.theme);if(d.unit&&state&&d.unit!==state.unit)setUnit(d.unit);});
+
 /* ---------- persistence ----------
    The record store moved to records.js, which the launcher shares. What that
    buys is one copy of the merge rule and one copy of "overdue", instead of
@@ -646,7 +641,7 @@ const { Store, Repo, decompose, nowISO } = Records;
 
 const SYNC=(typeof Sync!=="undefined")?Sync:null;   // absent if sync.js failed to load; the app still works locally
 let saveTimer=null;const persist=()=>{clearTimeout(saveTimer);
-  saveTimer=setTimeout(()=>{Repo.save(state);if(SYNC)SYNC.nudge();},180);};
+  saveTimer=setTimeout(()=>{Repo.save(state);if(SYNC)SYNC.nudge();if(typeof Shell!=="undefined"&&state.facilities&&state.facilities.length)Shell.setAddress(facility().id,sheet().id);},180);};
 
 /* ---------- undo ---------- */
 let undoStack=[];const snap=()=>JSON.stringify({data:data(),notes:notes()});
@@ -897,21 +892,17 @@ $("expPdf").addEventListener("click",()=>{const img=renderToImage(2000).toDataUR
 
 /* ---------- theme ---------- */
 function applyTheme(){document.documentElement.setAttribute("data-theme",state.theme);document.querySelector('meta[name=theme-color]').setAttribute("content",state.theme==="light"?"#eaeff3":"#0d1620");
-  const dark=state.theme==="dark";$("themeBtn").textContent=dark?"☾":"☀";
-  [["thLight",!dark],["thDark",dark],["thLight2",!dark],["thDark2",dark]].forEach(([id,on])=>{const el=$(id);if(el)el.setAttribute("aria-pressed",String(on));});}
+  const dark=state.theme==="dark";
+  [["thLight2",!dark],["thDark2",dark]].forEach(([id,on])=>{const el=$(id);if(el)el.setAttribute("aria-pressed",String(on));});}
 function setTheme(t){state.theme=t;Store.set("rink_theme",t);applyTheme();persist();if(state.screen==="work"){drawLive();buildLegend();}else buildHome();}
-$("thLight").addEventListener("click",()=>setTheme("light"));$("thDark").addEventListener("click",()=>setTheme("dark"));
 $("thLight2").addEventListener("click",()=>setTheme("light"));$("thDark2").addEventListener("click",()=>setTheme("dark"));
-$("themeBtn").addEventListener("click",()=>setTheme(state.theme==="dark"?"light":"dark"));
 
 /* ---------- units ---------- */
-function applyUnitButtons(){const mm=isMM();[$("unitHomeBtn"),$("unitBtn")].forEach(b=>{if(b)b.textContent=mm?"mm":"in";});
+function applyUnitButtons(){const mm=isMM();
   const pi=$("unitPrefIn"),pm=$("unitPrefMM");if(pi)pi.setAttribute("aria-pressed",String(!mm));if(pm)pm.setAttribute("aria-pressed",String(mm));}
 function setUnit(u){if(state.unit===u)return;state.unit=u;applyUnitButtons();buildBands();buildChips();persist();
   if(state.screen==="work"){drawLive();buildLegend();renderStats();updateContourReadout();}else buildHome();
   if($("scrim").classList.contains("on"))buildSettings();}
-$("unitHomeBtn").addEventListener("click",()=>setUnit(isMM()?"in":"mm"));
-$("unitBtn").addEventListener("click",()=>setUnit(isMM()?"in":"mm"));
 $("unitPrefIn").addEventListener("click",()=>setUnit("in"));
 $("unitPrefMM").addEventListener("click",()=>setUnit("mm"));
 
@@ -1157,6 +1148,11 @@ async function boot(){state=await Repo.load();
   if(!state.unit)state.unit="in";
   if(state.lastBackup===undefined)state.lastBackup=null;
   if(!state.facilities||!state.facilities.length){state=freshState();invented=true;}
+  /* Where you are is read from the address, which the shared bar and the shell's pages write;
+     the stored preference is only the fallback. */
+  const here=(typeof Shell!=="undefined")?await Shell.whereFromAddress().catch(()=>null):null;
+  if(here&&!invented){const f=state.facilities.find(x=>x.id===here.fid),sh=f&&f.sheets.find(x=>x.id===here.sid);
+    if(sh){state.activeFacility=f.id;state.activeSheet=sh.id;state.activeSession=[...sh.sessions].sort((a,b)=>new Date(b.date)-new Date(a.date))[0].id;}}
   /* Invented, not observed: marked so it stays off the wire until somebody really edits it. */
   if(invented)await Repo.save(state,{seed:true});
   if(!facility())state.activeFacility=state.facilities[0].id;
@@ -1192,16 +1188,27 @@ boot().then(()=>{
       return res.taken;
     }
   });
-  const bar=document.querySelector("#home .home-bar");
-  if(bar){ bar.insertBefore(SYNC.statusEl(), bar.querySelector(".themeseg"));
-           bar.insertBefore(SYNC.signOutEl(), bar.querySelector(".themeseg")); }
   /* What changes a record. Selectors, so controls built on the fly are covered too. Theme, units,
      view switches, exports and the map itself are device preferences or reading, and stay open. */
   SYNC.lockControls(["#logNew","#newRound","#roundCreate","#sheetCreate","#addFacBtn","#addSheetBtn",".fac.add",
     "#resetBands","#undoBtn","#clearBtn","#impBtn","#backupImport","#noteInput",".chip[data-opt]",".chip.clear",
     "#targetIn","#floodIn","#shaveIn","#tieChk","#edges input","#facManage input","#facManage .del",
     "#sheetManage input","#sheetManage .del","#roundManage input","#roundManage .del",".rdel"]);
-  SYNC.start({title:"Arena Management System"});
+  SYNC.start({title:"Arena Management System"}).then(()=>{
+    if(typeof Shell==="undefined")return;
+    return Shell.mountBar($("shellbar"),{app:"ice"}).then(()=>Shell.setAddress(facility().id,sheet().id));
+  });
+  /* A sheet chosen in the bar's menus is an address change; Ice follows it. */
+  window.addEventListener("hashchange",async()=>{
+    const w=await Shell.whereFromAddress().catch(()=>null);
+    if(!w){Shell.setAddress(facility().id,sheet().id);return;}          // an address that names nothing goes back to where Ice is
+    Shell.setAddress(w.fid,w.sid);                                      // and a facility alone is filled out to a sheet
+    if(w.fid===facility().id&&w.sid===sheet().id)return;
+    state.activeFacility=w.fid;state.activeSheet=w.sid;
+    state.activeSession=[...sheet().sessions].sort((a,b)=>new Date(b.date)-new Date(a.date))[0].id;
+    compareId=null;clearUndo();applyGeometry(Records.sizeOf(sheet()),session().mode);buildBands();buildChips();persist();
+    if(state.screen==="work")enterWork(state.lastView);else goHome();
+  });
 });
 
 /* ---------- PWA: install this file + its assets so the app opens and works offline ---------- */

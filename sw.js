@@ -1,6 +1,7 @@
 // Bump CACHE_VERSION whenever you change any file listed below — there's no build
 // step, so this string is the only thing that retires the previous cache.
-const CACHE_VERSION = "arena-v16";  // v16: the Staff page; sync.js, shell.js, home.js, shell.css
+const CACHE_VERSION = "arena-v17";  // v17: the shared bar inside Ice and Glass (shellbar.css); shell.js, ice.html, glass.html
+// v16: the Staff page; sync.js, shell.js, home.js, shell.css
 // v15: backup, restore and units in the account menu; records.js, shell.js, shell.css, ice.html
 // v14: Sheet settings page; records compared in a fixed key order; hidden sheets keep their rounds; records.js, home.js, shell.js, shell.css
 // v13: the shell replaces the launcher (index.html, shell.js, shell.css, home.js); the old launcher is launcher.html
@@ -10,7 +11,7 @@ const CACHE_VERSION = "arena-v16";  // v16: the Staff page; sync.js, shell.js, h
 // v9: D1 — two-step sign-in, editing lock, facility tags, sheet shape; sync.js, records.js, ice.html, glass.html
 const PRECACHE_URLS = [
   "./", "index.html", "ice.html", "glass.html", "sync.js", "records.js",
-  "shell.js", "shell.css", "home.js", "launcher.html",
+  "shell.js", "shell.css", "shellbar.css", "home.js", "launcher.html",
   "manifest.json", "icon-192.png", "icon-512.png"
 ];
 

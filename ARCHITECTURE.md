@@ -6,7 +6,8 @@ No build step, no framework, no dependencies. Edit a file, push, done.
 ```
 index.html    the shell's page: loads shell.js and home.js and mounts them (D2)
 shell.js      the shell: address, chrome, the one writer of where you are
-shell.css     the Ice Board look for the chrome and its pages
+shell.css     the Ice Board look for the shell's own pages (rail, tab bar, rows, forms)
+shellbar.css  the shared bar's look, scoped under .sb so it can sit inside Ice and Glass without restyling them
 home.js       the shell's pages: Facilities, Sheets (holding pages for settings and Staff)
 launcher.html the old launcher, unlinked, kept as a fallback until D5 deletes it
 ice.html      Ice Manager  — thickness rounds, contour map, trends (multi-facility)
@@ -566,6 +567,7 @@ node dev/overduetest.js    # 16 checks: overdue days belong to the facility; Ice
 node dev/routetest.js       # 40 checks: the shell's addresses, back/forward, a Staff person and a shared iPad, the apps follow where you are
 node dev/shelltest.js       # 91 checks: the chrome at 390/820/1024/1280, breakpoints, menus, theme, tab bar, rail
 node dev/facilitiestest.js  # 45 checks: Facilities and Sheets agree with Ice, trends, adding, nothing restamped, an empty device, people
+node dev/bartest.js          # 58 checks: the shared bar inside Ice and Glass: the address, the menus, theme and unit reaching the app, what it replaced, phone and laptop, nothing restamped
 node dev/stafftest.js        # 65 checks: Staff page: add, edit, reset, remove, restore, shared codes, activity; a code shown once and stored nowhere; new people can sign in; Staff cannot reach it
 node dev/backuptest.js      # 44 checks: backup and restore from the account menu, merging, old files, units, Ice and the shell make the same file, Staff cannot restore and never export what they may not see
 node dev/settingstest.js    # 68 checks: Sheet settings writes name and shape and nothing else; draft, validation, glass check, Staff read-only, remove and undo; Ice draws the new outline
@@ -627,8 +629,24 @@ replaces the launcher, which lives on as `launcher.html` (unlinked, still tested
   is corrected; it never says which, so it does not reveal what exists.
 - **Where you are** is a device preference (`activeFacility`, `activeSheet`, `activeSession`)
   and the shell is its only writer, through `Repo.savePrefs`. Opening a facility or sheet
-  address writes it; Facilities does not. Ice and Glass still read it from the preference;
-  mounting the bar inside them (and reading the address there) is the last D2 step.
+  address writes it; Facilities does not. Ice and Glass read it from the address (see below).
+- **The bar inside Ice and Glass.** Each app has a `<div id="shellbar">` above its page and calls
+  `Shell.mountBar(el, {app})` after the sign-in gate; the bar is the same one the shell draws (logo,
+  facility and sheet menus, Ice|Glass switch, sync pill, unlock, account menu), with `sb-app` on it so
+  the app switch stays on a phone (there is no tab bar or rail inside an app until D3 and D4). The apps
+  lost their own app switchers, theme and unit buttons and sign-out. Kept on purpose: Ice's Preferences
+  and its Sheets button, and Glass's *+ Add a rink* (the only way into its builder until D4).
+  *Where you are* is read from the address by `Shell.whereFromAddress()` at boot (the preference is only
+  the fallback), kept in step by `Shell.setAddress(fid, sid)` when the app changes sheet itself (called on
+  every Ice save, cheap when nothing moved), and followed on `hashchange`, which is what a choice in the
+  bar's menus is. An address that names nothing snaps back to where the app is; a facility alone is filled
+  out to a sheet. Glass on a sheet with no glass keeps the address you chose and says so, and keeps showing
+  the glass it has. A theme or unit chosen in the bar reaches the app as a `shell:prefs` event, because the
+  app holds its own copy and would otherwise save the old one back over it. Inside an app the account menu
+  has no *Restore* (an app would save its older state straight over the merged records); Sign out asks in
+  the page. The bar's classes are scoped under `.sb`, and two collisions that cost an afternoon are worth
+  remembering: a class on a bar element that an app also styles (`.fac`, `.sbtn`) restyles or even *locks*
+  the bar, so the bar's own classes must not be ones the apps use.
 - **Layout follows the width**: up to 560 phone (tab bar, one context button), 561 to 1100 iPad
   (the full bar), 1101 and up laptop (the bar plus a rail). `Shell.layout()` /
   `Shell.onLayout()` / `Shell.breakpoints` are for D3 and D4 to ask.
