@@ -566,6 +566,7 @@ node dev/overduetest.js    # 16 checks: overdue days belong to the facility; Ice
 node dev/routetest.js       # 40 checks: the shell's addresses, back/forward, a Staff person and a shared iPad, the apps follow where you are
 node dev/shelltest.js       # 91 checks: the chrome at 390/820/1024/1280, breakpoints, menus, theme, tab bar, rail
 node dev/facilitiestest.js  # 45 checks: Facilities and Sheets agree with Ice, trends, adding, nothing restamped, an empty device, people
+node dev/stafftest.js        # 65 checks: Staff page: add, edit, reset, remove, restore, shared codes, activity; a code shown once and stored nowhere; new people can sign in; Staff cannot reach it
 node dev/backuptest.js      # 44 checks: backup and restore from the account menu, merging, old files, units, Ice and the shell make the same file, Staff cannot restore and never export what they may not see
 node dev/settingstest.js    # 68 checks: Sheet settings writes name and shape and nothing else; draft, validation, glass check, Staff read-only, remove and undo; Ice draws the new outline
 node dev/restoretest.js    # 12 checks: restoring a backup (Ice) or a record file (Glass) is Management's; Staff are told and nothing merges
@@ -663,7 +664,20 @@ replaces the launcher, which lives on as `launcher.html` (unlinked, still tested
   Management's (`Sync.canRestore`) and needs the editing window, and is confirmed in the page, not a
   browser dialog; messages are a toast on the body, which a redraw cannot take away. Ice's own
   backup buttons call the same functions. Glass's separate record file is still its own until D4.
-- **Not yet**: the Staff page (D2b), and the bar inside Ice and Glass. The
+- **Staff** (`#/staff`, Management only; the rail and the account menu list it, and any other person
+  is sent to Facilities with the one message even by address): People and Activity tabs. People:
+  add, edit (name, role, facilities), reset code, remove and restore, with an in-page confirmation for
+  remove and for changing a shared code, plus the access code and editing code with when each was last
+  changed. Everything goes through `Sync.manage(action, body)`, which calls the `manage-staff` function
+  with the person's own token (a sign-in cannot be made or changed from a page, because that needs a
+  key that must never be in one). **A code is shown once**: it lives in one variable, is not written to
+  storage or the address, and is gone when the banner is dismissed or the page left. Restore always
+  issues a new code (the old one may have been shared). The server's refusals are shown as they come
+  ("That would leave no Manager.", "You cannot remove yourself."). Activity reads the change log through
+  `Sync.activity`, newest first, one line per change, filtered by person. `dev/fake-supabase.js` has a
+  `/functions/v1/manage-staff` endpoint with the real function's actions, rules and wording, so the page is
+  tested against the same contract; the real function has still not been run.
+- **Not yet**: the bar inside Ice and Glass. The
   account menu, and the bar inside Ice and Glass. The Ice Board fonts are system stacks, so
   the app stays offline-capable and makes no outside request.
 

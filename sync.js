@@ -951,6 +951,23 @@
     /* Adding or removing a facility or a sheet is Management's, on the same terms
        as restoring: open before anybody signs in as a person, Management after. */
     canManage: function () { return !person || scope === "*"; },
+    /* The one way people and codes are changed: the manage-staff function, called with this
+       person's own token. It refuses anyone who is not an active Manager, and its messages are
+       fit to show. A code it returns is shown once by whoever asked; nothing here keeps it.
+       Resolves {ok, ...answer} or {ok:false, error, status}. */
+    manage: function (action, body) {
+      var offline = { ok: false, error: "Can't reach the server. Check the connection and try again." };
+      if (!person || !session) return Promise.resolve({ ok: false, error: "Sign in first." });
+      return ensureToken().then(function (res) {
+        if (res !== "ok") return offline;
+        return fetch(CFG.url + "/functions/v1/manage-staff", { method: "POST", headers: headers(true), cache: "no-store",
+          body: JSON.stringify(Object.assign({}, body || {}, { action: action })) }).then(function (r) {
+          return r.json().catch(function () { return {}; }).then(function (j) {
+            return r.ok ? Object.assign({ ok: true }, j) : { ok: false, status: r.status, error: j.error || "That did not work (" + r.status + ")." };
+          });
+        });
+      }).catch(function () { return offline; });
+    },
     /* May this person see this facility? Everyone before people exist and
        Management always; Staff only what they were given. A person whose scope has
        not been fetched yet sees nothing until it is. This hides, it is not a security

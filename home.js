@@ -377,6 +377,245 @@
     return el;
   }
 
+  /* ---------- Staff ----------
+     Management's page for the people who can make changes. Everything goes through the
+     manage-staff function (Sync.manage), because creating a sign-in or changing a password
+     needs a key that must never be in a page. A code it hands back is shown ONCE, here, and
+     lives only in this variable: it is not written to storage, not put in the address, and
+     gone when the page is left, so there is no list of codes anywhere to leak. */
+  var staffTab = "people", staffData = null, staffLoading = false, staffMsg = "", reveal = null;
+  var ask = null, formFor = null, actLog = null, actLoading = false, actFilter = "all";
+  var CODE_ALPHABET = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";   // nothing easy to misread
+  function newCode() {
+    var b = new Uint8Array(10); (global.crypto || global.msCrypto).getRandomValues(b);
+    return Array.prototype.map.call(b, function (x) { return CODE_ALPHABET[x % CODE_ALPHABET.length]; }).join("");
+  }
+  function when(iso) {
+    if (!iso) return null;
+    var t = new Date(iso); if (isNaN(t)) return null;
+    var hm = ("0" + t.getHours()).slice(-2) + ":" + ("0" + t.getMinutes()).slice(-2), now = new Date(), day = 86400000;
+    var sod = function (x) { return new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime(); };
+    var diff = Math.round((sod(now) - sod(t)) / day);
+    if (diff === 0) return "Today, " + hm;
+    if (diff === 1) return "Yesterday, " + hm;
+    return t.getDate() + " " + ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][t.getMonth()] + ", " + hm;
+  }
+  function dateOnly(iso) { var w = when(iso); return w ? w.replace(/^(Today|Yesterday), \d\d:\d\d$/, "$1").replace(/, \d\d:\d\d$/, "") : null; }
+
+  async function loadStaff() {
+    if (staffLoading) return;
+    staffLoading = true;
+    var a = await Sync.manage("list"), c = await Sync.manage("codes");
+    staffLoading = false;
+    if (!a.ok) { staffMsg = a.error; staffData = { people: [], codes: {} }; }
+    else staffData = { people: a.people || [], codes: c.ok ? { access: c.access, editing: c.editing } : {} };
+    Shell.repaint();
+  }
+  async function loadActivity() {
+    if (actLoading) return;
+    actLoading = true;
+    var r = await Sync.activity({ order: "seq.desc", limit: 100 });
+    actLoading = false;
+    actLog = r.ok ? r.rows : []; if (!r.ok) staffMsg = r.error;
+    Shell.repaint();
+  }
+  /* One call, one message: say what the server said, then refresh what is on screen. */
+  async function act(action, body, done) {
+    staffMsg = "";
+    var r = await Sync.manage(action, body);
+    if (!r.ok) { staffMsg = r.error; Shell.repaint(); return r; }
+    if (done) done(r);
+    staffData = null; Shell.repaint();                       // reloads the list
+    return r;
+  }
+  function showCode(title, code, note) { reveal = { title: title, code: code, note: note }; }
+
+  function facName(d, id) {
+    var f = (d.facilities || []).filter(function (x) { return x.id === id; })[0];
+    return f ? f.name : id;
+  }
+  function personCard(d, p, me) {
+    var self = me && me.id === p.login;
+    var meta = (p.role === "management" ? "All facilities" : ((p.facilities || []).map(function (id) { return facName(d, id); }).join(", ") || "No facilities")) +
+      " \u00b7 " + (p.last_sign_in ? "last signed in " + when(p.last_sign_in) : "never signed in");
+    var acts = h("div", { cls: "acts" });
+    if (ask && ask.kind === "remove" && ask.login === p.login) {
+      acts.appendChild(h("span", { style: "font-size:13px", text: "Switch off " + p.name + "\u2019s code?" }));
+      acts.appendChild(h("button", { cls: "btn danger sm", type: "button", id: "rmYes", text: "Yes, remove", onclick: function () {
+        ask = null; act("remove", { login: p.login }, function () { reveal = null; Shell.toast(p.name + " has been removed. Their code no longer works."); }); } }));
+      acts.appendChild(h("button", { cls: "btn ghost sm", type: "button", id: "rmNo", text: "Keep", onclick: function () { ask = null; Shell.repaint(); } }));
+    } else if (p.active) {
+      acts.appendChild(h("button", { cls: "btn ghost sm", type: "button", "data-edit": p.login, text: "Edit", onclick: function () { formFor = p.login; staffMsg = ""; Shell.repaint(); } }));
+      acts.appendChild(h("button", { cls: "btn ghost sm", type: "button", "data-reset": p.login, text: "Reset code", onclick: function () {
+        act("reset_code", { login: p.login }, function (r) { showCode("New code for " + p.name + ":", r.code, "Their old code no longer works. It will not be shown again."); }); } }));
+      if (!self) acts.appendChild(h("button", { cls: "btn danger sm", type: "button", "data-ask": p.login, text: "Remove", onclick: function () { ask = { kind: "remove", login: p.login }; Shell.repaint(); } }));
+    } else {
+      acts.appendChild(h("button", { cls: "btn ghost sm", type: "button", "data-back": p.login, text: "Restore", onclick: async function () {
+        var r = await act("restore", { login: p.login });
+        if (!r.ok) return;
+        var c = await Sync.manage("reset_code", { login: p.login });     // a removed person's old code may have been shared: always a new one
+        if (c.ok) { showCode("Restored " + p.name + ". New code:", c.code, "It will not be shown again."); Shell.repaint(); }
+      } }));
+    }
+    return h("div", { cls: "pcard" + (p.active ? "" : " off"), "data-login": p.login }, [
+      h("div", { cls: "pid" }, [h("span", { cls: "av", text: (p.name || "?").charAt(0).toUpperCase() }), h("div", {}, [
+        h("div", { cls: "pname" }, [p.name, self ? h("span", { cls: "chip st", text: "you" }) : null]), h("div", { cls: "pmeta", text: meta })])]),
+      h("div", { cls: "pst" }, [h("span", { cls: "chip " + (p.role === "management" ? "mg" : "st"), text: p.role === "management" ? "Management" : "Staff" }),
+        h("span", { cls: "chip " + (p.active ? "ok" : "no"), text: p.active ? "Active" : "Removed" })]), acts]);
+  }
+  function personForm(d, p) {
+    var isNew = formFor === "new";
+    var name = h("input", { type: "text", id: "pName", placeholder: "e.g. Jordan", autocomplete: "off", value: isNew ? "" : p.name });
+    var role = h("select", { id: "pRole" }, [h("option", { value: "staff", text: "Staff" }), h("option", { value: "management", text: "Management" })]);
+    role.value = isNew ? "staff" : p.role;
+    var box = h("fieldset", { cls: "facset", id: "pFacs" }, [h("legend", { text: "Facilities (Management covers all)" })]);
+    (d.facilities || []).forEach(function (f) {
+      box.appendChild(h("label", { cls: "bigcheck" }, [h("input", { type: "checkbox", cls: "pfac", value: f.id, checked: !isNew && (p.facilities || []).indexOf(f.id) >= 0 }), f.name]));
+    });
+    function sync() { var off = role.value === "management"; box.disabled = off; box.classList.toggle("off", off); }
+    role.addEventListener("change", sync); setTimeout(sync, 0);
+    var save = h("button", { cls: "btn", type: "button", id: "pSave", text: isNew ? "Add and show code" : "Save changes", onclick: async function () {
+      var n = name.value.trim();
+      if (!n) { staffMsg = "A name is needed."; Shell.repaint(); return; }
+      var facs = [].map.call(box.querySelectorAll(".pfac"), function (c) { return c.checked ? c.value : null; }).filter(Boolean);
+      var body = { name: n, role: role.value, facilities: facs };
+      formFor = null;
+      if (isNew) await act("add", body, function (r) { showCode("Added " + n + ". Their code is", r.code, "Give it to them now. It will not be shown again."); });
+      else await act("update", Object.assign({ login: p.login }, body), function () { Shell.toast("Saved " + n); });
+    } });
+    return h("div", { cls: "addform", id: "personForm" }, [
+      h("label", { cls: "af" }, [h("span", { text: "Name" }), name]), h("label", { cls: "af" }, [h("span", { text: "Role" }), role]), box,
+      h("div", { cls: "afrow" }, [save, h("button", { cls: "btn ghost", type: "button", id: "pCancel", text: "Cancel", onclick: function () { formFor = null; staffMsg = ""; Shell.repaint(); } })])]);
+  }
+  function sharedCodes(codes) {
+    function one(kind, title, blurb, label, btnId) {
+      var asking = ask && ask.kind === kind;
+      var t = codes[kind], line = h("div", { cls: "subbar" }, [h("span", { id: kind + "When", text: t ? "Last changed " + dateOnly(t) : "Not changed since setup" })]);
+      if (asking) {
+        line.appendChild(h("span", { style: "font-size:13px", text: kind === "access"
+          ? "Everyone is signed out until they enter the new code. Nothing saved on their devices is lost." : "Everyone\u2019s open editing window ends." }));
+        line.appendChild(h("button", { cls: "btn danger sm", type: "button", id: kind + "Yes", text: "Yes, change it", onclick: function () {
+          var code = newCode(); ask = null;
+          act(kind === "access" ? "set_access_code" : "set_editing_code", { code: code }, function () {
+            showCode("New " + title.toLowerCase() + ":", code, kind === "access" ? "Share it with the team. Everyone is signed out until they enter it. It will not be shown again." : "Share it with the people who edit. It will not be shown again."); }); } }));
+        line.appendChild(h("button", { cls: "btn ghost sm", type: "button", id: kind + "No", text: "Keep", onclick: function () { ask = null; Shell.repaint(); } }));
+      } else line.appendChild(h("button", { cls: "btn ghost sm", type: "button", id: btnId, text: label, onclick: function () { ask = { kind: kind }; Shell.repaint(); } }));
+      return [h("div", { cls: "eyebrow" }, [h("span", { text: title })]), h("p", { style: "margin:0 0 10px;font-size:14px", text: blurb }), line];
+    }
+    var card = h("div", { cls: "card", id: "sharedCodes" });
+    one("access", "Access code", "One shared code that opens the app for viewing. Changing it signs everyone out until they enter the new one. Nothing saved on their devices is lost.", "Change access code", "chgAccess").forEach(function (x) { card.appendChild(x); });
+    card.appendChild(h("hr", { style: "border:0;border-top:1px solid var(--line);margin:14px 0" }));
+    one("editing", "Editing code", "One shared code that lets a signed-in person add, change or delete. Changing it affects everyone who edits.", "Change editing code", "chgEdit").forEach(function (x) { card.appendChild(x); });
+    return card;
+  }
+  function peopleTab(d) {
+    var me = Sync.person(), box = h("div", { cls: "stack" });
+    if (reveal && reveal.code) {
+      box.appendChild(h("div", { cls: "banner good", id: "revealBanner" }, [
+        reveal.title + " ", h("b", { cls: "code", id: "revealCode", text: reveal.code }), " " + reveal.note, " ",
+        h("button", { cls: "btn sm", type: "button", id: "revealDone", text: "Done", onclick: function () { reveal = null; Shell.repaint(); } })]));
+    }
+    if (staffMsg) box.appendChild(h("div", { cls: "banner warn", id: "staffMsg", role: "alert", text: staffMsg }));
+    var card = h("div", { cls: "card", id: "peopleCard" }, [h("div", { cls: "eyebrow" }, [h("span", { text: "People" }),
+      h("button", { cls: "btn sm", type: "button", id: "addPerson", text: "+ Add staff", onclick: function () { formFor = "new"; staffMsg = ""; Shell.repaint(); } })])]);
+    if (formFor) {
+      var who = formFor === "new" ? null : (staffData.people || []).filter(function (x) { return x.login === formFor; })[0];
+      if (formFor === "new" || who) card.appendChild(personForm(d, who));
+    }
+    if (!staffData) card.appendChild(h("p", { cls: "sub", id: "staffLoading", text: "Loading\u2026" }));
+    else {
+      card.appendChild(h("div", { cls: "plist", id: "peopleList" }, staffData.people.map(function (p) { return personCard(d, p, me); })));
+      card.appendChild(h("div", { cls: "subbar", style: "margin-top:10px", text: "A removed person\u2019s code stops working at once. Their name stays on the changes they made." }));
+    }
+    box.appendChild(card);
+    if (staffData) box.appendChild(sharedCodes(staffData.codes || {}));
+    return box;
+  }
+
+  /* ---- Activity: who changed what, newest first. The log keeps whole before and after
+     bodies; this says in a line what moved. ---- */
+  var SPOT = function (n) { return n === 1 ? "1 reading" : n + " readings"; };
+  function describe(r, d) {
+    var nb = r.new_body || {}, ob = r.old_body || {}, gone = r.deleted && !r.old_deleted, back = !r.deleted && r.old_deleted, fresh = !r.old_body;
+    function diff(a, b) { return JSON.stringify(a) !== JSON.stringify(b); }
+    switch (r.kind) {
+      case "_backfill": return "Ran a data migration";
+      case "facility":
+        if (gone) return "Removed the facility " + (ob.name || ""); if (fresh) return "Added the facility " + (nb.name || "");
+        if (ob.name !== nb.name) return "Renamed the facility " + (ob.name || "") + " to " + (nb.name || "");
+        if (diff(ob.settings, nb.settings)) {
+          var s0 = ob.settings || {}, s1 = nb.settings || {}, ch = ["target", "edges", "floodBelow", "shaveAbove", "overdueDays", "tieAttention"].filter(function (k) { return diff(s0[k], s1[k]); });
+          return "Changed the " + (ch.length ? ch.join(", ") : "settings");
+        }
+        return "Changed the facility";
+      case "sheet":
+        if (gone) return "Removed the sheet " + (ob.name || ""); if (back) return "Brought back the sheet " + (nb.name || ""); if (fresh) return "Added a sheet called " + (nb.name || "");
+        if (ob.name !== nb.name) return "Renamed the sheet " + (ob.name || "") + " to " + (nb.name || "");
+        if (diff(ob.shape, nb.shape) || diff(ob.size, nb.size)) return "Changed the size of " + (nb.name || "a sheet");
+        return "Changed the sheet " + (nb.name || "");
+      case "session": {
+        var n1 = Object.keys(nb.data || {}).length, n0 = Object.keys(ob.data || {}).length;
+        if (gone) return "Deleted a round"; if (fresh) return n1 ? "Logged a round, " + (nb.mode || "") + ", " + SPOT(n1) : "Started a round";
+        if (n1 !== n0 || diff(ob.data, nb.data)) return "Logged readings in a round (" + SPOT(n1) + ")";
+        if (diff(ob.notes, nb.notes)) return "Edited the notes on a round";
+        if (ob.date !== nb.date) return "Changed the date of a round";
+        return "Changed a round";
+      }
+      case "glass_panel": {
+        var pid = String(r.id).split(":").pop(), st = { replace: "Needs replacement", plexi: "Temporary plexi", ok: "Good" }[nb.status];
+        if (ob.status !== nb.status && st) return "Set panel " + pid + " to " + st;
+        if ((ob.note || "") !== (nb.note || "")) return nb.note ? "Edited the note on panel " + pid : "Cleared the note on panel " + pid;
+        return "Changed panel " + pid;
+      }
+      case "glass_layout": return gone ? "Removed the glass layout" : fresh ? "Built a glass layout" : "Changed the glass layout";
+      case "glass_binding": return "Pointed the glass at a sheet";
+      case "glass_widths": return "Changed the one-tap glass widths";
+      case "glass_spare": return gone ? "Removed a glass movement" : "Recorded " + (nb.qty > 0 ? "+" : "") + nb.qty + " " + (nb.mat || "") + " " + nb.w + "\u00d7" + nb.h + "\u2033 piece" + (Math.abs(nb.qty) === 1 ? "" : "s");
+      case "flag": return gone ? "Removed a flag" : fresh ? "Raised a flag" : nb.status === "resolved" ? "Resolved a flag" : "Changed a flag";
+      default: return (gone ? "Removed" : fresh ? "Added" : "Changed") + " a " + String(r.kind).replace(/_/g, " ");
+    }
+  }
+  function placeOf(r, d) {
+    var parts = [];
+    if (r.facility_id) parts.push(facName(d, r.facility_id));
+    var b = r.new_body || r.old_body || {}, sid = b.sheetId || (r.kind === "sheet" ? r.id : null);
+    if (sid) (d.facilities || []).forEach(function (f) { (f.sheets || []).forEach(function (s) { if (s.id === sid) parts.push(s.name || "Sheet"); }); });
+    parts.push({ session: "Ice", facility: "Ice", sheet: "Ice" }[r.kind] || (/^glass/.test(r.kind) ? "Glass" : ""));
+    return parts.filter(Boolean).join(" / ");
+  }
+  function activityTab(d) {
+    var box = h("div", { cls: "card", id: "activityCard" }, [h("div", { cls: "eyebrow" }, [h("span", { text: "Activity" }), h("span", { text: "who changed what" })])]);
+    if (staffMsg) box.appendChild(h("div", { cls: "banner warn", id: "staffMsg", role: "alert", text: staffMsg }));
+    if (!actLog) { box.appendChild(h("p", { cls: "sub", id: "actLoading", text: "Loading\u2026" })); return box; }
+    var names = ["all"], seen = {};
+    actLog.forEach(function (r) { var n = r.changed_by_name || "System"; if (!seen[n]) { seen[n] = 1; names.push(n); } });
+    box.appendChild(h("div", { cls: "subbar", style: "margin-bottom:8px" }, ["Show ", h("span", { cls: "seg", role: "group", "aria-label": "Filter by person" }, names.map(function (n) {
+      return h("button", { type: "button", "data-fl": n, text: n === "all" ? "Everyone" : n, "aria-pressed": String(actFilter === n), onclick: function () { actFilter = n; Shell.repaint(); } });
+    }))]));
+    var list = actLog.filter(function (r) { return actFilter === "all" || (r.changed_by_name || "System") === actFilter; });
+    var log = h("div", { cls: "log", id: "actLog" });
+    list.forEach(function (r) {
+      log.appendChild(h("div", { cls: "e", "data-kind": r.kind }, [h("div", { cls: "t", text: when(r.at) || "" }),
+        h("div", { cls: "m" }, [h("b", { text: r.changed_by_name || "System" }), " " + describe(r, d), h("small", { text: placeOf(r, d) })])]));
+    });
+    if (!list.length) log.appendChild(h("p", { cls: "sub", text: "Nothing recorded for this person." }));
+    box.appendChild(log);
+    return box;
+  }
+  function staff(route, d) {
+    var el = h("div", { cls: "screen", id: "pageStaff" });
+    el.appendChild(h("div", { cls: "crumb", text: "Account / Staff" }));
+    el.appendChild(h("h2", { text: "Staff" }));
+    el.appendChild(h("p", { cls: "sub", text: "People who can make changes. Each signs in with their own code." }));
+    el.appendChild(h("div", { cls: "tabs", role: "tablist" }, [["people", "People", "tabPeople"], ["activity", "Activity", "tabActivity"]].map(function (t) {
+      return h("button", { cls: "tab", type: "button", role: "tab", id: t[2], text: t[1], "aria-selected": String(staffTab === t[0]),
+        onclick: function () { staffTab = t[0]; reveal = null; ask = null; formFor = null; staffMsg = ""; if (t[0] === "activity") actLog = null; Shell.repaint(); } });
+    })));
+    if (staffTab === "people") { if (!staffData) loadStaff(); el.appendChild(peopleTab(d)); }
+    else { if (!actLog) loadActivity(); el.appendChild(activityTab(d)); }
+    return el;
+  }
+
   /* ---------- holding pages ---------- */
   function holding(title, crumb, text) {
     var el = h("div", { cls: "screen", id: "pageHolding" });
@@ -391,7 +630,7 @@
       Shell = shell; h = shell.h;
       if (route.page === "sheets") return sheets(route, d);
       if (route.page === "settings") return settings(route, d);
-      if (route.page === "staff") return holding("Staff", "Account / staff", "The Staff page arrives with the next step of the shell.");
+      if (route.page === "staff") return staff(route, d);
       return facilities(d);
     },
     view: function () { return view; }

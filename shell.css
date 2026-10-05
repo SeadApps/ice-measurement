@@ -157,6 +157,38 @@ tr:last-child td{border-bottom:0}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 
+/* ---- Staff ---- */
+.tabs{display:flex;gap:2px;flex-wrap:wrap;margin:0 0 14px;border-bottom:1px solid var(--line)}
+.tab{font:700 14px var(--sans);text-transform:uppercase;letter-spacing:.03em;padding:0 16px;min-height:48px;color:var(--ink-dim);background:none;
+  border:0;border-bottom:4px solid transparent;cursor:pointer}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--frost)}
+.plist{display:grid;gap:10px}
+.pcard{display:grid;grid-template-columns:minmax(0,1.6fr) auto auto;gap:12px 16px;align-items:center;background:var(--panel-2);
+  border:1px solid var(--line);border-radius:3px;padding:12px 14px}
+.pcard.off{opacity:.65}
+.pid{display:flex;align-items:center;gap:14px;min-width:0}
+.av{width:48px;height:48px;border-radius:3px;background:var(--frost);color:var(--on-frost);display:inline-flex;align-items:center;
+  justify-content:center;font:800 22px var(--sans);flex:none}
+.pname{font:700 18px var(--sans);text-transform:uppercase;letter-spacing:.02em;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pmeta{font-size:14px;color:var(--ink-dim)}
+.pst{display:flex;gap:6px;flex-wrap:wrap}
+.chip.mg{background:var(--frost-soft);color:var(--frost)}
+.chip.st{background:var(--panel);color:var(--ink-dim);border:1px solid var(--line)}
+.chip.no{background:var(--panel);color:var(--ink-faint)}
+.acts{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.subbar{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;font-size:13px;color:var(--ink-dim)}
+.facset{border:0;padding:0;margin:0;font-size:13px;color:var(--ink-dim);grid-column:1/-1}
+.facset.off{opacity:.45}
+.facset legend{padding:0 0 4px}
+.bigcheck{display:flex;align-items:center;gap:12px;min-height:44px;font-size:16px;color:var(--ink)}
+.bigcheck input{width:24px;height:24px}
+b.code{font:600 17px var(--mono);letter-spacing:.1em;color:var(--ink);background:var(--panel);padding:2px 8px;border-radius:3px;margin:0 4px;user-select:all}
+.log .e{display:grid;grid-template-columns:150px minmax(0,1fr);gap:4px 14px;padding:12px 0;border-bottom:1px solid var(--line);font-size:15px}
+.log .e:last-child{border-bottom:0}
+.log .t{font:11.5px var(--mono);color:var(--ink-faint)}
+.log .m small{display:block;color:var(--ink-faint);font-size:12.5px}
+@media (max-width:900px){.pcard{grid-template-columns:minmax(0,1fr)}.log .e{grid-template-columns:1fr}}
+
 /* ---- the toast and the restore question ---- */
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);max-width:min(92vw,520px);background:var(--ink);color:var(--bg);
   font:600 14px var(--sans);padding:12px 18px;border-radius:3px;z-index:30;box-shadow:0 8px 24px rgba(0,0,0,.3)}

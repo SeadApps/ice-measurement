@@ -307,7 +307,9 @@
     var who = person();
     var ab = h("button", { cls: "chipu", type: "button", id: "acctMenu" }, [h("span", { id: "whoName", text: who ? who.name : "Menu" })]);
     acct = makeMenu(ab, function () {
-      var it = [{ hd: "Theme" },
+      var it = [];
+      if (isManager()) it.push({ hd: "Account" }, { label: "Staff", href: "#/staff", current: route.page === "staff" }, { hr: true });
+      it.push({ hd: "Theme" },
         { label: "Light", current: currentTheme() === "light", onclick: function () { theme("light"); acctRefresh(); } },
         { label: "Dark", current: currentTheme() === "dark", onclick: function () { theme("dark"); acctRefresh(); } },
         { hr: true }, { hd: "Units" },
@@ -317,7 +319,7 @@
         { label: "Back up all data", onclick: function () { backUp(); } },
         { label: "Restore from backup\u2026", onclick: function () { restore(); } },
         { label: backupAgo((data.prefs || {}).lastBackup), disabled: true },
-        { hr: true }];
+        { hr: true });
       if (SYNC) {
         if (person()) it.push({ label: "Switch user", onclick: function () { SYNC.switchUser(); } });
         it.push({ label: "Sign out", onclick: function () { SYNC.signOut(); } });

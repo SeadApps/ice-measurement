@@ -88,6 +88,11 @@ is something the fake server could only imitate.
       give `0.75, 1.5, 1.625, 2`, shave `1.5625` gives `1.625`. After `d3-01b` a second preview
       shows nothing to change, no facility's `updated_at` moved, and one `_backfill` row
       says how many were done. (This SQL has never been run; the JS twin is tested.)
+- [ ] The Staff page (the client end of `manage-staff`) works against the real function: `list`
+      returns `people` with `login, name, role, active, facilities, last_sign_in`; `codes` returns
+      `{access, editing}`; `add` returns `{login, code}` once; `restore` is followed by `reset_code`, so the
+      person's old code must stop working; a refused call answers with `{error}` in a form fit to show
+      ("That would leave no Manager.", "You cannot remove yourself.", "Only Management can do this.").
 - [ ] A Staff person cannot set a flag to resolved, and cannot change a flag
       that is already resolved (reopen it or edit it); Management can do both.
       A `glass_widths` record in their own facility is theirs to write.

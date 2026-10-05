@@ -35,7 +35,7 @@ const EDIT_CODE = 'test-editing-code';
 const TYPES = {'.html':'text/html','.css':'text/css','.js':'application/javascript','.json':'application/json','.png':'image/png'};
 const SETTINGS_KINDS = ['facility','sheet'];     // Staff may read these, never write them
 
-let rows, tokens, staff, unlocks, failures, activity, opts, lastMs = 0;
+let rows, tokens, staff, unlocks, failures, activity, opts, codeTimes, lastMs = 0;
 function reset(){
   rows = new Map();       // "kind id" -> {id,kind,body,deleted,updated_at,facility_id,changed_by,changed_by_name}
   tokens = new Map();     // access -> {exp,user,kind} ; "r:"+refresh -> {exp,user,kind}
@@ -43,6 +43,7 @@ function reset(){
   unlocks = new Map();    // user id -> expiry ms
   failures = new Map();   // user id -> [ms of each wrong editing code]
   activity = [];          // append-only
+  codeTimes = {access:null, editing:null};   // when each shared code was last changed through manage-staff
   opts = {paused:false, flaky:0, writes:0, tight:false, code:DEFAULT_CODE, editCode:EDIT_CODE, unlockMs:3600000,
           softremove:false};
 }
@@ -185,6 +186,7 @@ const server = http.createServer(async (req,res)=>{
       const id = String(b.email||'').endsWith(STAFF_DOMAIN) ? b.email.slice(0, -STAFF_DOMAIN.length) : null;
       const s = id && staff.get(id);
       if (!s || !s.active || s.code !== b.password) return bad();
+      s.lastSignIn = new Date().toISOString();
       return json(res,200,authToken(s.id,'person',ttl));
     } else if (u.query.grant_type === 'refresh_token'){
       const old = b && tokens.get('r:'+b.refresh_token);
@@ -196,6 +198,80 @@ const server = http.createServer(async (req,res)=>{
       }
       return json(res,200,authToken(old.user,old.kind,ttl));
     } else return json(res,400,{error:'unsupported_grant_type'});
+  }
+
+  /* ---- manage-staff: stands in for the Edge Function (supabase/functions/manage-staff) ----
+     Same actions, same refusals, same wording, because the Staff page is tested against it.
+     Only an active Manager may call it. A code it makes is returned once and kept nowhere a
+     list could read it back. */
+  if (p === '/functions/v1/manage-staff'){
+    if (req.method !== 'POST') return json(res,405,{error:'POST only'});
+    const w = who(req);
+    if (!w || w.kind !== 'person') return json(res,401,{error:'Sign in first.'});
+    if (!isMgmt(w)) return json(res,403,{error:'Only Management can do this.'});
+    const b = await body(req);
+    if (!b || typeof b !== 'object') return json(res,400,{error:'Send JSON.'});
+    const fail = (c, m) => json(res,c,{error:m});
+    const ALPHABET = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const makeCode = () => Array.from({length:10}, () => ALPHABET[Math.floor(Math.random()*ALPHABET.length)]).join('');
+    const asList = v => Array.isArray(v) ? v.filter(x => typeof x === 'string' && x).map(String) : [];
+    const managers = () => [...staff.values()].filter(s => s.role === 'management' && s.active);
+    const find = () => staff.get(String(b.login || ''));
+    switch (b.action){
+      case 'list':
+        return json(res,200,{people:[...staff.values()].sort((a,c)=>String(a.name).localeCompare(c.name)).map(s => ({
+          login:s.id, name:s.name, role:s.role, active:s.active, facilities:s.role === 'management' ? [] : (s.facilities || []).slice().sort(),
+          last_sign_in:s.lastSignIn || null}))});
+      case 'codes':
+        return json(res,200,{access:codeTimes.access, editing:codeTimes.editing});
+      case 'add': {
+        const name = String(b.name || '').trim(), role = b.role === 'management' ? 'management' : 'staff';
+        if (!name) return fail(400,'A name is needed.');
+        const slug = name.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,24) || 'person';
+        const login = slug + '-' + Array.from({length:3}, () => 'abcdefghjkmnpqrstuvwxyz23456789'[Math.floor(Math.random()*31)]).join('');
+        const code = makeCode();
+        staff.set(login, {id:login, name, role, code, active:true, facilities:role === 'staff' ? asList(b.facilities) : []});
+        return json(res,200,{login, code});
+      }
+      case 'update': {
+        const s = find(); if (!s) return fail(404,'No such person.');
+        const role = b.role === undefined ? s.role : (b.role === 'management' ? 'management' : 'staff');
+        if (s.role === 'management' && role !== 'management' && managers().length <= 1) return fail(409,'That would leave no Manager.');
+        if (b.name !== undefined) s.name = String(b.name).trim() || s.name;
+        s.role = role;
+        s.facilities = role === 'management' ? [] : (b.facilities === undefined ? s.facilities : asList(b.facilities));
+        return json(res,200,{ok:true});
+      }
+      case 'reset_code': {
+        const s = find(); if (!s) return fail(404,'No such person.');
+        s.code = makeCode();
+        return json(res,200,{code:s.code});
+      }
+      case 'remove': case 'restore': {
+        const s = find(); if (!s) return fail(404,'No such person.');
+        const removing = b.action === 'remove';
+        if (removing && s.id === w.user.id) return fail(409,'You cannot remove yourself.');
+        if (removing && s.role === 'management' && managers().filter(m => m.id !== s.id).length === 0) return fail(409,'That would leave no Manager.');
+        s.active = !removing;
+        if (removing) unlocks.delete(s.id);
+        return json(res,200,{ok:true});
+      }
+      case 'set_access_code': {
+        const code = String(b.code || '');
+        if (code.length < 8) return fail(400,'The access code needs at least 8 characters.');
+        opts.code = code; codeTimes.access = new Date().toISOString();
+        for (const [k,s] of tokens) if (s.kind === 'device') tokens.delete(k);     // every device is asked again
+        return json(res,200,{ok:true});
+      }
+      case 'set_editing_code': {
+        const code = String(b.code || '');
+        if (code.length < 8) return fail(400,'The editing code needs at least 8 characters.');
+        opts.editCode = code; codeTimes.editing = new Date().toISOString();
+        unlocks.clear();                                                           // everyone's open window ends with the old code
+        return json(res,200,{ok:true});
+      }
+      default: return fail(400,'Unknown action.');
+    }
   }
 
   // ---- functions ----

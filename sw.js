@@ -1,6 +1,7 @@
 // Bump CACHE_VERSION whenever you change any file listed below — there's no build
 // step, so this string is the only thing that retires the previous cache.
-const CACHE_VERSION = "arena-v15";  // v15: backup, restore and units in the account menu; records.js, shell.js, shell.css, ice.html
+const CACHE_VERSION = "arena-v16";  // v16: the Staff page; sync.js, shell.js, home.js, shell.css
+// v15: backup, restore and units in the account menu; records.js, shell.js, shell.css, ice.html
 // v14: Sheet settings page; records compared in a fixed key order; hidden sheets keep their rounds; records.js, home.js, shell.js, shell.css
 // v13: the shell replaces the launcher (index.html, shell.js, shell.css, home.js); the old launcher is launcher.html
 // v12: settings in eighths, overdue days per facility, settings edits sync; records.js, ice.html, index.html
