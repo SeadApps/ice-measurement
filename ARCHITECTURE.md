@@ -6,6 +6,7 @@ No build step, no framework, no dependencies. Edit a file, push, done.
 ```
 index.html    the shell's page: loads shell.js and home.js and mounts them (D2)
 shell.js      the shell: address, chrome, the one writer of where you are
+ice-core.js   the model of an Ice page with no page in it: geometry and spots, the sixteen labels and units, state, bands, saving, the interpolation (moved out of ice.html unchanged, D3 step 1)
 shell.css     the Ice Board look for the shell's own pages (rail, tab bar, rows, forms)
 shellbar.css  the shared bar's look, scoped under .sb so it can sit inside Ice and Glass without restyling them
 home.js       the shell's pages: Facilities, Sheets (holding pages for settings and Staff)
