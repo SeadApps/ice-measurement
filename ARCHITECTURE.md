@@ -12,10 +12,16 @@ records.js    shared: the v4 record store — decompose, merge, reassemble, pref
 sw.js         service worker — offline + cache strategy
 manifest.json icon-192.png icon-512.png
 .github/workflows/keepalive.yml   pings Supabase so the free tier never sleeps
+supabase/     the server side of the people-and-access work: SQL, the manage-staff function, a README
+dev/          the test suites and the fake Supabase they run against (development only)
 ```
 
 Both apps are single files. `sync.js` and `records.js` are the shared code —
 the network, and the store.
+
+**Pages serves everything in this repo, `supabase/` and `dev/` included.** The scripts
+there are meant to be readable, but they must never hold a real code, a key other than
+the public anon key, or a filled-in copy of `d1-03-first-manager.sql`.
 
 ---
 
@@ -79,13 +85,17 @@ per-kind maps in local storage, and each carries its own timestamp.
 | kind | local key | notes |
 |---|---|---|
 | `facility` | `ice_v4_facilities` | name, settings |
-| `sheet` | `ice_v4_sheets` | `facilityId`, size |
+| `sheet` | `ice_v4_sheets` | `facilityId`, `size`, and `shape` once migrated (see *One shape per sheet*) |
 | `session` | `ice_v4_sessions` | `sheetId`, date, mode, `data` (readings), `notes` |
-| `glass_panel` | `glass_record_v2` | status, note, by, at, and `label`/`tag` where somebody has changed them |
+| `glass_panel` | `glass_record_v2` | status, note, at, and `label`/`tag` where somebody has changed them. Who marked it is the server's stamp (`changedBy`); `by` survives only on marks from before it was retired |
 | `glass_binding` | `glass_record_v2` | `sheetId` — which ice surface the Conway panels are the glass for |
 | `glass_layout` | `glass_record_v2` | the walk a built rink was made from; the drawing is regenerated |
 | `glass_spare` | `glass_record_v2` | one **movement** of spare glass in or out, against a facility — not a stock level |
 | — | `ice_v4_prefs` | **device-local, never synced** |
+
+Every record also carries `fac` (the facility it belongs to) and, coming back from the
+server, `changedBy`. Both are metadata the comparison in `bodyOf()` ignores: see
+*Access, people and the activity log*.
 
 ### Why not one blob
 
@@ -259,7 +269,9 @@ records(id text, kind text, body jsonb, deleted bool, updated_at timestamptz,
 RLS on. Signed-in users read/insert/update; no delete policy. A trigger stamps
 `updated_at` on every write. Public signups are off.
 
-**Auth is one shared account** — `operations@conwayarena.local`. The access code
+**Auth began as one shared account** — `operations@conwayarena.local` — and is now
+three layers (see *Access, people and the activity log*, below). What follows is
+still true of the shared account and of rotating its code. The access code
 *is* that account's password, so the code box is a real sign-in validated
 server-side, not a JavaScript check. The code never appears in the repo. The
 anon key does, and that is fine: on its own it grants nothing.
@@ -294,6 +306,134 @@ it emails you, one click to re-enable.
 
 ---
 
+## Access, people and the activity log
+
+This replaces "one shared account" as the whole story. The shared account is
+still there, but it is now only the first of three layers. The scripts that put
+this on the real project are in `supabase/` (read its README first); everything
+below is what the client and the fake server in `dev/` already do.
+
+### Three layers
+
+1. **The access code** — the shared account's password, as before. After it, a
+   device holds a session that can do exactly one thing: ask `staff_names()` for
+   the list of people. It reads no record.
+2. **Who are you?** — each person is a real auth user whose email is
+   `<login>@staff.conwayarena.local` and whose password is their own generated
+   code. Their session replaces the shared one as the thing that reads and writes
+   data. `Sync.person()` says who, `{id, name}`; `id` is the login.
+3. **The editing code** — a shared code entered from "Unlock to edit". The server
+   opens a one-hour window for that person (`unlock_editing`), extends it while
+   they work (`extend_editing`) and closes it on Switch user and Sign out
+   (`lock_editing`). Outside a window the server refuses every write, Management
+   included. A wrong code answers 403, and five wrong tries in ten minutes block
+   the next.
+
+Until anyone has been given a login, the shared account carries the data exactly
+as it always did — `staff_names()` returns nothing and the gate skips step 2. That
+is how the rollout begins, and why the older suites needed no change. While no
+person is signed in each sync asks whether people exist yet; once they do, the
+shared session steps back to being the device's and the gate asks who is using it.
+
+**`tight`** is one setting on the server (`app.settings`). Until it is true the new
+row rules behave exactly like the old ones, and flipping it is the only step that
+cannot be undone quietly for devices on the old build. `supabase/d1-04-untighten.sql`
+flips it back.
+
+### What the server stamps, and what the page may not
+
+`changed_by` and `changed_by_name` are filled in by a trigger from the session, so
+a page cannot claim to be someone else, and a `changedBy` smuggled into a record's
+body is thrown away. They come back on every pull as `changedBy`.
+
+**`changedBy` is not content.** It arrives with every pulled record, like
+`updatedAt`. `bodyOf()` in `records.js` and `changed()` in `sync.js` both ignore
+it, and `stampChanges` carries it forward. Count it, and every pull looks like an
+edit, every device re-sends what it just received, and the server restamps the
+lot — the clobber this whole design exists to prevent, with nothing on screen to
+show it. `stamptest` pins it, and was run red first with only the pull changed.
+
+**The typed name is gone.** Glass used to write whatever was in its "Marked by" box
+into `by`. It now shows the signed-in name read-only and writes `changedBy` locally
+for display; the server's stamp is the truth. A mark from before keeps its typed
+`by` for display and is not claimed by whoever pulls it. `Sync.who()` and
+`rink_who` no longer exist.
+
+### Facilities: the tag, and who sees what
+
+Every record carries `fac`, the facility it belongs to, and the server copies it to
+a `facility_id` column. A Staff person sees and writes only the facilities they were
+given; Management sees all of them, including ones created later; a record with no
+tag is Management's alone. A Staff person cannot rewrite another facility's record
+by re-tagging it, and cannot write a `facility` or `sheet` record at all.
+
+`fac` is **derived from where a record sits**, so `bodyOf()` ignores it too. If it
+counted, the first save on any device would restamp every record it holds, and a
+device with a stale copy would then look newest on all of them. A record picks up
+its tag when next really edited; the Management backfill
+(`supabase/d1-02a`/`d1-02b`) tags the rest without moving a timestamp.
+
+**The pull cursor is per person and per set of facilities.** A cursor only moves
+forward, so a record the server hid from this person when it passed would never be
+offered again — giving someone a facility later, or handing a device to a second
+person, would miss everything older than where the cursor stood. The key is
+`rink_sync_cursor:<kinds>:<personId>:<scope>`, where scope comes from
+`my_facilities()` (`*` for Management). A change of either starts one fresh pull,
+which is safe: pulling what is already held changes nothing.
+
+### The activity log
+
+Records keep only their latest version, so the `activity` table is the only place a
+"before" exists. A trigger writes one row per insert or update — kind, id, facility,
+who, when, old and new body — and nothing, not even Management, can update or
+delete one. It is not a record: it is read with `Sync.activity(filters)` and never
+passes through the sync loop, so reading it cannot make anything look edited.
+Management only. A refused write leaves no row.
+
+### Changing hands
+
+On a shared iPad the server stamps a write with whoever's session sends it. That is
+right when people send their own changes and wrong if Dana edits offline and Pete
+signs in first. So Switch user, Sign out and the idle sign-out (an hour with no
+input; a device left closed past it signs the person out on opening) all go through
+`handOver()`:
+
+- Online, the leaver's changes are sent first, under their name.
+- Otherwise the screen locks in place and their session stays on the device,
+  send-only (`rink_departed`). It sends on reconnect — even with nobody signed in —
+  then closes their editing window and is discarded.
+- **Which changes are whose is recorded exactly**: each hand-over claims the
+  unsent records by key *and timestamp*. Comparing times would misattribute
+  a record somebody else edits afterwards, or when two people leave in a row.
+- If their window ended while they were away their changes wait, and are never
+  sent in anyone else's name. They go when that person signs back in and unlocks.
+  A removed person's claim is the one exception: it drops, and the changes go out
+  under whoever is signed in, rather than being lost.
+
+### The editing lock in the pages
+
+The server is what refuses; the pages only stop offering what would be turned away.
+While a person is signed in without an open window, `Sync.lockControls(selectors)`
+greys the controls a page lists and a tap offers the unlock dialog instead. Pages
+list **selectors**, not elements, because Glass rebuilds its panel card on every
+selection. With nobody signed in nothing is locked.
+
+### One shape per sheet
+
+A sheet holds `shape` — length, width, corner radius in feet and inches, where the
+glass walk starts, which way the building faces — and Ice and Glass both draw from
+it. The standard corner is **27′ 2″**: Ice's presets used 28′ while the glass survey
+of Conway solves to 27′ 2″, so the two disagreed about the same ice.
+
+An old sheet is *read* as though it had a shape (`Records.shapeOf`) and only gains
+one when deliberately migrated or edited, for the same reason `fac` is not derived
+on write. The old `size` stays on the record, in step, for a device on the older
+build. `Repo.previewShapes()` shows what a migration would do, `backfillShapes()`
+does it, and `updateShape()` is what the glass builder calls after comparing its
+own measurement (`compareShape()`) with the sheet's.
+
+---
+
 ## Caching — the thing that will waste your afternoon
 
 Two layers sit between a push and what you see:
@@ -315,7 +455,12 @@ anything starts from nothing.
 
 `dev/fake-supabase.js` speaks the same auth and REST dialect as the real project
 and serves the site on `localhost:8200`, so the suite never touches production
-data. It can also fake a paused project and flaky writes.
+data. It can also fake a paused project and flaky writes, and — for the access work —
+people, per-person sessions, the editing window and its throttle, the facility rules,
+the activity log and a removed person refused with 403 (`/__staff`, `/__ctl?tight=1`,
+`softremove`, `clearfailures`, `/__unlocks`, `/__activity`). By default it behaves as
+the real project does before step 5, so the older suites run unchanged; `tight=1`
+turns the new rules on. **It is the only test bed the SQL in `supabase/` has had.**
 
 One-time setup. Node and Playwright are development-only — nothing shipped
 depends on them, and `node_modules` is gitignored because Pages serves
@@ -345,10 +490,34 @@ node dev/resume.js         #  9 checks: coming back lands where you left off
 node dev/phonetest.js      # 42 checks: no page scrolls sideways on a phone, tapping a panel shows it, and the desktop is untouched
 node dev/scheduletest.js   # 31 checks: the schedule opens on what needs attention, and print still carries all 127
 node dev/sparestest.js     # 46 checks: spare stock is a ledger per facility, tempered and plexi are different piles, and fitting a pane deducts the right one
+node dev/stamptest.js      # 25 checks: the server stamps who changed a record; a pulled stamp never looks like an edit
+node dev/authtest.js       # 56 checks: the two-step gate, a rotated code, a removed person, first sign-in offline, the rollout
+node dev/editlocktest.js   # 62 checks: writes refused until the editing code; the window ends, extends, closes; the unlock button
+node dev/scopetest.js      # 53 checks: a Staff person sees and writes only their facilities; the tag; the per-person cursor
+node dev/activitytest.js   # 48 checks: one log row per write with old and new, append-only, Management only
+node dev/handovertest.js   # 40 checks: changing hands on a shared iPad, offline, and the idle sign-out
+node dev/shapetest.js      # 46 checks: one shape per sheet, the migration, the builder's compare and update
+node dev/controlstest.js   # 35 checks: edit controls lock until unlocked; what only reads stays open
+node dev/whotest.js        # 19 checks: nobody types their name; the server's stamp is shown
 ```
 
-464 checks in all. Tests point `window.__SYNC_CONFIG__` at the fake via
+848 checks in all. Tests point `window.__SYNC_CONFIG__` at the fake via
 `addInitScript`; the real pages never read it.
+
+**Lessons from the access work, each of which cost a debugging session:**
+
+- `Sync.sync()` does not resolve while the gate is up, because it waits for somebody
+  to sign in. A test that expects a gate must fire it and sleep, not await it.
+- The fake server shares the page's origin, so the service worker's cache-first rule
+  answers a repeated identical pull from cache. Production is cross-origin and the
+  worker leaves it alone, so the newer suites open their contexts with
+  `serviceWorkers: 'block'`.
+- A suite that edits as a signed-in person must lift the editing lock first
+  (`document.body.classList.remove('sync-locked')`), as the suites about sync do;
+  `controlstest` is the one that tests the lock itself.
+- A fresh device invents a phantom facility before its first pull (see the open item
+  below), which sorts ahead of the real one and shifts its `ord`. Tests that judge
+  "who last changed X" leave the facility out, or look a sheet up by id.
 
 **Run them one at a time.** They share the one fake server, and several assert
 what the server is holding — `synctest` prints its record count and checks it.
@@ -642,8 +811,9 @@ where that facility has more than one surface, so Conway still reads
   can now be told the answer: clearing that panel's tag retires the dashes, the
   tick and the standing explanation together.
 - **Glass Manager on a phone** has not been looked at. Desktop and tablet are fine.
-- **Ice app has no "marked by" field.** Glass does. Worth adding for parity —
-  attribution without individual logins.
+- **Ice shows no "changed by".** Both apps now get the server's stamp on every
+  record (`changedBy`), but only Glass displays it. Ice's Rink view will once the
+  pages are rebuilt (D3).
 - **No realtime.** Sync happens on open and on focus. Supabase realtime would
   make the desktop update while you watch; not needed so far.
 - **A fresh device invents a facility.** Ice falls back to `freshState()` when
@@ -653,7 +823,17 @@ where that facility has more than one surface, so Conway still reads
   invention, since `apply()` only repoints `activeFacility` when `facility()`
   is falsy and it never is. That is why `facilitytest` now pins the active
   facility before adding a sheet: without it, which facility wins comes down to
-  how two random ids sort. Pre-dates all of the launcher work.
+  how two random ids sort. Pre-dates all of the launcher work. The access suites
+  trip over it too, and work around it: a new device's phantom facility sorts ahead
+  of the real one and shifts its `ord`, which really is a change and is stamped as
+  one. The shell (D2) must never create a facility on its own.
+- **The SQL in `supabase/` has not been run against a real database.** The README
+  has the checklist, including the two behaviours the client depends on: the
+  "editing is locked" wording, and what the auth service answers for a removed
+  person.
+- **Staff cannot update a sheet from the glass builder.** Writing a sheet is
+  Management-only, so the builder's offer to update the sheet's shape (D4) needs
+  to say so, or hand the update to a Manager.
 - **A surface added on the launcher has no glass until somebody walks it.** That
   is the intended shape — glass comes off a tape measure, not a form — but the
   launcher does not yet say which of its rinks have none.
