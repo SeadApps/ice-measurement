@@ -126,6 +126,20 @@ button and again on the chosen file, say `Sync.restoreMessage`, and merge nothin
 backup can hold any facility, and the server would refuse a Staff person's writes to
 the ones they were not given record by record.
 
+**The Rink view's map has two colourings** (D3). *Color map*, the default, is the same bands as ever
+with the colour blending into the next band over the last `MAP_BLEND` (1/16 inch) below each edge, so it
+no longer jumps; a reading sits on its band, not in a blend (the labels are eighths), so every reading is
+still exactly its band's colour, and a span of zero is the old hard edges pixel for pixel, which is how it
+is tested. *Lowest point* is scaled from the round being viewed (`lowestScale` in `ice-core.js`): lowest
+recorded reading red, highest dark blue, yellow halfway up to the facility's target, green at the target,
+light blue halfway from there to the highest; with nothing below the target the scale starts at green on
+the lowest reading, and the same above; a flat round is one colour; spots tied at the lowest or highest are
+ringed; the legend prints the lowest and how many spots share it, ideal, and the highest. The choice is the
+`mapMode` device preference (never a record). The image export draws whichever mode is on. The builder's
+thickness keys always keep the band colours. The 3D view is removed; a saved 3D view opens on the map. One
+trap found while testing: a reading whose key is not an "x,y" coordinate turns every interpolated cell into
+NaN and the map goes flat, so test seeds must use real coordinates.
+
 **Hidden sheets keep their rounds.** A hidden sheet is not in anyone's state, so neither are its
 rounds, and `save()` treats whatever is missing from the state as deleted. `save()` therefore
 carries over, untouched, every round whose sheet is hidden; without that, the next page that saved
@@ -535,6 +549,12 @@ cd dev && npm install && npx playwright install chromium
 
 Then from the repo root:
 
+Run them all with `node dev/runall.js` (one at a time, each against a fresh fake server). A suite is green only
+if it exits 0, prints no FAIL **and reaches its count in `dev/expected.json`**: a suite that throws partway prints
+"0 FAIL" for the checks it got through, so counting FAIL lines calls a crash green. A suite that is not green is
+run once more and, if that run is green, reported as FLAKY rather than passed. After adding or changing a suite,
+update its number in `dev/expected.json` by hand: the number is a claim.
+
 ```
 node dev/fake-supabase.js &
 node dev/synctest.js       # 26 checks: sign-in, two devices, offline, paused, and the readings inside a round
@@ -568,6 +588,7 @@ node dev/overduetest.js    # 16 checks: overdue days belong to the facility; Ice
 node dev/routetest.js       # 40 checks: the shell's addresses, back/forward, a Staff person and a shared iPad, the apps follow where you are
 node dev/shelltest.js       # 91 checks: the chrome at 390/820/1024/1280, breakpoints, menus, theme, tab bar, rail
 node dev/facilitiestest.js  # 45 checks: Facilities and Sheets agree with Ice, trends, adding, nothing restamped, an empty device, people
+node dev/maptest.js          # 37 checks: Color map blend (zero span = old pixels, readings pure, no jumps), Lowest point scale and legend, the mode preference, no 3D
 node dev/bartest.js          # 58 checks: the shared bar inside Ice and Glass: the address, the menus, theme and unit reaching the app, what it replaced, phone and laptop, nothing restamped
 node dev/stafftest.js        # 65 checks: Staff page: add, edit, reset, remove, restore, shared codes, activity; a code shown once and stored nowhere; new people can sign in; Staff cannot reach it
 node dev/backuptest.js      # 44 checks: backup and restore from the account menu, merging, old files, units, Ice and the shell make the same file, Staff cannot restore and never export what they may not see

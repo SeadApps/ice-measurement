@@ -168,6 +168,7 @@
   .canvas-wrap{position:relative;width:100%}
   canvas#rink{display:block;width:100%;height:auto;border-radius:10px;touch-action:manipulation}
   .hint{position:absolute;inset:0;display:grid;place-items:center;text-align:center;pointer-events:none;color:#90a8b8;font-size:13px;padding:24px}
+  .mapmode{display:flex;margin:0 0 8px}
   .hint span{background:#0b141cd9;border:1px solid #273d4f;border-radius:10px;padding:10px 16px}
   .legend{display:flex;gap:6px;flex-wrap:wrap;align-items:stretch}
   .legend .key{flex:1 1 0;min-width:92px;display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
@@ -222,10 +223,6 @@
   .todo li .pip{width:8px;height:8px;border-radius:50%;flex:none}.todo li .z{color:var(--ink-dim)}.todo li .t{margin-left:auto;color:var(--ink)}
   footer.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:13px 0 22px;border-top:1px solid var(--line)}
   .spacer{margin-left:auto}.saved-note{font-size:11px;color:var(--ink-faint);font-family:var(--mono)}
-  #threeWrap{display:none}#threeWrap.on{display:block}#live2d.off{display:none}
-  canvas#surf{display:block;width:100%;height:auto;border-radius:10px;cursor:grab;touch-action:none}
-  canvas#surf:active{cursor:grabbing}
-  .surf-hint{font-size:11px;color:#90a8b8;margin-top:8px;text-align:center;font-family:var(--mono)}
   .contour-bar{display:flex;align-items:center;gap:10px;margin-top:10px;color:#90a8b8;font-family:var(--mono);font-size:11px}
   .contour-bar .cl{white-space:nowrap}
   .contour-bar .cl.dim{color:#5d7384}
@@ -340,7 +337,6 @@
     <div class="seg" role="group" aria-label="View">
       <button id="viewMap" aria-pressed="true">Map</button>
       <button id="viewTrend" aria-pressed="false">Trend</button>
-      <button id="view3d" aria-pressed="false">3D</button>
     </div>
     <button class="iconbtn" id="gear" title="Preferences" aria-label="Preferences">⚙</button>
   </header>
@@ -365,6 +361,7 @@
             <span class="val">reading: <b id="selVal">not set</b></span>
           </div>
           <div class="note-row"><span class="tag">note</span><input id="noteInput" type="text" placeholder="e.g. crack, soft spot, near drain…" autocomplete="off"></div>
+          <div class="mapmode" id="mapModeRow"><div class="seg" id="mapModeSeg" role="group" aria-label="Map mode"><button id="mmColor" aria-pressed="true">Color map</button><button id="mmLowest" aria-pressed="false">Lowest point</button></div></div>
           <div id="live2d"><div class="canvas-wrap"><canvas id="rink" width="1100" height="468"></canvas>
             <div class="hint" id="hint"><span>Tap a point on the ice, then choose a thickness →</span></div></div></div>
           <div class="contour-bar" id="contourBar">
@@ -377,8 +374,6 @@
             <input type="range" id="smoothSlider" min="0" max="5" step="1" value="2" aria-label="Interpolation smoothing">
             <span class="cl dim">sharp</span><span class="cl ct" id="smoothCount"></span>
           </div>
-          <div id="threeWrap"><canvas id="surf" width="1100" height="620"></canvas>
-            <div class="surf-hint">drag to rotate · pinch or ↑/↓ to scale height</div></div>
         </div>
       </section>
       <aside class="side">
@@ -591,16 +586,23 @@ function drawMarkings(ctx,ox,oy,s){const line=(x1,y1,x2,y2,c,w)=>{ctx.strokeStyl
   line(GOAL1,0,GOAL1,W,RED,1.6);line(GOAL2,0,GOAL2,W,RED,1.6);line(CX,0,CX,W,"rgba(213,52,58,.7)",1.6);line(BLUE1,0,BLUE1,W,BLUE,2.4);line(BLUE2,0,BLUE2,W,BLUE,2.4);circ(CX,CY,15,BLUE,1.6);
   for(const[x,y]of[[FO_L,FO_B],[FO_L,FO_T],[FO_R,FO_B],[FO_R,FO_T]]){circ(x,y,15,RED,1.6);circ(x,y,2,"rgba(213,52,58,.9)",0,true);}circ(CX,CY,1.6,"rgba(213,52,58,.9)",0,true);
   ctx.strokeStyle=BLUE;ctx.lineWidth=1.6;ctx.beginPath();ctx.arc(FX(ox,s,GOAL1),FY(oy,s,CY),6*s,-Math.PI/2,Math.PI/2);ctx.stroke();ctx.beginPath();ctx.arc(FX(ox,s,GOAL2),FY(oy,s,CY),6*s,Math.PI/2,3*Math.PI/2);ctx.stroke();}
-function drawDots(ctx,ox,oy,s,opt){const d=data(),nt=notes(),base=opt.trend?baselineSession():null;
+function drawDots(ctx,ox,oy,s,opt){const d=data(),nt=notes(),base=opt.trend?baselineSession():null,sc=(!opt.trend&&mapMode()==="lowest")?mapScale():null;
   for(let k=0;k<POINTS.length;k++){const p=POINTS[k],px=FX(ox,s,p.x),py=FY(oy,s,p.y),lab=d[keyOf(p)],set=lab!=null;
-    ctx.beginPath();ctx.arc(px,py,set?5.4:4.2,0,7);if(set){ctx.fillStyle=bandOf(decOf.get(lab)).color;ctx.fill();ctx.lineWidth=1.4;ctx.strokeStyle="rgba(10,16,22,.9)";ctx.stroke();}else{ctx.fillStyle="rgba(15,24,32,.85)";ctx.fill();ctx.lineWidth=1.4;ctx.strokeStyle="rgba(144,168,184,.8)";ctx.stroke();}
+    ctx.beginPath();ctx.arc(px,py,set?5.4:4.2,0,7);if(set){ctx.fillStyle=sc?rgbCss(sc.color(decOf.get(lab))):bandOf(decOf.get(lab)).color;ctx.fill();ctx.lineWidth=1.4;ctx.strokeStyle="rgba(10,16,22,.9)";ctx.stroke();
+      if(sc&&(decOf.get(lab)===sc.min||decOf.get(lab)===sc.max)){ctx.beginPath();ctx.arc(px,py,8.6,0,7);ctx.lineWidth=2;ctx.strokeStyle="#0a1016";ctx.stroke();}}else{ctx.fillStyle="rgba(15,24,32,.85)";ctx.fill();ctx.lineWidth=1.4;ctx.strokeStyle="rgba(144,168,184,.8)";ctx.stroke();}
     if(opt.labels&&nt[keyOf(p)]){ctx.beginPath();ctx.arc(px+6,py-6,2.6,0,7);ctx.fillStyle="#6fd6ec";ctx.fill();}
     if(opt.labels&&set){let txt;if(opt.trend){if(base&&base.data[keyOf(p)]!=null){const dd=decOf.get(lab)-decOf.get(base.data[keyOf(p)]);txt=isMM()?(dd>0?'+':dd<0?'−':'±')+Math.abs(mmOf(dd)).toFixed(1):(dd>0?'+':dd<0?'−':'±')+Math.abs(dd).toFixed(2);}else txt="new";}else txt=fmtLabelShort(lab);
       ctx.font="600 11px ui-monospace,Menlo,monospace";ctx.textAlign="center";ctx.textBaseline="bottom";const tw=ctx.measureText(txt).width;ctx.fillStyle="rgba(8,13,18,.78)";ctx.fillRect(px-tw/2-3,py-9-13,tw+6,13);ctx.fillStyle="#eaf3f8";ctx.fillText(txt,px,py-9);}}
   if(opt.sel){const p=POINTS[selIdx],px=FX(ox,s,p.x),py=FY(oy,s,p.y);ctx.beginPath();ctx.arc(px,py,9,0,7);ctx.lineWidth=2.4;ctx.strokeStyle="#6fd6ec";ctx.stroke();ctx.beginPath();ctx.arc(px,py,12.5,0,7);ctx.lineWidth=1;ctx.strokeStyle="rgba(111,214,236,.4)";ctx.stroke();}}
+/* Which map colours are in use, and the scale behind them. The mode is a device preference. */
+const mapMode=()=>state&&state.mapMode==="lowest"?"lowest":"color";
+const mapScale=()=>lowestScale(Object.values(data()).map(l=>decOf.get(l)),EF().target);
+const rgbCss=c=>"rgb("+Math.round(c[0])+","+Math.round(c[1])+","+Math.round(c[2])+")";
+function mapColorFn(){const sc=mapMode()==="lowest"?mapScale():null;return sc?sc.color:colorFor;}
+const spots=n=>n+" spot"+(n===1?"":"s");
 function renderScene(ctx,ox,oy,w,opt){const s=w/L,h=W*s;ctx.save();roundRink(ctx,ox,oy,s);ctx.save();ctx.clip();ctx.fillStyle="#e9eef0";ctx.fillRect(ox,oy,w,h);
   if(opt.trend){if(deltaField){bandImageFrom(deltaField,divColor);ctx.imageSmoothingEnabled=true;ctx.globalAlpha=.92;ctx.drawImage(heatCanvas,ox,oy,w,h);ctx.globalAlpha=1;}}
-  else{bandImageFrom(field,bandColor);ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";ctx.globalAlpha=.9;ctx.drawImage(heatCanvas,ox,oy,w,h);ctx.globalAlpha=1;if(opt.contours)drawContours(ctx,ox,oy,s);}
+  else{bandImageFrom(field,mapColorFn());ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";ctx.globalAlpha=.9;ctx.drawImage(heatCanvas,ox,oy,w,h);ctx.globalAlpha=1;if(opt.contours)drawContours(ctx,ox,oy,s);}
   drawMarkings(ctx,ox,oy,s);drawOrientation(ctx,ox,oy,s);ctx.restore();roundRink(ctx,ox,oy,s);ctx.lineWidth=2.4;ctx.strokeStyle="rgba(150,176,192,.55)";ctx.stroke();drawDots(ctx,ox,oy,s,opt);ctx.restore();}
 
 /* ---------- live canvas ---------- */
@@ -654,6 +656,10 @@ function buildChips(){const el=$("chips");el.innerHTML="";for(const o of OPTIONS
   btn.innerHTML=`<span class="dot" style="background:${b.color}"></span><span class="f">${fmtLabel(o)}</span>`;btn.addEventListener("click",()=>assign(o));el.appendChild(btn);}
   const clr=document.createElement("button");clr.className="chip clear";clr.textContent="Clear this point";clr.addEventListener("click",clearPoint);el.appendChild(clr);}
 function buildLegend(){const el=$("legend");if(viewMode==="trend"){el.className="legend trend";el.innerHTML=`<span class="lbl">−½″ thinner</span><span class="bar"></span><span class="lbl">+½″ thicker</span>`;return;}
+  if(mapMode()==="lowest"){el.className="legend";el.innerHTML="";const sc=mapScale();
+    if(!sc){el.innerHTML='<div class="key" data-k="none"><div><div class="lab">Lowest point</div><div class="rng">No readings yet</div></div></div>';return;}
+    [["low",LP_COLORS.red,"Lowest",fmtSet(sc.min)+" · "+spots(sc.nMin)],["ideal",LP_COLORS.green,"Ideal",fmtSet(EF().target)],["high",LP_COLORS.dblue,"Highest",fmtSet(sc.max)+" · "+spots(sc.nMax)]].forEach(([k,c,lab,rng])=>{
+      const d=document.createElement("div");d.className="key";d.dataset.k=k;d.innerHTML=`<span class="sw" style="background:${rgbCss(c)}"></span><div><div class="lab">${lab}</div><div class="rng">${rng}</div></div>`;el.appendChild(d);});return;}
   el.className="legend";el.innerHTML="";for(const b of BANDS){const d=document.createElement("div");d.className="key";d.innerHTML=`<span class="sw" style="background:${b.color}"></span><div><div class="lab">${b.label}</div><div class="rng">${b.rng}</div></div>`;el.appendChild(d);}}
 function buildSessSel(){const sh=sheet(),es=$("sessSel");es.innerHTML="";[...sh.sessions].sort((a,b)=>new Date(b.date)-new Date(a.date)).forEach(s=>{const o=document.createElement("option");o.value=s.id;o.textContent=fmtDate(s.date)+(s.label?` · ${s.label}`:"")+` (${Object.keys(s.data).length})`;if(s.id===state.activeSession)o.selected=true;es.appendChild(o);});
   const cs=$("cmpSel");cs.innerHTML="";const others=sh.sessions.filter(s=>s.id!==state.activeSession).sort((a,b)=>new Date(b.date)-new Date(a.date));
@@ -671,7 +677,7 @@ function refresh(){if(selIdx>=POINTS.length)selIdx=0;if(guidedPos>=guidedOrder.l
   document.querySelectorAll(".chip[data-opt]").forEach(c=>c.classList.toggle("is-set",c.dataset.opt===lab));
   const gp=$("gprog");gp.classList.toggle("on",entryMode==="guided");
   if(entryMode==="guided"){$("gposLab").textContent=`Point ${guidedPos+1} of ${tot} · ${zoneOf(POINTS[guidedOrder[guidedPos]])}`;$("gleftLab").textContent=`${cnt}/${tot} done`;$("gfill").style.width=(cnt/tot*100)+"%";}
-  renderStats();if(viewMode==="3d")drawSurf();updateContourReadout();}
+  renderStats();if(viewMode==="map"&&mapMode()==="lowest")buildLegend();updateContourReadout();}
 function renderStats(){const d=data(),rows=[];for(const k in d){const[x,y]=k.split(",").map(Number);rows.push({x,y,zone:zoneOf({x,y}),lab:d[k],v:decOf.get(d[k])});}
   $("targetNote").textContent="target "+fmtSet(EF().target);
   if(!rows.length){$("stAvg").textContent="—";$("stIdeal").textContent="—";$("zL").textContent=$("zN").textContent=$("zR").textContent="—";
@@ -696,7 +702,7 @@ function setTag(el,r){if(!r){el.textContent="—";el.style.background="transpare
 $("prev").addEventListener("click",()=>{hideSel=false;if(entryMode==="guided"){guidedPos=(guidedPos-1+guidedOrder.length)%guidedOrder.length;selIdx=guidedOrder[guidedPos];}else selIdx=(selIdx-1+POINTS.length)%POINTS.length;refresh();});
 $("next").addEventListener("click",()=>{hideSel=false;if(entryMode==="guided"){guidedPos=(guidedPos+1)%guidedOrder.length;selIdx=guidedOrder[guidedPos];}else selIdx=(selIdx+1)%POINTS.length;refresh();});
 window.addEventListener("keydown",e=>{if(state&&state.screen!=="work")return;if(e.target.tagName==="INPUT")return;
-  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="z"){e.preventDefault();doUndo();return;}if(viewMode==="3d")return;
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="z"){e.preventDefault();doUndo();return;}
   if(e.key==="ArrowLeft")$("prev").click();else if(e.key==="ArrowRight")$("next").click();});
 $("undoBtn").addEventListener("click",doUndo);
 $("modeFree").addEventListener("click",()=>setEntry("free"));$("modeGuided").addEventListener("click",()=>setEntry("guided"));
@@ -704,15 +710,19 @@ function setEntry(m){entryMode=m;$("modeFree").setAttribute("aria-pressed",Strin
 $("noteInput").addEventListener("input",e=>setNote(e.target.value));
 
 /* ---------- views ---------- */
-function setView(v){viewMode=v;if(state){state.lastView=v;persist();}$("viewMap").setAttribute("aria-pressed",String(v==="map"));$("viewTrend").setAttribute("aria-pressed",String(v==="trend"));$("view3d").setAttribute("aria-pressed",String(v==="3d"));
-  $("live2d").classList.toggle("off",v==="3d");$("threeWrap").classList.toggle("on",v==="3d");$("contourBar").style.display=v==="map"?"flex":"none";$("smoothBar").style.display=v==="map"?"flex":"none";buildLegend();buildSessSel();
-  if(v==="3d"){sizeSurf();drawSurf();}else drawLive();renderStats();updateContourReadout();updateSmoothReadout();}
-$("viewMap").addEventListener("click",()=>setView("map"));$("viewTrend").addEventListener("click",()=>{computeDelta();setView("trend");});$("view3d").addEventListener("click",()=>setView("3d"));
+function setView(v){if(v!=="map"&&v!=="trend")v="map";   // a saved 3D view, which no longer exists, opens on the map
+  viewMode=v;if(state){state.lastView=v;persist();}$("mapModeRow").style.display=v==="map"?"flex":"none";syncMapMode();$("viewMap").setAttribute("aria-pressed",String(v==="map"));$("viewTrend").setAttribute("aria-pressed",String(v==="trend"));
+  $("contourBar").style.display=v==="map"?"flex":"none";$("smoothBar").style.display=v==="map"?"flex":"none";buildLegend();buildSessSel();
+  drawLive();renderStats();updateContourReadout();updateSmoothReadout();}
+$("viewMap").addEventListener("click",()=>setView("map"));$("viewTrend").addEventListener("click",()=>{computeDelta();setView("trend");});
+function syncMapMode(){const lo=mapMode()==="lowest";$("mmColor").setAttribute("aria-pressed",String(!lo));$("mmLowest").setAttribute("aria-pressed",String(lo));}
+function setMapMode(m){state.mapMode=m;persist();syncMapMode();buildLegend();drawLive();}
+$("mmColor").addEventListener("click",()=>setMapMode("color"));$("mmLowest").addEventListener("click",()=>setMapMode("lowest"));
 function updateContourReadout(){const on=state.contoursOn??true;if(!on){$("contourCount").textContent="off";return;}const step=CONTOUR_STEPS[state.contourIdx??2],n=contourLevels().length;$("contourCount").textContent="every "+fmtSet(step)+(n?` · ${n} lines`:" · flat");}
 $("contourSlider").addEventListener("input",e=>{state.contourIdx=+e.target.value;persist();if(viewMode==="map")drawLive();updateContourReadout();});
 $("contourOn").addEventListener("change",e=>{state.contoursOn=e.target.checked;$("contourBar").classList.toggle("off",!e.target.checked);$("contourSlider").disabled=!e.target.checked;persist();if(viewMode==="map")drawLive();updateContourReadout();});
 function updateSmoothReadout(){$("smoothCount").textContent=SMOOTH_LABELS[(state.smoothIdx!=null)?state.smoothIdx:2];}
-$("smoothSlider").addEventListener("input",e=>{state.smoothIdx=+e.target.value;persist();computeField();computeDelta();if(viewMode==="3d")drawSurf();else drawLive();updateSmoothReadout();updateContourReadout();});
+$("smoothSlider").addEventListener("input",e=>{state.smoothIdx=+e.target.value;persist();computeField();computeDelta();drawLive();updateSmoothReadout();updateContourReadout();});
 
 /* ---------- round controls ---------- */
 $("sessSel").addEventListener("change",e=>{state.activeSession=e.target.value;compareId=null;clearUndo();selIdx=0;hideSel=false;applyGeometry(Records.sizeOf(sheet()),session().mode);computeField();computeDelta();buildSessSel();refresh();persist();});
@@ -760,7 +770,8 @@ $("expPng").addEventListener("click",()=>{const Wd=1760,Hd=980,pad=56,c=document
   x.fillText(facility().name+" — "+sheet().name+(viewMode==="trend"?" · TREND":""),pad,pad+18);x.fillStyle="#90a8b8";x.font="14px ui-monospace,Menlo,monospace";x.fillText(fmtDate(session().date),pad,pad+42);
   x.fillStyle="#6fd6ec";x.textAlign="right";x.fillText(Object.keys(data()).length+" / "+POINTS.length+" · target "+fmtSet(EF().target),Wd-pad,pad+42);x.textAlign="left";
   const rw=Wd-pad*2,ry=pad+78;renderScene(x,pad,ry,rw,{labels:true,sel:false,contours:true,trend:viewMode==="trend"});const rh=W*(rw/L);let lx=pad,ly=ry+rh+44;x.font="600 14px ui-monospace,Menlo,monospace";x.textBaseline="middle";
-  if(viewMode==="trend"){x.fillStyle="#eaf3f8";x.fillText("Change vs "+(baselineSession()?fmtDate(baselineSession().date):"previous"),pad,ly);}else for(const b of BANDS){x.fillStyle=b.color;x.fillRect(lx,ly-9,18,18);x.strokeStyle="#ffffff22";x.strokeRect(lx,ly-9,18,18);x.fillStyle="#eaf3f8";x.fillText(b.label,lx+26,ly-1);x.fillStyle="#90a8b8";x.fillText(b.rng,lx+26,ly+15);lx+=Math.max(180,x.measureText(b.label).width+96);}
+  if(viewMode==="trend"){x.fillStyle="#eaf3f8";x.fillText("Change vs "+(baselineSession()?fmtDate(baselineSession().date):"previous"),pad,ly);}else if(mapMode()==="lowest"){const sc=mapScale();if(sc)for(const[c,lab,rng]of[[LP_COLORS.red,"Lowest",fmtSet(sc.min)+" · "+spots(sc.nMin)],[LP_COLORS.green,"Ideal",fmtSet(EF().target)],[LP_COLORS.dblue,"Highest",fmtSet(sc.max)+" · "+spots(sc.nMax)]]){x.fillStyle=rgbCss(c);x.fillRect(lx,ly-9,18,18);x.strokeStyle="#ffffff22";x.strokeRect(lx,ly-9,18,18);x.fillStyle="#eaf3f8";x.fillText(lab,lx+26,ly-1);x.fillStyle="#90a8b8";x.fillText(rng,lx+26,ly+15);lx+=240;}}
+  else for(const b of BANDS){x.fillStyle=b.color;x.fillRect(lx,ly-9,18,18);x.strokeStyle="#ffffff22";x.strokeRect(lx,ly-9,18,18);x.fillStyle="#eaf3f8";x.fillText(b.label,lx+26,ly-1);x.fillStyle="#90a8b8";x.fillText(b.rng,lx+26,ly+15);lx+=Math.max(180,x.measureText(b.label).width+96);}
   c.toBlob(blob=>{exportFile(blob,"image/png",fileStem()+".png");},"image/png");});
 
 /* ---------- print ---------- */
@@ -1002,27 +1013,8 @@ function buildRoundManage(){const el=$("roundManage");if(!el)return;el.innerHTML
     del.addEventListener("click",()=>{if(confirm(`Delete the ${fmtDay(s.date)} round? This can't be undone.`)){if(deleteRound(sh,s.id)){buildRoundManage();if(state.screen==="work"){computeField();computeDelta();buildSessSel();refresh();}else buildHome();}}});
     row.appendChild(dt);row.appendChild(cnt);row.appendChild(del);el.appendChild(row);});}
 
-/* ---------- 3D ---------- */
-let azim=-0.7,elev=0.62,zScale=14,dragging=false,lastX=0,lastY=0;
-const surf=document.getElementById("surf"),sctx=surf.getContext("2d");
-function sizeSurf(){const wrap=surf.parentElement,cssW=wrap.clientWidth;if(!cssW)return;const cssH=Math.min(cssW*0.56,640),dpr=Math.min(window.devicePixelRatio||1,2);surf.style.height=cssH+"px";surf.width=Math.round(cssW*dpr);surf.height=Math.round(cssH*dpr);sctx.setTransform(dpr,0,0,dpr,0,0);if(viewMode==="3d")drawSurf();}
-function project(x,y,z,cw,ch){let X=x-L/2,Y=y-W/2,Z=z;const ca=Math.cos(azim),sa=Math.sin(azim);let x1=X*ca-Y*sa,y1=X*sa+Y*ca;const ce=Math.cos(elev),se=Math.sin(elev);let y2=y1*ce+Z*se;const scale=Math.min(cw/L,ch/W)*0.94;return[cw/2+x1*scale,ch*0.60-y2*scale];}
-function drawSurf(){const cw=surf.clientWidth,ch=surf.clientHeight;if(!cw)return;sctx.clearRect(0,0,cw,ch);const SX=46,SY=22;
-  const sample=(i,j)=>{const fx=i/SX*L,fy=j/SY*W,gi=Math.min(NX-1,Math.max(0,Math.round((fx/L)*NX-0.5))),gj=Math.min(NY-1,Math.max(0,Math.round((fy/W)*NY-0.5)));return field[gi+gj*NX];};
-  sctx.strokeStyle="rgba(120,150,168,.4)";sctx.lineWidth=1;sctx.beginPath();[[0,0],[L,0],[L,W],[0,W]].forEach((c,i)=>{const p=project(c[0],c[1],0,cw,ch);i?sctx.lineTo(p[0],p[1]):sctx.moveTo(p[0],p[1]);});sctx.closePath();sctx.stroke();
-  const quads=[];for(let j=0;j<SY;j++)for(let i=0;i<SX;i++){const v=(sample(i,j)+sample(i+1,j)+sample(i,j+1)+sample(i+1,j+1))/4,depth=Math.sin(azim)*(i/SX*L-L/2)+Math.cos(azim)*(j/SY*W-W/2);quads.push({i,j,v,depth});}
-  quads.sort((a,b)=>a.depth-b.depth);
-  for(const q of quads){const{i,j}=q,z=v=>(v-EF().target)*zScale,c00=sample(i,j),c10=sample(i+1,j),c11=sample(i+1,j+1),c01=sample(i,j+1),fx0=i/SX*L,fx1=(i+1)/SX*L,fy0=j/SY*W,fy1=(j+1)/SY*W;
-    const p00=project(fx0,fy0,z(c00),cw,ch),p10=project(fx1,fy0,z(c10),cw,ch),p11=project(fx1,fy1,z(c11),cw,ch),p01=project(fx0,fy1,z(c01),cw,ch),b=bandOf(q.v),sh=Math.max(0,Math.min(1,0.55+(c10-c00+c11-c01)*0.6)),[r,g,bl]=rgbOf(b.color);
-    sctx.fillStyle=`rgb(${r*sh|0},${g*sh|0},${bl*sh|0})`;sctx.beginPath();sctx.moveTo(p00[0],p00[1]);sctx.lineTo(p10[0],p10[1]);sctx.lineTo(p11[0],p11[1]);sctx.lineTo(p01[0],p01[1]);sctx.closePath();sctx.fill();sctx.strokeStyle="rgba(0,0,0,.10)";sctx.lineWidth=.5;sctx.stroke();}}
-function bindDrag(){surf.addEventListener("pointerdown",e=>{dragging=true;lastX=e.clientX;lastY=e.clientY;surf.setPointerCapture(e.pointerId);});
-  surf.addEventListener("pointermove",e=>{if(!dragging)return;azim+=(e.clientX-lastX)*0.01;elev=Math.max(0.15,Math.min(1.25,elev-(e.clientY-lastY)*0.006));lastX=e.clientX;lastY=e.clientY;drawSurf();});
-  surf.addEventListener("pointerup",()=>dragging=false);surf.addEventListener("pointercancel",()=>dragging=false);
-  window.addEventListener("keydown",e=>{if(viewMode!=="3d"||state.screen!=="work")return;if(e.key==="ArrowUp"){zScale=Math.min(36,zScale+2);drawSurf();}else if(e.key==="ArrowDown"){zScale=Math.max(4,zScale-2);drawSurf();}});
-  let pinch=0;surf.addEventListener("touchmove",e=>{if(e.touches.length===2){const dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY,dd=Math.hypot(dx,dy);if(pinch){zScale=Math.max(4,Math.min(36,zScale+(dd-pinch)*0.05));drawSurf();}pinch=dd;e.preventDefault();}},{passive:false});surf.addEventListener("touchend",()=>pinch=0);}
-
 /* ---------- boot ---------- */
-let resizeT=null;window.addEventListener("resize",()=>{clearTimeout(resizeT);resizeT=setTimeout(()=>{if(state.screen==="work"){sizeLive();if(viewMode==="3d")sizeSurf();}else buildHome();},120);});
+let resizeT=null;window.addEventListener("resize",()=>{clearTimeout(resizeT);resizeT=setTimeout(()=>{if(state.screen==="work")sizeLive();else buildHome();},120);});
 function migrateV2(o){const f={id:uid(),name:o.facility||"Main facility",settings:o.settings||defaultSettings(),sheets:o.sheets&&o.sheets.length?o.sheets:[newSheet()]};if(!f.settings.edges)f.settings.edges=[...DEFAULT_EDGES];
   return{theme:"dark",facilities:[f],activeFacility:f.id,activeSheet:o.activeSheet||f.sheets[0].id,activeSession:o.activeSession||f.sheets[0].sessions[0].id};}
 function migrateV1(o){const st=freshState();st.facilities[0].sheets[0].sessions[0].data=o;return st;}
@@ -1035,6 +1027,7 @@ async function boot(){state=await Repo.load();
   const sharedTheme=await Store.get("rink_theme");   // kept in step with glass.html
   if(sharedTheme==="light"||sharedTheme==="dark")state.theme=sharedTheme;else Store.set("rink_theme",state.theme);
   if(!state.unit)state.unit="in";
+  if(state.mapMode!=="lowest")state.mapMode="color";
   if(state.lastBackup===undefined)state.lastBackup=null;
   if(!state.facilities||!state.facilities.length){state=freshState();invented=true;}
   /* Where you are is read from the address, which the shared bar and the shell's pages write;
@@ -1052,7 +1045,7 @@ async function boot(){state=await Repo.load();
   if(state.contourIdx==null)state.contourIdx=2;$("contourSlider").value=state.contourIdx;
   if(state.contoursOn==null)state.contoursOn=true;$("contourOn").checked=state.contoursOn;$("contourSlider").disabled=!state.contoursOn;$("contourBar").classList.toggle("off",!state.contoursOn);
   if(state.smoothIdx==null)state.smoothIdx=2;$("smoothSlider").value=state.smoothIdx;
-  applyGeometry(Records.sizeOf(sheet()),session().mode);applyTheme();applyUnitButtons();buildBands();buildChips();bindDrag();
+  applyGeometry(Records.sizeOf(sheet()),session().mode);applyTheme();applyUnitButtons();buildBands();buildChips();
   /* Pick up where this device left off — coming back from another app in the suite
      lands on the sheet you were working, not the front screen. Ice in the
      switcher still goes back to them. */

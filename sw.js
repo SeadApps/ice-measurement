@@ -1,6 +1,7 @@
 // Bump CACHE_VERSION whenever you change any file listed below — there's no build
 // step, so this string is the only thing that retires the previous cache.
-const CACHE_VERSION = "arena-v18";  // v18: ice-core.js (the model, moved out of ice.html unchanged)
+const CACHE_VERSION = "arena-v19";  // v19: no 3D; Color map blend and Lowest point on the Rink view; ice.html, ice-core.js, records.js
+// v18: ice-core.js (the model, moved out of ice.html unchanged)
 // v17: the shared bar inside Ice and Glass (shellbar.css); shell.js, ice.html, glass.html
 // v16: the Staff page; sync.js, shell.js, home.js, shell.css
 // v15: backup, restore and units in the account menu; records.js, shell.js, shell.css, ice.html

@@ -35,7 +35,7 @@
      on — held here and excluded from sync, so one device cannot move another's
      view. This is also what makes the launcher's rink picker safe. */
   const PREF_KEYS = ["theme","unit","lastBackup","contourIdx","contoursOn","smoothIdx","overdueDays",
-                     "activeFacility","activeSheet","activeSession","screen","lastView"];
+                     "activeFacility","activeSheet","activeSession","screen","lastView","mapMode"];
 
   /* The same wrapper all three pages had a copy of: a host-provided store if
      one exists, else this browser. */

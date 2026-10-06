@@ -126,3 +126,39 @@ function computeField(){const pts=[],d=data();for(const k in d){const[x,y]=k.spl
 function computeDelta(){const base=baselineSession();if(!base){deltaField=null;return;}const cur=data(),bd=base.data,pts=[];
   for(const k in cur){if(bd[k]!=null){const[x,y]=k.split(",").map(Number);pts.push({x,y,v:decOf.get(cur[k])-decOf.get(bd[k])});}}deltaField=pts.length?idw(pts.concat(anchors(0)),0):null;}
 
+
+/* ---------- map colours ----------
+   Two ways to colour the map, chosen on the Rink view.
+
+   COLOR MAP, the default: the same colours and ranges as ever, with the colour blending into the
+   next band over the last MAP_BLEND inches of thickness below each edge, so it no longer jumps at
+   an edge. A reading sits on its band, not in a blend (the sixteen labels are eighths and the span is
+   a sixteenth), so every reading is still exactly its band's colour. A span of zero is the old hard
+   edges, pixel for pixel, which is how the change is tested.
+
+   LOWEST POINT: the scale comes from the round being viewed. The lowest recorded reading is red
+   and the highest dark blue; between them yellow halfway up to ideal (the facility's target), green
+   at ideal, light blue halfway from ideal to the highest. Only recorded readings count, not the
+   interpolated field. With nothing below ideal there is nothing to colour red or yellow, so the scale
+   starts at green at the lowest reading, and the same on the other side. */
+let MAP_BLEND=1/16;
+const mixRGB=(a,b,t)=>[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t];
+function colorFor(v){let bi=BANDS.length-1;for(let b=0;b<BANDS.length;b++){if(v<BANDS[b].lt){bi=b;break;}}
+  const next=bi+1<BANDS.length?BAND_RGB[bi+1]:null,e=BANDS[bi].lt;
+  if(MAP_BLEND>0&&next&&isFinite(e)&&v>=e-MAP_BLEND)return mixRGB(BAND_RGB[bi],next,(v-(e-MAP_BLEND))/MAP_BLEND);
+  return BAND_RGB[bi];}
+const LP_COLORS={red:[214,69,63],yellow:[232,181,74],green:[74,176,112],lblue:[106,169,214],dblue:[44,106,163]};
+function lowestScale(vals,target){
+  vals=vals.filter(v=>isFinite(v));if(!vals.length)return null;
+  let min=Infinity,max=-Infinity,nMin=0,nMax=0;
+  for(const v of vals){if(v<min)min=v;if(v>max)max=v;}
+  for(const v of vals){if(v===min)nMin++;if(v===max)nMax++;}
+  const C=LP_COLORS;let stops;
+  if(max-min<1e-9)stops=[[min,min<target-1e-9?C.red:min>target+1e-9?C.dblue:C.green]];            // every reading the same
+  else if(min>=target-1e-9)stops=[[min,C.green],[(min+max)/2,C.lblue],[max,C.dblue]];             // nothing below ideal
+  else if(max<=target+1e-9)stops=[[min,C.red],[(min+max)/2,C.yellow],[max,C.green]];              // nothing above ideal
+  else stops=[[min,C.red],[(min+target)/2,C.yellow],[target,C.green],[(target+max)/2,C.lblue],[max,C.dblue]];
+  const last=stops[stops.length-1];
+  const color=v=>{if(v<=stops[0][0])return stops[0][1];if(v>=last[0])return last[1];
+    for(let i=1;i<stops.length;i++){const a=stops[i-1],b=stops[i];if(v<=b[0])return mixRGB(a[1],b[1],(v-a[0])/(b[0]-a[0]));}return last[1];};
+  return {min,max,nMin,nMax,target,stops,color};}

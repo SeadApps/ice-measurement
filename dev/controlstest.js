@@ -82,9 +82,11 @@ ok('the locked controls are greyed', +dim<0.8, dim);
 
 /* what only reads stays open */
 const th0=await D.p.evaluate(()=>document.documentElement.getAttribute('data-theme'));
-await D.p.click('#themeBtn'); await sleep(300);
-ok('the theme button still works', (await D.p.evaluate(()=>document.documentElement.getAttribute('data-theme')))!==th0 && !(await asking(D.p)));
-await D.p.click('#themeBtn');
+/* the theme is chosen in the shared bar's account menu now, and a locked person can still change it */
+const pick=async name=>{await D.p.click('#shellbar #acctMenu'); await D.p.click('#shellbar .dropdown .it:has-text("'+name+'")'); await sleep(300);};
+await pick(th0==='dark'?'Light':'Dark');
+ok('the theme still works', (await D.p.evaluate(()=>document.documentElement.getAttribute('data-theme')))!==th0 && !(await asking(D.p)));
+await pick(th0==='dark'?'Dark':'Light');
 await D.p.click('#viewTrend'); await sleep(300);
 ok('so do the view switches', !(await asking(D.p)));
 await D.p.click('#viewMap');
