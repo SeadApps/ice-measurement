@@ -64,10 +64,10 @@ const ids = await R(() => state.facilities.map(f => ({ n: f.name, s: f.sheets[0]
 const strict = ids.find(x => x.n === 'Strict Rink'), relaxed = ids.find(x => x.n === 'Relaxed Rink');
 
 await R(a => { state.activeFacility = a.f; state.activeSheet = a.s; buildHome(); }, strict);
-ok('Ice\'s home screen calls a 10-day-old round overdue where the facility says 3 days',
-   (await R(() => document.querySelector('#fleet .fl-row').className)).includes('over'), await R(() => document.querySelector('#fleet .fl-row').className));
+ok('Ice reads 3 days from the strict facility, so a 10-day-old round is overdue',
+   await R(() => Records.overdueDaysOf(facility(), state)) === 3);
 await R(a => { state.activeFacility = a.f; state.activeSheet = a.s; buildHome(); }, relaxed);
-ok('and not where it says 30', !(await R(() => document.querySelector('#fleet .fl-row').className)).includes('over'));
+ok('and 30 from the relaxed one, where it is not', await R(() => Records.overdueDaysOf(facility(), state)) === 30);
 
 await R(a => Records.Repo.savePrefs({ activeSheet: a.s, activeFacility: a.f }), strict);
 await p.goto(B + '/launcher.html'); await sleep(2500);

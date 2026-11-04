@@ -44,7 +44,7 @@ const b=await chromium.launch();
 let D=await device(b,'D0'); await D.p.goto(B+'/ice.html'); await sleep(1200);
 await access(D.p); await sleep(2500);
 ok('with no people yet nothing is locked', !(await locked(D.p)));
-await D.p.click('.fl-row'); await sleep(700);
+await D.p.evaluate(()=>showPage('build')); await sleep(700);
 await D.p.click('#newRound'); await sleep(400);
 ok('and the controls work as they always did', await D.p.isVisible('#roundCreate') && !(await asking(D.p)));
 await D.p.click('#roundCancel');
@@ -56,7 +56,7 @@ await addStaff({id:'pete',name:'Pete',role:'management',code:'pete-code-1'});
 D=await device(b,'D1'); await D.p.goto(B+'/ice.html'); await sleep(1200);
 await signInAs(D.p,'dana','dana-code-1');
 ok('a person signs in locked', await locked(D.p));
-await D.p.click('.fl-row'); await sleep(800);
+await D.p.evaluate(()=>showPage('build')); await sleep(800);
 ok('opening a facility is not editing, so it still works', await D.p.isVisible('#newRound'));
 
 await D.p.click('#newRound'); await sleep(400);
@@ -87,11 +87,13 @@ const pick=async name=>{await D.p.click('#shellbar #acctMenu'); await D.p.click(
 await pick(th0==='dark'?'Light':'Dark');
 ok('the theme still works', (await D.p.evaluate(()=>document.documentElement.getAttribute('data-theme')))!==th0 && !(await asking(D.p)));
 await pick(th0==='dark'?'Dark':'Light');
+await D.p.click('#iceTabs [data-page=rink]'); await sleep(300);
 await D.p.click('#viewTrend'); await sleep(300);
 ok('so do the view switches', !(await asking(D.p)));
-await D.p.click('#viewMap');
+await D.p.click('#viewMap'); await D.p.click('#iceTabs [data-page=build]'); await sleep(300);
 await D.p.click('#next'); await sleep(200);
 ok('and stepping between points', !(await asking(D.p)));
+await D.p.click('#iceTabs [data-page=rink]'); await sleep(300);
 const dl=D.p.waitForEvent('download',{timeout:3000}).catch(()=>null);
 await D.p.click('#expCsv'); await dl; await sleep(300);
 ok('and exporting', !(await asking(D.p)));
@@ -107,7 +109,8 @@ await D.p.click('#backupImport'); await sleep(300);
 ok('nor a backup restored', await asking(D.p)); await cancel(D.p);
 await D.p.click('#settingsDone'); await sleep(300);
 
-/* unlocking through the dialog */
+/* unlocking through the dialog ("+ New round" lives on the Measurement builder) */
+await D.p.click('#iceTabs [data-page=build]'); await sleep(300);
 await D.p.click('#newRound'); await sleep(300);
 await unlockViaDialog(D.p);
 ok('unlocking through the dialog lifts the lock', !(await locked(D.p)));

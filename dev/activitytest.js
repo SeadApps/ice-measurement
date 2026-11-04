@@ -141,7 +141,7 @@ const P=await device(b,'P');
 await P.p.goto(B+'/ice.html'); await sleep(1200);
 await signIn(P.p,'pete','pete-code-1');
 await P.p.evaluate(c=>window.Sync.unlockEditing(c),EDIT); await sleep(1500);
-await P.p.click('.fl-row'); await sleep(700);
+await P.p.evaluate(()=>showPage('build')); await sleep(700);
 await P.p.click('#newRound'); await sleep(300); await P.p.click('#roundCreate'); await sleep(3500);
 const made=await rows();
 const al=await P.p.evaluate(()=>window.Sync.activity());

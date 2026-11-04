@@ -42,7 +42,7 @@ const note=async p=>(await p.textContent('.sync-gate .sync-note').catch(()=>''))
 const errText=async p=>(await p.textContent('.sync-gate .sync-err').catch(()=>''))||'';
 const ls=(p,k)=>p.evaluate(k=>JSON.parse(localStorage.getItem(k)||'null'),k);
 const setLs=(p,k,fn)=>p.evaluate(([k,f])=>{const v=JSON.parse(localStorage.getItem(k)||'null');localStorage.setItem(k,JSON.stringify(new Function('v','return ('+f+')(v)')(v)));},[k,fn.toString()]);
-const made=async p=>{ await p.click('.fl-row'); await sleep(700); await bypass(p); await p.click('#newRound'); await sleep(300); await p.click('#roundCreate'); await sleep(3000); };
+const made=async p=>{ await p.evaluate(()=>showPage('build')); await sleep(700); await bypass(p); await p.click('#newRound'); await sleep(300); await p.click('#roundCreate'); await sleep(3000); };
 
 (async()=>{
 const b=await chromium.launch();

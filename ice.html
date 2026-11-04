@@ -147,6 +147,19 @@
 
   main{display:flex;flex-direction:column;gap:12px;padding:12px 0}
   .work-top{display:grid;gap:12px;grid-template-columns:1fr}
+  /* The three pages. One workspace serves two of them, so each page puts the other's controls away. */
+  .icetabs{display:flex;gap:2px;max-width:1500px;margin:0 auto;padding:8px clamp(10px,2.5vw,24px) 0;border-bottom:1px solid var(--line);overflow-x:auto}
+  .icetabs button{background:none;border:0;border-bottom:2px solid transparent;color:var(--ink-dim);font:600 13px var(--sans);padding:9px 14px;min-height:44px;cursor:pointer;white-space:nowrap}
+  .icetabs button[aria-current="page"]{color:var(--ink);border-bottom-color:var(--frost)}
+  .icetabs button:focus-visible{outline:2px solid var(--frost);outline-offset:-2px}
+  #app[data-page="rink"] .side, #app[data-page="rink"] .note-row, #app[data-page="rink"] .sel-readout,
+  #app[data-page="rink"] #newRound, #app[data-page="rink"] #modeWrap,
+  #app[data-page="rink"] #impBtn, #app[data-page="rink"] #clearBtn{display:none!important}
+  #app[data-page="rink"] .work-top{grid-template-columns:1fr}
+  #app[data-page="build"] #mapModeRow, #app[data-page="build"] .contour-bar, #app[data-page="build"] .readout,
+  #app[data-page="build"] #cmpWrap, #app[data-page="build"] #expCsv, #app[data-page="build"] #expPng, #app[data-page="build"] #expPdf,
+  #app[data-page="build"] .bar .seg{display:none!important}
+
   @media(min-width:880px){.work-top{grid-template-columns:minmax(0,1fr) 256px;align-items:start}}
   .stage{display:flex;flex-direction:column;gap:12px;min-width:0}
   .readout .ro-grid{display:flex;flex-wrap:wrap;gap:12px}
@@ -287,30 +300,22 @@
 
 <div id="shellbar"></div>
 
+<!-- The three pages of Ice. The address names the page; these are links to it. -->
+<nav class="icetabs" id="iceTabs" aria-label="Ice pages">
+  <button type="button" data-page="rink">Rink view</button>
+  <button type="button" data-page="trends">Trends</button>
+  <button type="button" data-page="build">Measurement builder</button>
+</nav>
+
 <!-- ===================== HOME ===================== -->
 <div id="home">
   <div class="home-bar">
-    <div class="brand"><h1><span class="mark">[ ◊ ]</span> Ice Sheet</h1><span class="sub">ice thickness · multi-facility</span></div>
+    <div class="brand"><h1><span class="mark">[ ◊ ]</span> Trends</h1><span class="sub" id="trendsFac"></span></div>
     <button class="iconbtn" id="gearHome" title="Preferences" aria-label="Preferences">⚙</button>
   </div>
 
   <div class="backup-warn" id="backupWarn">
     <span class="bw-txt" id="backupWarnTxt"></span><button class="mini" id="backupWarnBtn">Back up now</button>
-  </div>
-
-  <div class="hsec" id="fleetSec">
-    <span class="eyebrow">Fleet overview <span class="fleet-sum" id="fleetSummary"></span></span>
-    <div class="fleet" id="fleet"></div>
-  </div>
-
-  <div class="hsec">
-    <span class="eyebrow">Facility</span>
-    <div class="fac-list" id="facList"></div>
-  </div>
-
-  <div class="hsec">
-    <span class="eyebrow" id="sheetsLbl">Sheets</span>
-    <div class="sheet-grid" id="sheetGrid"></div>
   </div>
 
   <div class="hsec">
@@ -320,9 +325,7 @@
       <canvas id="histChart" width="1000" height="170"></canvas>
       <div class="rounds" id="roundsList"></div>
       <div class="home-actions">
-        <button class="btn primary" id="logNew">+ Log new round</button>
-        <button class="btn" id="openLatest">Open latest round</button>
-        <button class="btn" id="openTrend">View point trends</button>
+        <button class="btn primary" id="logNew">+ New round</button>
       </div>
     </div>
   </div>
@@ -331,7 +334,6 @@
 <!-- ===================== WORKSPACE ===================== -->
 <div class="app" id="app">
   <header class="bar">
-    <button class="iconbtn" id="homeBtn" title="Back to the sheets" aria-label="Back to the sheets" style="width:auto;padding:0 12px">&larr; Sheets</button>
     <div class="brand-mini"><b id="wsName">Sheet</b><span class="sub" id="wsFac"></span></div>
     <div class="count-pill" id="countPill"><b id="countNum">0</b> / <span id="countTot">33</span> logged</div>
     <div class="seg" role="group" aria-label="View">
@@ -343,7 +345,7 @@
 
   <div class="subbar">
     <span class="field">Round <select id="sessSel"></select></span>
-    <span class="field">Detail <select id="modeSel">
+    <span class="field" id="modeWrap">Detail <select id="modeSel">
       <option value="full">Full · 65</option><option value="detailed">Detailed · 39</option><option value="moderate">Moderate · 33</option><option value="quick">Quick · 19</option></select></span>
     <button class="mini" id="newRound">+ New round</button>
     <span class="sub-spacer"></span>
@@ -820,13 +822,22 @@ $("backupWarnBtn").addEventListener("click",doBackupExport);
 
 /* ---------- screens ---------- */
 const appEl=$("app");
-function enterWork(view){state.screen="work";compareId=null;clearUndo();hideSel=false;applyGeometry(Records.sizeOf(sheet()),session().mode);buildBands();buildChips();computeField();computeDelta();
+function enterWork(view){state.screen="work";if(page==="trends")page="rink";appEl.dataset.page=page;markTabs();compareId=null;clearUndo();hideSel=false;applyGeometry(Records.sizeOf(sheet()),session().mode);buildBands();buildChips();computeField();computeDelta();
   $("home").style.display="none";appEl.classList.add("live");buildSessSel();sizeLive();setView(view||"map");refresh();persist();}
-function goHome(){state.screen="home";appEl.classList.remove("live");$("home").style.display="block";buildHome();persist();}
+function goHome(){state.screen="home";page="trends";appEl.dataset.page=page;markTabs();appEl.classList.remove("live");$("home").style.display="block";buildHome();persist();}
+/* ---------- the three pages ----------
+   The address names the page (#/f/FID/s/SID/rink|trends|build). Trends is the old home screen
+   cut down to the chart and the rounds; Rink view and the Measurement builder are the workspace
+   with the other page's controls put away (see the [data-page] rules in the stylesheet). */
+const PAGES=["rink","trends","build"];let page="rink";
+function markTabs(){document.querySelectorAll("#iceTabs [data-page]").forEach(b=>b.setAttribute("aria-current",b.dataset.page===page?"page":"false"));}
+function showPage(p){if(!PAGES.includes(p))p="rink";page=p;state.lastPage=p;
+  if(p==="trends")goHome();else{$("home").style.display="none";enterWork(p==="build"?"map":state.lastView);}
+  if(typeof Shell!=="undefined")Shell.setAddress(facility().id,sheet().id,p);}
+document.querySelectorAll("#iceTabs [data-page]").forEach(b=>b.addEventListener("click",()=>showPage(b.dataset.page)));
 /* The ≡ is gone; the switcher carries both jobs now. Crossing to Glass is a
    link, and Ice's own entry - which was a link to the page you are already on,
    so a no-op reload - goes back to the sheets instead. */
-$("homeBtn").addEventListener("click",e=>{e.preventDefault();goHome();});
 
 /* ---------- HOME build ---------- */
 function sessStats(s){const vals=Object.values(s.data).map(l=>decOf.get(l));if(!vals.length)return null;
@@ -835,52 +846,9 @@ function sessStatsFor(s,f){const vals=Object.values(s.data).map(l=>decOf.get(l))
   const avg=vals.reduce((a,b)=>a+b,0)/vals.length,ef=Records.settingsOf(f.settings,state),e=ef.edges;
   const fb=ef.tieAttention?e[1]:ef.floodBelow;
   return{avg,flood:vals.filter(v=>v<fb).length,n:vals.length};}
-/* The launcher is where you say which rink you are at, and it holds the view
-   across every facility. This screen is the one you are standing in. */
-function buildFleet(){const el=$("fleet");el.innerHTML="";let nSheets=0,nOver=0;const now=Date.now(),od=Records.overdueDaysOf(facility(),state);
-  [facility()].filter(Boolean).forEach(f=>{const grp=document.createElement("div");grp.className="fl-fac";
-    const h=document.createElement("div");h.className="fl-fname";h.textContent=f.name;grp.appendChild(h);
-    const rows=document.createElement("div");rows.className="fl-rows";
-    f.sheets.forEach(sh=>{nSheets++;
-      const withData=[...sh.sessions].filter(s=>Object.keys(s.data).length).sort((a,b)=>new Date(b.date)-new Date(a.date));
-      const last=withData[0],st=last?sessStatsFor(last,f):null,days=last?Math.floor((now-new Date(last.date).getTime())/86400000):null;
-      const over=days!=null&&days>od;if(over)nOver++;const cls=last?(over?"over":"ok"):"nodata";
-      const sizeName=(sh.size&&sh.size.name)?sh.size.name.split(" — ")[0]:"NHL";
-      const row=document.createElement("div");row.className="fl-row "+cls;
-      row.innerHTML=`<span class="fl-sheet">${sh.name}</span><span class="fl-size">${sizeName}</span>`+
-        `<span class="fl-when">${last?fmtDay(last.date)+" · "+days+"d ago":"no data"}</span>`+
-        `<span class="fl-avg">${st?fmtNum(st.avg):"—"}</span>`+
-        `<span class="fl-flood">${st&&st.flood?st.flood+" to flood":""}</span>`+
-        `<span class="fl-badge">${last?(over?"overdue":"ok"):"empty"}</span>`;
-      row.addEventListener("click",()=>{state.activeFacility=f.id;state.activeSheet=sh.id;state.activeSession=[...sh.sessions].sort((a,b)=>new Date(b.date)-new Date(a.date))[0].id;enterWork("map");});
-      rows.appendChild(row);});
-    grp.appendChild(rows);el.appendChild(grp);});
-  $("fleetSummary").textContent=`${nSheets} sheet${nSheets===1?"":"s"}${nOver?" · "+nOver+" overdue":""}`;}
-function buildHome(){buildBands();buildFleet();updateBackupBanner();
-  // facilities
-  /* Where you are is one fact, and the launcher owns it. Showing every
-     facility here was a second way to set it, and the two could disagree. */
-  const fl=$("facList");fl.innerHTML="";
-  const cur=facility();
-  if(cur){const b=document.createElement("div");b.className="fac active";
-    b.innerHTML=`<span class="pin"></span>${cur.name}`;fl.appendChild(b);}
-  const other=document.createElement("a");other.className="fac-elsewhere";
-  other.href="index.html";
-  other.textContent=state.facilities.length>1?"At a different rink? →":"All apps →";
-  fl.appendChild(other);
-  const fa=document.createElement("button");fa.className="fac add";fa.textContent="+ Add facility";fa.addEventListener("click",addFacility);fl.appendChild(fa);
-  // sheets
-  $("sheetsLbl").textContent="Sheets at "+facility().name;
-  const sg=$("sheetGrid");sg.innerHTML="";facility().sheets.forEach(sh=>{const card=document.createElement("div");card.className="sheet-card"+(sh.id===state.activeSheet?" active":"");
-    const latest=[...sh.sessions].sort((a,b)=>new Date(b.date)-new Date(a.date))[0],st=latest?sessStats(latest):null;
-    card.innerHTML=`<h3>${sh.name}</h3><div class="meta">${sh.sessions.length} round${sh.sessions.length>1?"s":""}${latest?" · last "+fmtDay(latest.date):""}${st?" · "+fmtNum(st.avg)+" avg":""}</div>
-      <div class="row"><button class="scbtn primary" data-act="open">Open</button><button class="scbtn" data-act="trend">Trends</button></div>`;
-    card.addEventListener("click",e=>{const act=e.target.dataset.act;state.activeSheet=sh.id;state.activeSession=latest.id;
-      if(act==="open"){enterWork("map");}else if(act==="trend"){enterWork("trend");}else{buildHome();persist();}});
-    sg.appendChild(card);});
-  const sa=document.createElement("div");sa.className="sheet-card add";sa.textContent="+ Add sheet";sa.addEventListener("click",()=>openAddSheet(()=>buildHome()));sg.appendChild(sa);
-  // trend panel for active sheet
-  buildTrendPanel();}
+/* The Trends page is what the old home screen was once the fleet, the facility list and the
+   sheet grid had gone to the shell: the chart and the rounds of the sheet you are on. */
+function buildHome(){buildBands();updateBackupBanner();$("trendsFac").textContent=facility().name+" · "+sheet().name;buildTrendPanel();}
 function buildTrendPanel(){const sh=sheet();$("trendTitle").textContent=facility().name+" · "+sh.name;
   const withData=sh.sessions.map(s=>({s,st:sessStats(s)})).filter(o=>o.st).sort((a,b)=>new Date(a.s.date)-new Date(b.s.date));
   const mini=$("trendMini");
@@ -892,7 +860,7 @@ function buildTrendPanel(){const sh=sheet();$("trendTitle").textContent=facility
   recent.forEach(s=>{const st=sessStats(s),row=document.createElement("div");row.className="round";
     const col=st?bandOf(st.avg).color:"#5d7384";
     row.innerHTML=`<span class="dot" style="background:${col}"></span><span class="d">${fmtDate(s.date)}</span>${st?`<span class="a">${fmtNum(st.avg)}</span><span>·</span><span>${st.ideal}/${st.n} ideal</span>`:`<span class="empty">empty</span>`}<span class="x">${st?st.flood+" to flood":""}</span>`;
-    row.addEventListener("click",()=>{state.activeSession=s.id;enterWork("map");});
+    row.addEventListener("click",()=>{state.activeSession=s.id;showPage("rink");});
     const delb=document.createElement("button");delb.className="rdel";delb.textContent="✕";delb.title="Delete round";
     delb.addEventListener("click",ev=>{ev.stopPropagation();if(confirm(`Delete the ${fmtDay(s.date)} round? This can't be undone.`)){if(deleteRound(sheet(),s.id))buildHome();}});
     row.appendChild(delb);rl.appendChild(row);});
@@ -915,9 +883,7 @@ function drawHistory(withData){const c=$("histChart"),wrap=c.parentElement,cssW=
   g.fillStyle=inkDim;g.font="10px ui-monospace,monospace";g.textAlign="left";g.fillText(fmtDay(withData[0].s.date),padL,cssH-6);
   if(withData.length>1){g.textAlign="right";g.fillText(fmtDay(withData[withData.length-1].s.date),padL+w,cssH-6);}}
 
-$("logNew").addEventListener("click",()=>openNewRound(()=>enterWork("map")));
-$("openLatest").addEventListener("click",()=>{const sh=sheet();state.activeSession=[...sh.sessions].sort((a,b)=>new Date(b.date)-new Date(a.date))[0].id;enterWork("map");});
-$("openTrend").addEventListener("click",()=>{const sh=sheet();state.activeSession=[...sh.sessions].sort((a,b)=>new Date(b.date)-new Date(a.date))[0].id;enterWork("trend");});
+$("logNew").addEventListener("click",()=>openNewRound(()=>showPage("build")));
 
 function addFacility(){const n=prompt("New facility name:","Facility "+(state.facilities.length+1));if(n===null)return;const f=newFacility(n.trim()||("Facility "+(state.facilities.length+1)));state.facilities.push(f);state.activeFacility=f.id;state.activeSheet=f.sheets[0].id;state.activeSession=f.sheets[0].sessions[0].id;buildBands();buildHome();persist();}
 let addSheetAfter=null;
@@ -969,7 +935,7 @@ $("backupFile").addEventListener("change",e=>{const f=e.target.files[0];if(!f)re
     if(!sheet())state.activeSheet=facility().sheets[0].id;
     if(!session())state.activeSession=sheet().sessions[0].id;
     compareId=null;clearUndo();
-    applyGeometry(Records.sizeOf(sheet()),session().mode);buildBands();buildChips();persist();closeSettings();goHome();
+    applyGeometry(Records.sizeOf(sheet()),session().mode);buildBands();buildChips();persist();closeSettings();showPage(page);
     flashNote(res.taken?("merged "+res.taken+" change"+(res.taken===1?"":"s")):"already up to date");
   }catch(err){alert("That doesn't look like a valid Ice Sheet backup file.");}
   $("backupFile").value="";};rd.readAsText(f);});
@@ -1049,7 +1015,8 @@ async function boot(){state=await Repo.load();
   /* Pick up where this device left off — coming back from another app in the suite
      lands on the sheet you were working, not the front screen. Ice in the
      switcher still goes back to them. */
-  if(state.screen==="work"&&facility()&&sheet()&&session())enterWork(state.lastView);else goHome();}
+  const want=(here&&here.view)||(PAGES.includes(state.lastPage)?state.lastPage:"rink");   // no page in the address: the one this device was last on; a device from the old home screen has none, so the rink
+  if(facility()&&sheet()&&session())showPage(want);}
 boot().then(()=>{
   if(!SYNC) return;
   SYNC.attach({
@@ -1078,18 +1045,18 @@ boot().then(()=>{
     "#sheetManage input","#sheetManage .del","#roundManage input","#roundManage .del",".rdel"]);
   SYNC.start({title:"Arena Management System"}).then(()=>{
     if(typeof Shell==="undefined")return;
-    return Shell.mountBar($("shellbar"),{app:"ice"}).then(()=>Shell.setAddress(facility().id,sheet().id));
+    return Shell.mountBar($("shellbar"),{app:"ice"}).then(()=>Shell.setAddress(facility().id,sheet().id,page));
   });
   /* A sheet chosen in the bar's menus is an address change; Ice follows it. */
   window.addEventListener("hashchange",async()=>{
     const w=await Shell.whereFromAddress().catch(()=>null);
     if(!w){Shell.setAddress(facility().id,sheet().id);return;}          // an address that names nothing goes back to where Ice is
     Shell.setAddress(w.fid,w.sid);                                      // and a facility alone is filled out to a sheet
-    if(w.fid===facility().id&&w.sid===sheet().id)return;
+    if(w.fid===facility().id&&w.sid===sheet().id){if(w.view&&w.view!==page)showPage(w.view);return;}
     state.activeFacility=w.fid;state.activeSheet=w.sid;
     state.activeSession=[...sheet().sessions].sort((a,b)=>new Date(b.date)-new Date(a.date))[0].id;
     compareId=null;clearUndo();applyGeometry(Records.sizeOf(sheet()),session().mode);buildBands();buildChips();persist();
-    if(state.screen==="work")enterWork(state.lastView);else goHome();
+    showPage(w.view||page);
   });
 });
 

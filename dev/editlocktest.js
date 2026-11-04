@@ -45,7 +45,7 @@ async function signIn(p,id,code){
   await p.click('.sync-gate .sync-name[data-id="'+id+'"]');
   await p.fill('.sync-gate #sg-personal',code); await p.click('.sync-gate .sync-go'); await sleep(2500);
 }
-const made=async p=>{ if(!(await p.isVisible('#newRound'))){ await p.click('.fl-row'); await sleep(700); } await bypass(p); await p.click('#newRound'); await sleep(300); await p.click('#roundCreate'); await sleep(3000); };
+const made=async p=>{ if(!(await p.isVisible('#newRound'))){ await p.evaluate(()=>showPage('build')); await sleep(700); } await bypass(p); await p.click('#newRound'); await sleep(300); await p.click('#roundCreate'); await sleep(3000); };
 const pending=p=>p.evaluate(()=>window.Sync.pending());
 const editing=p=>p.evaluate(()=>window.Sync.isEditing());
 const pill=async p=>(await p.textContent('.sync-pill').catch(()=>''))||'';

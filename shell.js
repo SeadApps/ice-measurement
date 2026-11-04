@@ -72,6 +72,9 @@
       if (p.length === 2) return { page: "sheets", fid: p[1] };
       if (p[2] === "s" && p[3] && p.length === 4) return { page: "sheets", fid: p[1], sid: p[3] };
       if (p[2] === "s" && p[3] && p[4] === "settings" && p.length === 5) return { page: "settings", fid: p[1], sid: p[3] };
+      /* Ice's own pages. The shell's pages never draw these; they are read by Ice (and by
+         whereFromAddress), and the sheet they sit under is the sheet you are on. */
+      if (p[2] === "s" && p[3] && (p[4] === "rink" || p[4] === "trends" || p[4] === "build") && p.length === 5) return { page: "sheets", fid: p[1], sid: p[3], view: p[4] };
     }
     return { page: "unknown" };
   }
@@ -484,7 +487,7 @@
     if (!f) return null;
     var sheets = f.sheets || [], s = r.sid ? sheets.filter(function (x) { return x.id === r.sid; })[0]
       : (sheets.filter(function (x) { return x.id === (d.prefs || {}).activeSheet; })[0] || sheets[0]);
-    return s ? { fid: f.id, sid: s.id } : null;
+    return s ? { fid: f.id, sid: s.id, view: r.sid ? r.view || null : null } : null;
   }
   async function paintBar() {
     if (!barHost) return;
@@ -501,9 +504,12 @@
   }
   /* The app changed sheet itself (a row on its own home screen): put that in the address, and
      in where-you-are, without a navigation. Called on every save, so it is cheap when nothing moved. */
-  function setAddress(fid, sid) {
+  function setAddress(fid, sid, view) {
     if (!barHost || !fid || !sid) return;
-    var want = "#/f/" + fid + "/s/" + sid;
+    /* A call that does not name a page keeps the page the address already has, on the same sheet. */
+    var cur = parse(global.location.hash);
+    if (view === undefined && cur.fid === fid && cur.sid === sid) view = cur.view;
+    var want = "#/f/" + fid + "/s/" + sid + (view ? "/" + view : "");
     if (global.location.hash === want) return;
     global.history.replaceState(null, "", global.location.pathname + global.location.search + want);
     paintBar();

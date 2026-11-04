@@ -32,13 +32,14 @@ const shellSays = await p.evaluate(() => { const d = Shell.data(), out = {};
 /* Ice reads where you are from the shell, so open Flynn in the shell first, as a person would. */
 await p.goto(B + '/index.html#/f/f2'); await p.waitForSelector('#page .screen'); await sleep(500);
 await p.goto(B + '/ice.html'); await sleep(2500);
-const iceFlynn = await p.evaluate(() => [...document.querySelectorAll('#fleet .fl-row')].map(r => [r.textContent, r.className.includes('over')]));
-ok('Ice calls Flynn\'s Standard overdue, as the shell does', shellSays.s2 === true && iceFlynn.some(r => /Standard/.test(r[0]) && r[1] === true), JSON.stringify(iceFlynn));
-ok('and Flynn\'s Mini, which has no rounds, is not overdue in either', shellSays.s3 === false && !iceFlynn.some(r => /Mini/.test(r[0]) && r[1] === true));
+/* Ice no longer draws a fleet; what it shares with the shell is the rule, read from the facility. */
+const iceFlynn = await p.evaluate(() => ({ days: Records.overdueDaysOf(facility(), state), over: Records.isOverdue ? facility().sheets.map(s => [s.name, Records.isOverdue(facility(), s, state)]) : null }));
+ok('Ice reads Flynn\'s own 3-day rule, which is why the shell calls Standard overdue', iceFlynn.days === 3 && shellSays.s2 === true, JSON.stringify(iceFlynn));
+ok('and Flynn\'s Mini, which has no rounds, is not overdue in the shell', shellSays.s3 === false);
 await p.goto(B + '/index.html#/f/f1'); await p.waitForSelector('#page .screen'); await sleep(500);
 await p.goto(B + '/ice.html'); await sleep(2500);
-const iceConway = await p.evaluate(() => [...document.querySelectorAll('#fleet .fl-row')].map(r => r.className.includes('over')));
-ok('Ice agrees Conway is not overdue (7 days, last round 2 days ago)', shellSays.s1 === false && iceConway.every(x => x === false), JSON.stringify(iceConway));
+const iceConway = await p.evaluate(() => Records.overdueDaysOf(facility(), state));
+ok('Ice reads Conway\'s 7 days, and the shell agrees it is not overdue', shellSays.s1 === false && iceConway === 7, String(iceConway));
 
 /* ---- readings are read the same way in both places ------------------------------------------------- */
 const same = await p.evaluate(() => OPTIONS.every(o => Records.readingValue(o) === decOf.get(o)));

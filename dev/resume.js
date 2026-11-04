@@ -27,36 +27,32 @@ const p=await ctx.newPage(); const errs=[];
 p.on('pageerror',e=>errs.push(String(e).split('\n')[0]));
 p.on('console',m=>{if(m.type()==='error'&&!/sw\.js|404/i.test(m.text()))errs.push('console: '+m.text())});
 
-// first visit ever -> the front screen, as before
+// first visit ever -> the Rink view (the old home screen is the shell's now)
 await p.goto('http://localhost:8200/ice.html'); await p.waitForTimeout(1400);
-ok('a first visit still lands on the home screen', await p.isVisible('#home'));
-
-// open a sheet, then go over to Glass
-await p.click('.fl-row'); await p.waitForTimeout(900);
-ok('sheet opens', await p.isVisible('#rink') && !(await p.isVisible('#home')));
+ok('a first visit lands on the Rink view', await p.isVisible('#rink') && !(await p.isVisible('#home')));
 const sheetName = await p.$eval('#wsName',e=>e.textContent);
-await p.click('#viewTrend'); await p.waitForTimeout(500);   // and leave it on Trend
+await p.click('#viewTrend'); await p.waitForTimeout(500);   // and leave it on Compare
 
 await p.goto('http://localhost:8200/glass.html'); await p.waitForTimeout(900);
 ok('glass app loads', (await p.$$('.pnl')).length===127);
 
 // ...and back again via the tab
 await p.click('#shellbar .appsw a:has-text("Ice")'); await p.waitForTimeout(1600);
-ok('returns straight to the sheet, not home', await p.isVisible('#rink') && !(await p.isVisible('#home')));
+ok('returns straight to the sheet', await p.isVisible('#rink') && !(await p.isVisible('#home')));
 ok('same sheet as before ('+sheetName.trim()+')', (await p.$eval('#wsName',e=>e.textContent)).trim()===sheetName.trim());
 ok('and the same view (Trend)', await p.$eval('#viewTrend',e=>e.getAttribute('aria-pressed'))==='true');
 
-// the home button still works, and that choice sticks
-await p.click('#homeBtn'); await p.waitForTimeout(700);
-ok('home button still goes home', await p.isVisible('#home'));
+// the page you chose is the page you come back to
+await p.click('#iceTabs [data-page=trends]'); await p.waitForTimeout(700);
+ok('the Trends tab shows the trends', await p.isVisible('#home'));
 await p.goto('http://localhost:8200/glass.html'); await p.waitForTimeout(700);
 await p.click('#shellbar .appsw a:has-text("Ice")'); await p.waitForTimeout(1500);
-ok('having chosen home, it stays home', await p.isVisible('#home'));
+ok('having chosen Trends, it stays on Trends', await p.isVisible('#home'));
 
 // a plain reload behaves the same way
-await p.click('.fl-row'); await p.waitForTimeout(900);
+await p.click('#iceTabs [data-page=rink]'); await p.waitForTimeout(900);
 await p.reload(); await p.waitForTimeout(1500);
-ok('a reload also resumes the sheet', await p.isVisible('#rink'));
+ok('a reload also resumes the page', await p.isVisible('#rink'));
 
 console.log('\nerrors:', errs.length?errs.slice(0,5):'none');
 console.log('\n  '+pass+' passed, '+fail+' failed');

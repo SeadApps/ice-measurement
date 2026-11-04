@@ -92,7 +92,7 @@ const b=await chromium.launch();
 const A=await device(b,'A');
 await A.p.goto(B+'/ice.html'); await sleep(1200);
 await signIn(A.p,'dana','dana-code-1');
-await A.p.click('.fl-row'); await sleep(800);
+await A.p.evaluate(()=>showPage('build')); await sleep(800);
 await bypass(A.p); await A.p.click('#newRound'); await sleep(400); await A.p.click('#roundCreate'); await sleep(3000);
 const made=await rows();
 ok('Dana\'s records reached the server ('+made.length+')', made.length>=3);
@@ -133,7 +133,7 @@ ok('Dana is still the one stamped on her own records', (await rows()).filter(x=>
 ok('and the local copy still knows it', (await local()).some(x=>x.changedBy==='Dana'));
 
 /* A real edit by Pete is stamped Pete, and never carries a changedBy of its own. */
-await Pd.p.click('.fl-row'); await sleep(700);
+await Pd.p.evaluate(()=>showPage('build')); await sleep(700);
 await bypass(Pd.p); await Pd.p.click('#newRound'); await sleep(300); await Pd.p.click('#roundCreate'); await sleep(3000);
 const sent=await Pd.p.evaluate(()=>window.__sent);
 ok('Pete\'s edit was sent', sent.length>0);

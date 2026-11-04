@@ -25,7 +25,8 @@ const personInApp = async (p, id, pw) => {
 const barText = p => text(p, '#shellbar');
 const menuItems = p => p.$$eval('#shellbar .dropdown .it', e => e.map(x => x.textContent));
 const prefs = p => p.evaluate(() => JSON.parse(localStorage.getItem('ice_v4_prefs') || '{}'));
-const here = p => p.evaluate(() => location.hash);
+/* The sheet the address names; Ice adds a page after it (pagestest covers that part). */
+const here = p => p.evaluate(() => location.hash.replace(/\/(rink|trends|build)$/, ''));
 
 (async () => {
 await fetch(B + '/__reset');
@@ -40,7 +41,7 @@ ok('before the code, the bar names no facility, because it is not drawn', !(awai
 await p.fill('.sync-gate #sg-code', ACCESS); await p.click('.sync-gate button'); await p.waitForSelector('#shellbar .nav', { timeout: 12000 }); await sleep(800);
 ok('after it, Ice has the shared bar', !!(await p.$('#shellbar .nav.sb.sb-app')));
 ok('the bar is above the page: the logo, the menus, the app switch, the sync pill, the account menu', await p.evaluate(() => ['#logo', '#facMenu', '#sheetMenu', '#appSw', '.sync-pill', '#acctMenu'].every(s => !!document.querySelector('#shellbar ' + s))));
-ok('and sits above Ice\'s own header, not over it', await p.evaluate(() => document.getElementById('shellbar').getBoundingClientRect().bottom <= document.getElementById('home').getBoundingClientRect().top + 1));
+ok('and sits above Ice\'s own header, not over it', await p.evaluate(() => document.getElementById('shellbar').getBoundingClientRect().bottom <= document.getElementById('iceTabs').getBoundingClientRect().top + 1));
 ok('the logo goes to the shell\'s Facilities page', await p.getAttribute('#shellbar #logo', 'href') === 'index.html');
 
 /* ---- what the bar replaced is gone ------------------------------------------------------------------ */
@@ -48,7 +49,7 @@ ok('Ice\'s own app switcher is gone, from the home bar and the workspace bar', !
 ok('and its theme and unit buttons, and the sign-out it used to add', !(await p.$('#thLight')) && !(await p.$('#thDark')) && !(await p.$('#unitHomeBtn')) && !(await p.$('#unitBtn')) && !(await p.$('#themeBtn')) && !(await p.$('#home .sync-signout')));
 ok('Preferences, which is Ice\'s own, keeps its display buttons until D3', !!(await p.$('#thLight2')) && !!(await p.$('#unitPrefIn')));
 ok('and the gear that opens it is still there', !!(await p.$('#gearHome')) && !!(await p.$('#gear')));
-ok('the way back to the sheets is its own button now', await p.evaluate(() => document.getElementById('homeBtn').tagName) === 'BUTTON');
+ok('the way back to the sheets is the shell is now, and Ice has a tab row in its place', await p.evaluate(() => !document.getElementById('homeBtn') && document.querySelectorAll('#iceTabs button').length === 3));
 
 /* ---- the app you are in is marked ---------------------------------------------------------------------- */
 const sw = await p.$$eval('#shellbar #appSw a', a => a.map(x => [x.textContent, x.getAttribute('aria-current'), x.hasAttribute('data-app'), x.getAttribute('href')]));
@@ -64,12 +65,6 @@ await p.goto(B + '/ice.html'); await p.waitForSelector('#shellbar .nav'); await 
 ok('with no address, Ice falls back to the preference and then writes the address', /^#\/f\/f[12]\/s\/s[123]$/.test(await here(p)), await here(p));
 await p.goto(B + '/ice.html#/f/f1/s/nope'); await p.waitForSelector('#shellbar .nav'); await sleep(2500);
 ok('an address that names nothing is ignored, and corrected to where Ice is', /^#\/f\/f[12]\/s\/s[123]$/.test(await here(p)) && await p.evaluate(() => !!sheet()), await here(p));
-
-/* a sheet chosen on Ice's own home screen goes into the address */
-await p.goto(B + '/ice.html#/f/f2/s/s2'); await p.waitForSelector('#shellbar .nav'); await sleep(2500);
-await p.evaluate(() => { document.querySelectorAll('.sheet-card').forEach(c => { if (/Mini/.test(c.textContent)) c.querySelector('[data-act], button, .btn').click(); }); });
-await sleep(1500);
-ok('choosing a sheet on Ice\'s own screen moves the address to it', await here(p) === '#/f/f2/s/s3' && /Mini/.test(await text(p, '#sheetMenu')), await here(p));
 
 /* ---- the bar's menus move Ice, without a reload ------------------------------------------------------------ */
 await p.evaluate(() => { window.__same = 1; });

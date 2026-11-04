@@ -137,7 +137,7 @@ await signIn(P.p,'pete','pete-code-1');
 await unlockUI(P.p); await sleep(1500);
 /* The device pulls 'late' and has no invention of its own now, so Pete makes a facility of his own for Ice to write. */
 await P.p.evaluate(()=>{ const f=newFacility('Pete Rink'); state.facilities.push(f); state.activeFacility=f.id; state.activeSheet=f.sheets[0].id; state.activeSession=f.sheets[0].sessions[0].id; persist(); buildHome(); }); await sleep(800);
-await P.p.click('.fl-row'); await sleep(700);
+await P.p.evaluate(()=>showPage('build')); await sleep(700);
 await P.p.click('#newRound'); await sleep(300); await P.p.click('#roundCreate'); await sleep(3500);
 let all=await rows();
 const byKind=k=>all.filter(x=>x.kind===k&&x.facility_id!=='late');   // the seeded 'late' facility is not Ice's

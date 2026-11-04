@@ -41,7 +41,7 @@ async function signIn(p,id,code,wait){
   await p.click('.sync-gate .sync-name[data-id="'+id+'"]');
   await p.fill('.sync-gate #sg-personal',code); await p.click('.sync-gate .sync-go'); await sleep(wait||2500);
 }
-const round=async p=>{ if(!(await p.isVisible('#newRound'))){ await p.click('.fl-row'); await sleep(700); }
+const round=async p=>{ if(!(await p.isVisible('#newRound'))){ await p.evaluate(()=>showPage('build')); await sleep(700); }
                        await bypass(p); await p.click('#newRound'); await sleep(300); await p.click('#roundCreate'); await sleep(600); };
 const pending=p=>p.evaluate(()=>window.Sync.pending());
 const person=p=>p.evaluate(()=>{const x=window.Sync.person();return x&&x.id;});
@@ -82,7 +82,7 @@ ok('nobody\'s work was sent under the other\'s name', !(await sessions()).some(r
 await people();
 D=await device(b,'D2'); await D.p.goto(B+'/ice.html'); await sleep(1200);
 await signIn(D.p,'dana','dana-code-1');
-await D.p.click('.fl-row'); await sleep(700);
+await D.p.evaluate(()=>showPage('build')); await sleep(700);
 await sleep(2500);                                    // the first round and facility are on the server
 const base=(await rows()).length;
 await D.ctx.setOffline(true); await sleep(500);
@@ -107,7 +107,7 @@ ok('the screen is still locked for the next person', await gateUp(D.p));
 await people();
 D=await device(b,'D3'); await D.p.goto(B+'/ice.html'); await sleep(1200);
 await signIn(D.p,'dana','dana-code-1');
-await D.p.click('.fl-row'); await sleep(3000);
+await D.p.evaluate(()=>showPage('build')); await sleep(3000);
 const base3=(await rows()).length;
 await D.ctx.setOffline(true); await sleep(500);
 await round(D.p);
@@ -134,7 +134,7 @@ await ctl('tight=1');
 D=await device(b,'D4'); await D.p.goto(B+'/ice.html'); await sleep(1200);
 await signIn(D.p,'dana','dana-code-1');
 await unlock(D.p); await sleep(2500);
-await D.p.click('.fl-row'); await sleep(2500);
+await D.p.evaluate(()=>showPage('build')); await sleep(2500);
 const base4=(await rows()).length;
 await ctl('unlockms=1500'); await D.p.evaluate(()=>window.Sync.lockEditing());
 await unlock(D.p);                                  // a window that will have ended by the time anyone is back
@@ -167,7 +167,7 @@ D=await device(b,'D5',{idleMs:6000,idleCheckMs:400});
 await D.p.goto(B+'/ice.html'); await sleep(1200);
 await signIn(D.p,'dana','dana-code-1');
 await unlock(D.p); await sleep(1500);
-await D.p.click('.fl-row'); await sleep(700);
+await D.p.evaluate(()=>showPage('build')); await sleep(700);
 ok('using the device keeps the person signed in', await (async()=>{
   for(let i=0;i<5;i++){ await D.p.mouse.move(100+i*10,100+i*10); await D.p.mouse.click(300,300); await sleep(1300); }
   return (await person(D.p))==='dana' && !(await gateUp(D.p)); })());

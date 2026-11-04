@@ -15,7 +15,7 @@
  "layouttest": 40,
  "phonetest": 46,
  "reg": 15,
- "resume": 9,
+ "resume": 8,
  "scheduletest": 31,
  "routetest": 40,
  "shelltest": 91,
@@ -23,7 +23,7 @@
  "settingstest": 68,
  "backuptest": 44,
  "stafftest": 65,
- "bartest": 58,
+ "bartest": 57,
  "maptest": 37,
  "restoretest": 12,
  "bandmigrationtest": 31,
@@ -35,5 +35,6 @@
  "stamptest": 25,
  "synctest": 26,
  "whotest": 19,
- "widthstest": 25
+ "widthstest": 25,
+ "pagestest": 26
 }
