@@ -59,7 +59,7 @@ const decOf=new Map(OPTIONS.map(o=>[o,parseFrac(o)]));
 function labelOf(v){let best=OPTIONS[0],bd=1e9;for(const o of OPTIONS){const d=Math.abs(decOf.get(o)-v);if(d<bd){bd=d;best=o;}}return best;}
 function fr(v){const n=Math.round(v*16),whole=Math.floor(n/16);let rem=n-whole*16;if(rem===0)return whole+'″';
   let num=rem,den=16;while(num%2===0&&den%2===0){num/=2;den/=2;}return (whole?whole+' ':'')+num+'/'+den+'″';}
-const frClean=s=>s.replace(/"/g,'″');
+const frClean=s=>String(s).replace(/"/g,'″');   // a reading is a label; String() so an odd record cannot throw while drawing
 const deltaStr=d=>(d>0?'+':d<0?'−':'±')+Math.abs(d).toFixed(2)+'″';
 
 /* ---------- unit display (storage stays decimal inches; these format for display only) ---------- */

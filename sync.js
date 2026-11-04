@@ -361,7 +361,17 @@
                                           changedBy: row.changed_by_name || "" });
         });
         var newest = rows[rows.length - 1].updated_at;
-        var applied = hooks.apply(byKind) || 0;
+        /* The page draws what it was handed inside apply(), and drawing can throw.
+           A throw there used to abandon the rest of this pull: the records were
+           merged and held, but never marked as sent and the cursor never moved, so
+           the next cycle pushed every one of them straight back and the server
+           restamped the lot - the clobber the record store exists to prevent,
+           set off by a display error. What the device holds is marked either way
+           (it only marks records it really has); the cursor moves only if apply
+           finished, so a failed apply is retried rather than skipped. */
+        var applied = 0, applyOk = true;
+        try { applied = hooks.apply(byKind) || 0; }
+        catch (e) { applyOk = false; if (global.console) console.error("sync: apply() threw, the records are kept and marked, the pull will be retried", e); }
         /* Anything we just took from the server matches the server, so mark it
            as sent — otherwise the next push would echo it straight back and
            bump its timestamp, making everyone else's copy look stale. */
@@ -372,7 +382,7 @@
             if (mine && mine.updatedAt === row.updated_at) sent[row.kind + " " + row.id] = row.updated_at;
           });
           return writeJSON(K_SENT, sent);
-        }).then(function () { return writeJSON(cursorKey(), newest); }).then(function () { return applied; });
+        }).then(function () { return applyOk ? writeJSON(cursorKey(), newest) : null; }).then(function () { return applied; });
       });
     });
   }

@@ -129,6 +129,29 @@ const fn = await names(F.p);
 ok('a facility somebody really used is kept beside the real one', fn.includes('Main facility') && fn.includes('Conway Arena'), JSON.stringify(fn));
 await F.ctx.close();
 
+/* A page that throws while drawing what it was handed must not make the device send it back.
+   apply() draws, and drawing can throw (a record that is not what the page expects). That used
+   to abandon the rest of the pull: the records were held but never marked as sent, the cursor
+   never moved, and the next cycle pushed every one of them back - restamping the server. */
+await fetch(B + '/__reset');
+await seedServer();
+const G = await device(b);
+await G.p.goto(B + '/ice.html'); await signIn(G.p);
+await G.p.evaluate(() => Sync.attach({ kinds: ['facility', 'sheet', 'session'],
+  collect: () => { const m = Records.Repo.outgoing(); return { facility: m.fac, sheet: m.sh, session: m.se }; },
+  apply: inc => { Records.Repo.merge({ facilities: inc.facility || {}, sheets: inc.sheet || {}, sessions: inc.session || {} });
+                  Records.Repo.persistMaps(); throw new Error('boom: drawing failed'); } }));
+{ const r = await fetch(B + '/auth/v1/token?grant_type=password', { method: 'POST', body: JSON.stringify({ email: CFG.email, password: CODE }) });
+  const tok = (await r.json()).access_token;
+  await fetch(B + '/rest/v1/records?on_conflict=kind,id', { method: 'POST', headers: H(tok), body: JSON.stringify([
+    { kind: 'session', id: 'zextra', deleted: false, body: { id: 'zextra', sheetId: 'sconway', ord: 1, date: T, mode: 'moderate', data: {}, notes: {}, updatedAt: T } }]) }); }
+const g0 = JSON.stringify((await kinds()).map(r => [r.id, r.updated_at]).sort());
+for (let i = 0; i < 2; i++) { await G.p.evaluate(() => Sync.sync()); await sleep(2200); }
+ok('a device whose drawing throws still holds what it was sent', await G.p.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('ice_v4_sessions') || '{}')).includes('zextra')));
+ok('and sends none of it back', JSON.stringify((await kinds()).map(r => [r.id, r.updated_at]).sort()) === g0);
+ok('with nothing left waiting to send', (await G.p.evaluate(() => Sync.pending())) === 0);
+await G.ctx.close();
+
 await b.close();
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

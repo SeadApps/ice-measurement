@@ -144,7 +144,7 @@ ok('a corner that differs is not small either', cmp.corner.small===false && near
 ok('it says which dimensions differ', cmp.far.differs.join()==='L,W' && cmp.corner.differs.join()==='R', JSON.stringify([cmp.far.differs,cmp.corner.differs]));
 
 /* ---- updating the sheet from the builder ---------------------------------------- */
-await A.p.click('#newRound'); await sleep(300); await A.p.click('#roundCreate'); await sleep(3000);   // a round with readings in the facility
+await A.p.evaluate(()=>showPage('build')); await sleep(500); await A.p.click('#newRound'); await sleep(300); await A.p.click('#roundCreate'); await sleep(3000);   // a round with readings in the facility
 await A.p.evaluate(()=>window.Sync.sync('t')); await sleep(2000);
 const srvSess0=JSON.stringify((await rows()).filter(r=>r.kind==='session').map(r=>[r.id,r.updated_at]).sort());
 const before=await stampsOf(), id=(await firstSheet(A.p)).id;

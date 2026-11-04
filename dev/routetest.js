@@ -90,7 +90,7 @@ ok('Facilities is not a place: where you are is left as it was', (await prefs())
 await at('#/f/f2');
 await G.p.click('#sheetRows .srow[data-sid="s2"] [data-open="ice"]');
 await G.p.waitForURL(/ice\.html/, { timeout: 8000 }); await sleep(2500);
-ok('Ice Manager opens at the address of that sheet', /ice\.html#\/f\/f2\/s\/s2$/.test(G.p.url()), G.p.url());
+ok('Ice Manager opens at the address of that sheet', /ice\.html#\/f\/f2\/s\/s2\/rink$/.test(G.p.url()), G.p.url());
 ok('and Ice is on that sheet, read from where the shell put it', await G.p.evaluate(() => sheet().id) === 's2' && await G.p.evaluate(() => facility().id) === 'f2');
 await G.p.goto(B + '/index.html#/f/f2/s/s3'); await G.p.waitForSelector('#page .screen'); await sleep(500);
 await G.p.click('#appSw a:has-text("Glass")');
