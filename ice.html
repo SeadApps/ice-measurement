@@ -523,6 +523,14 @@
   </div>
 </div>
 
+<!-- ===================== ARE YOU SURE ===================== -->
+<div class="scrim" id="sureScrim">
+  <div class="modal small" role="alertdialog" aria-labelledby="sureTitle">
+    <h2 id="sureTitle"></h2><div class="lead" id="sureText"></div>
+    <div class="modal-foot"><button class="btn ghost" id="sureNo">Cancel</button><button class="btn primary" id="sureYes">OK</button></div>
+  </div>
+</div>
+
 <div id="printRoot"></div>
 
 <script src="sync.js"></script>
@@ -725,9 +733,19 @@ $("smoothSlider").addEventListener("input",e=>{state.smoothIdx=+e.target.value;p
 
 /* ---------- round controls ---------- */
 $("sessSel").addEventListener("change",e=>{state.activeSession=e.target.value;compareId=null;clearUndo();selIdx=0;hideSel=false;applyGeometry(Records.sizeOf(sheet()),session().mode);computeField();computeDelta();buildSessSel();refresh();persist();});
+/* In-page replacement for confirm()/alert(). ask({title,text,ok,cancel}, onYes, onNo): with cancel:null it is a notice with one button. */
+function ask(o,yes,no){const sc=$("sureScrim");$("sureTitle").textContent=o.title||"Are you sure?";$("sureText").textContent=o.text||"";
+  $("sureYes").textContent=o.ok||"OK";$("sureNo").textContent=o.cancel||"Cancel";$("sureNo").style.display=o.cancel===null?"none":"";
+  const done=fn=>{sc.classList.remove("on");$("sureYes").onclick=$("sureNo").onclick=sc.onclick=null;if(fn)fn();};
+  $("sureYes").onclick=()=>done(yes);$("sureNo").onclick=()=>done(no);sc.onclick=e=>{if(e.target===sc)done(no);};
+  sc.classList.add("on");$("sureNo").style.display==="none"?$("sureYes").focus():$("sureNo").focus();}
+function askDeleteRound(sh,s,after){   /* the sheet is looked up again on OK: a pull can replace the objects while the question is open */
+  const sid=s.id,shId=sh.id;
+  if(sh.sessions.length<=1){ask({title:"Keep at least one round",text:"This is the only round on this sheet, so it can't be deleted.",cancel:null});return;}
+  ask({title:`Delete the ${fmtDay(s.date)} round?`,text:"This can't be undone.",ok:"Delete round"},()=>{const cur=(facility().sheets||[]).find(x=>x.id===shId)||sheet();if(deleteRound(cur,sid))after();});}
 function changeMode(mode){const s=session();if(mode===(s.mode||"moderate"))return;
   const valid=new Set(pointsForMode(mode).map(keyOf)),cur=s.data,orphan=Object.keys(cur).filter(k=>!valid.has(k));
-  if(orphan.length&&!confirm(`Switch to ${MODES[mode].label} (${MODES[mode].n} spots)? ${orphan.length} existing reading(s) fall outside that grid and will be removed.`)){$("modeSel").value=s.mode||"moderate";return;}
+  if(orphan.length&&!changeMode.ok){ask({title:`Switch to ${MODES[mode].label} (${MODES[mode].n} spots)?`,text:`${orphan.length} existing reading(s) fall outside that grid and will be removed.`,ok:"Switch"},()=>{changeMode.ok=1;changeMode(mode);changeMode.ok=0;},()=>{$("modeSel").value=s.mode||"moderate";});return;}
   if(orphan.length){pushUndo();orphan.forEach(k=>{delete cur[k];delete s.notes[k];});}
   s.mode=mode;selIdx=0;guidedPos=0;applyGeometry(Records.sizeOf(sheet()),mode);computeField();computeDelta();buildSessSel();refresh();persist();flashNote(MODES[mode].label+" · "+MODES[mode].n+" spots");}
 $("modeSel").addEventListener("change",e=>changeMode(e.target.value));
@@ -746,7 +764,7 @@ $("impFile").addEventListener("change",e=>{const f=e.target.files[0];if(!f)retur
   for(let i=hdr?1:0;i<lines.length;i++){const c=parseCsvLine(lines[i]);if(c.length<3)continue;const fx=+c[0],fy=+c[1];let t=+c[2];if(isNaN(fx)||isNaN(t))continue;if(mmFile)t=t/25.4;let best=null,bd=1e9;for(const p of POINTS){const dd=(p.x-fx)**2+(p.y-fy)**2;if(dd<bd){bd=dd;best=p;}}if(best&&bd<25){d[keyOf(best)]=labelOf(t);if(c[4]&&c[4].trim())nt[keyOf(best)]=c[4];}}
   selIdx=0;afterChange();flashNote("imported "+Object.keys(d).length+" readings");}catch(err){flashNote("couldn’t read that file");}$("impFile").value="";};rd.readAsText(f);});
 function parseCsvLine(line){const out=[];let cur="",q=false;for(let i=0;i<line.length;i++){const c=line[i];if(q){if(c==='"'){if(line[i+1]==='"'){cur+='"';i++;}else q=false;}else cur+=c;}else{if(c===','){out.push(cur);cur="";}else if(c==='"')q=true;else cur+=c;}}out.push(cur);return out;}
-$("clearBtn").addEventListener("click",()=>{const d=data();if(!Object.keys(d).length)return;if(confirm("Clear all readings in this round?")){pushUndo();for(const k in d)delete d[k];const nt=notes();for(const k in nt)delete nt[k];selIdx=0;afterChange();flashNote("round cleared");}});
+$("clearBtn").addEventListener("click",()=>{const d=data();if(!Object.keys(d).length)return;ask({title:"Clear all readings in this round?",text:"The readings and notes go. Undo brings them back.",ok:"Clear round"},()=>{pushUndo();for(const k in d)delete d[k];const nt=notes();for(const k in nt)delete nt[k];selIdx=0;afterChange();flashNote("round cleared");});});
 /* content: string or Blob. Tries the native share sheet (so the file can go straight to
    email/AirDrop/Slack/etc) and falls back to a normal download if sharing isn't available,
    isn't supported for this file type, or the user backs out of a real share attempt. */
@@ -867,7 +885,7 @@ function buildTrendPanel(){const sh=sheet();$("trendTitle").textContent=facility
     row.innerHTML=`<span class="dot" style="background:${col}"></span><span class="d">${fmtDate(s.date)}</span>${st?`<span class="a">${fmtNum(st.avg)}</span><span>·</span><span>${st.ideal}/${st.n} ideal</span>`:`<span class="empty">empty</span>`}<span class="x">${st?st.flood+" to flood":""}</span>`;
     row.addEventListener("click",()=>{state.activeSession=s.id;showPage("rink");});
     const delb=document.createElement("button");delb.className="rdel";delb.textContent="✕";delb.title="Delete round";
-    delb.addEventListener("click",ev=>{ev.stopPropagation();if(confirm(`Delete the ${fmtDay(s.date)} round? This can't be undone.`)){if(deleteRound(sheet(),s.id))buildHome();}});
+    delb.addEventListener("click",ev=>{ev.stopPropagation();askDeleteRound(sheet(),s,buildHome);});
     row.appendChild(delb);rl.appendChild(row);});
   if(!recent.length)rl.innerHTML='<div class="empty">No rounds yet.</div>';}
 function drawHistory(withData){const c=$("histChart"),wrap=c.parentElement,cssW=wrap.clientWidth-32;const dpr=Math.min(window.devicePixelRatio||1,2),cssH=170;
@@ -936,7 +954,7 @@ $("backupFile").addEventListener("change",e=>{const f=e.target.files[0];if(!f)re
     const pv=Repo.previewImport(obj);                                  // the record format, or the older whole-state one
     if(!pv.ok)throw 0;
     const inc=pv.inc,count=pv.rounds;
-    if(!confirm("Merge this backup into your data?\n\n"+count+" round"+(count===1?"":"s")+" in the file. Nothing is deleted — where both copies changed the same round, the newer edit wins and readings from each are kept.")){$("backupFile").value="";return;}
+    ask({title:"Merge this backup into your data?",text:count+" round"+(count===1?"":"s")+" in the file. Nothing is deleted — where both copies changed the same round, the newer edit wins and readings from each are kept.",ok:"Merge"},()=>{
     const res=Repo.merge(inc);
     state.facilities=res.facilities;
     state.facilities.forEach(fa=>{if(!fa.settings)fa.settings=defaultSettings();if(!fa.settings.edges)fa.settings.edges=[...DEFAULT_EDGES];(fa.sheets||[]).forEach(sh=>{if(!sh.size)sh.size=NHL_SIZE();(sh.sessions||[]).forEach(se=>{if(!se.mode)se.mode="moderate";});});});
@@ -946,7 +964,8 @@ $("backupFile").addEventListener("change",e=>{const f=e.target.files[0];if(!f)re
     compareId=null;clearUndo();
     applyGeometry(Records.sizeOf(sheet()),session().mode);buildBands();buildChips();persist();closeSettings();showPage(page);
     flashNote(res.taken?("merged "+res.taken+" change"+(res.taken===1?"":"s")):"already up to date");
-  }catch(err){alert("That doesn't look like a valid Ice Sheet backup file.");}
+    });
+  }catch(err){ask({title:"Not a backup file",text:"That doesn't look like a valid Ice Sheet backup file.",cancel:null});}
   $("backupFile").value="";};rd.readAsText(f);});
 function applySettings(){buildBands();buildChips();buildLegend();computeField();if(state.screen==="work"){drawLive();renderStats();}else buildHome();persist();}
 
@@ -975,7 +994,7 @@ function buildRoundManage(){const el=$("roundManage");if(!el)return;el.innerHTML
     const cnt=document.createElement("span");cnt.style.cssText="flex:1;font-family:var(--mono);font-size:12px;color:var(--ink-dim)";
     cnt.textContent=Object.keys(s.data).length+" readings"+(s.label?" · "+s.label:"");
     const del=document.createElement("button");del.className="del";del.textContent="✕";del.title="Delete round";
-    del.addEventListener("click",()=>{if(confirm(`Delete the ${fmtDay(s.date)} round? This can't be undone.`)){if(deleteRound(sh,s.id)){buildRoundManage();if(state.screen==="work"){computeField();computeDelta();buildSessSel();refresh();}else buildHome();}}});
+    del.addEventListener("click",()=>askDeleteRound(sh,s,()=>{buildRoundManage();if(state.screen==="work"){computeField();computeDelta();buildSessSel();refresh();}else buildHome();}));
     row.appendChild(dt);row.appendChild(cnt);row.appendChild(del);el.appendChild(row);});}
 
 /* ---------- boot ---------- */

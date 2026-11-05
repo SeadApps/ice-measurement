@@ -58,7 +58,7 @@ const b = await chromium.launch();
 const L = await device(b, 'L');
 await L.p.goto(B + '/ice.html'); await access(L.p);
 ok('with nobody signed in as a person, restore is allowed as it always was', await L.p.evaluate(() => Sync.canRestore()) === true);
-await L.p.setInputFiles('#backupFile', iceBackup); await sleep(1500);
+await L.p.setInputFiles('#backupFile', iceBackup); await sleep(1500); await L.p.click('#sureScrim.on #sureYes'); await sleep(800);
 ok('and the backup merges', (await names(L.p)).includes('Backup Rink'), JSON.stringify(await names(L.p)));
 await L.ctx.close();
 
@@ -82,7 +82,7 @@ ok('with the same message', (await note(S.p)) === MSG, await note(S.p));
 const M = await device(b, 'M');
 await M.p.goto(B + '/ice.html'); await signInAs(M.p, 'pete', 'pete-code-1'); await unlock(M.p); await sleep(800);
 ok('Management can', await M.p.evaluate(() => Sync.canRestore()) === true);
-await M.p.setInputFiles('#backupFile', iceBackup); await sleep(1800);
+await M.p.setInputFiles('#backupFile', iceBackup); await sleep(1800); await M.p.click('#sureScrim.on #sureYes'); await sleep(800);
 ok('and the backup merges for them', (await names(M.p)).includes('Backup Rink'), JSON.stringify(await names(M.p)));
 
 /* ---- Glass's own record file ------------------------------------------------------ */

@@ -90,7 +90,7 @@ ok('device B starts on its own data', before.includes('Main facility') && !befor
 await pb.evaluate(()=>{ session().data['3']='1 1/2"'; persist(); }); await pb.waitForTimeout(600);
 
 await pb.evaluate(()=>openSettings()); await pb.waitForTimeout(500);
-await pb.setInputFiles('#backupFile', file);
+await pb.setInputFiles('#backupFile', file); await pb.click('#sureScrim.on #sureYes');
 await pb.waitForTimeout(1800);
 /* Both names used to appear on the home screen, because it listed every
    facility. It is scoped to the one you are at now - the launcher says which -
