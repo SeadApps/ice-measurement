@@ -185,3 +185,8 @@ function seriesOf(sessions,sel){
   return (sessions||[]).map(s=>{const v=[];for(const k in s.data){if(take(k)){const d=decOf.get(s.data[k]);if(d!==undefined)v.push(d);}}
       return v.length?{s,st:{avg:v.reduce((a,b)=>a+b,0)/v.length,n:v.length}}:null;})
     .filter(Boolean).sort((a,b)=>new Date(a.s.date)-new Date(b.s.date));}
+
+/* ---------- small shared helpers ---------- */
+const $=id=>document.getElementById(id);
+const fmtDate=iso=>{const d=new Date(iso);return d.toLocaleDateString(undefined,{month:"short",day:"numeric"})+" "+d.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"});};
+const fmtDay=iso=>new Date(iso).toLocaleDateString(undefined,{month:"short",day:"numeric"});
