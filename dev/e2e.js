@@ -93,7 +93,7 @@ await pb.evaluate(()=>openSettings()); await pb.waitForTimeout(500);
 await pb.setInputFiles('#backupFile', file); await pb.click('#sureScrim.on #sureYes');
 await pb.waitForTimeout(1800);
 /* Both names used to appear on the home screen, because it listed every
-   facility. It is scoped to the one you are at now - the launcher says which -
+   facility. It is scoped to the one you are at now - the address says which -
    so the merge is checked where every facility is still managed. */
 const managed=await pb.evaluate(()=>state.facilities.map(f=>f.name));
 ok("A's facility arrives on B",       managed.includes('Conway Arena'), JSON.stringify(managed));

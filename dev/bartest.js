@@ -84,7 +84,7 @@ ok('(Ice is still alive: no page errors, readings intact)', await p.evaluate(() 
 await p.goto(B + '/glass.html#/f/f1/s/s1'); await p.waitForSelector('#shellbar .nav'); await sleep(3000);
 ok('Glass has the bar, with Glass marked', await p.$$eval('#shellbar #appSw a', a => a.map(x => x.getAttribute('aria-current') || '').join()) === ',true');
 ok('and no app switcher, theme buttons or sign-out of its own', !(await p.$('.wrap header .appsw')) && !(await p.$('#thLight')) && !(await p.$('.wrap header .sync-signout')));
-ok('while Add a rink, which is the only way into the builder for now, is still there', !!(await p.$('#addRink')));
+ok('and Glass has its own pages: Rink view, Builder and Inventory, with no header of its own', (await p.$$('#glassTabs [data-page]')).length === 3 && !(await p.$('.wrap header')));
 ok('Glass is on Conway\'s sheet, as the address says', /Conway Arena/.test(await text(p, '#shellbar #facMenu')) && (await p.$$('.pnl')).length === 127);
 await p.evaluate(() => { window.__same = 1; });
 await p.click('#shellbar #facMenu'); await p.click('#shellbar .dropdown .it:has-text("Flynn Rink")'); await sleep(1500);

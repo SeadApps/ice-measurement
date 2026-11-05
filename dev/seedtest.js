@@ -99,13 +99,13 @@ ok('naming the facility sends the whole tree', JSON.stringify(k) === '["facility
 ok('under the name it was given', (await kinds()).find(r => r.kind === 'facility').body.name === 'Flynn Rink');
 await D.ctx.close();
 
-/* ---- the launcher ------------------------------------------------------------------ */
+/* ---- the shell ---------------------------------------------------------------------- */
 await fetch(B + '/__reset');
 const L = await device(b);
 await L.p.goto(B + '/ice.html'); await signIn(L.p);
-await L.p.goto(B + '/launcher.html'); await sleep(3000);
+await L.p.goto(B + '/index.html#/'); await sleep(3000);
 await L.p.evaluate(() => Sync.sync && Sync.sync()); await sleep(1000);
-ok('the launcher does not send an invented facility', (await kinds()).length === 0, JSON.stringify((await kinds()).map(r => r.kind)));
+ok('the shell does not send an invented facility', (await kinds()).length === 0, JSON.stringify((await kinds()).map(r => r.kind)));
 await L.ctx.close();
 
 /* ---- real data arriving after the device has been used offline -------------------- */

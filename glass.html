@@ -19,19 +19,6 @@ document.documentElement.setAttribute("data-theme",_t==="light"?"light":"dark");
 
 <div id="shellbar"></div>
 <div class="wrap" id="glassWrap" data-page="rink">
-<header>
-  <div class="brand">
-    <h1><span class="mark">[ &#9633; ]</span> Glass Manager</h1>
-    <span class="sub">rink glass &middot; panel schedule &amp; condition</span>
-  </div>
-  <span class="rinkwrap" id="rinkWrap" hidden>
-    <select class="rinkpick" id="rinkPick" aria-label="Rink" hidden></select>
-    <button type="button" class="rinkdel" id="rinkDel" hidden
-            title="Remove this rink's glass" aria-label="Remove this rink's glass">&times;</button>
-  </span>
-  <button type="button" class="bld-x" id="addRink">+ Add a rink</button>
-</header>
-
 <nav class="gtabs" id="glassTabs" aria-label="Glass pages">
   <button type="button" data-page="rink" aria-current="page">Rink view</button>
   <button type="button" data-page="build" aria-current="false">Builder</button>
@@ -786,7 +773,7 @@ const BLD = {
   step: 1, name: '', L: 200, W: 85, Rft: 27, Rin: 2,
   height: 75, vary: false, thickness: '1/2"',
   start: 'centre', walls: [], wi: 0, built: null, turn: false, flip: false,
-  sheet: '__new',         // the surface being walked, or a new one
+  sheet: '',              // the surface being walked
   shapeChoice: 'keep',    // step 4: 'update' writes the measured size to the sheet, 'keep' leaves it
   shape0: null,           // the sheet's size when this walk began, kept in the draft
   draftNote: null,        // 'continue' (a draft was restored) or 'changed' (the sheet's size moved under it)
@@ -897,16 +884,14 @@ const bldSheetLabel = s => {
 };
 function bldStep1(){
   return '<h3>The sheet</h3>'
-  + '<p class="note">Glass belongs to an ice surface. Pick the one you are standing in &mdash; or'
-  + ' add it, which writes the same facility and sheet the launcher would.</p>'
-  + '<div class="bld-f"><label for="bSheet">Which surface is this?</label><select id="bSheet">'
-  + bldFreeSheets().map(s => '<option value="' + esc(s.id) + '"'
-      + (BLD.sheet === s.id ? ' selected' : '') + '>' + esc(bldSheetLabel(s)) + '</option>').join('')
-  + '<option value="__new"' + (BLD.sheet === '__new' ? ' selected' : '')
-  + '>+ A surface not in the system yet</option></select></div>'
-  + '<div class="bld-f" id="bNewWrap"' + (BLD.sheet === '__new' ? '' : ' hidden') + '>'
-  + '<label for="bName">What is this rink called?</label>'
-  + '<input id="bName" type="text" placeholder="e.g. Rink 2" value="' + esc(BLD.name) + '"></div>'
+  + '<p class="note">Glass belongs to an ice surface. Pick the one you are standing in. A surface that is not in the'
+  + ' system yet is added on the Facilities page, and then walked here.</p>'
+  + (bldFreeSheets().length
+    ? '<div class="bld-f"><label for="bSheet">Which surface is this?</label><select id="bSheet">'
+      + bldFreeSheets().map(s => '<option value="' + esc(s.id) + '"'
+          + (BLD.sheet === s.id ? ' selected' : '') + '>' + esc(bldSheetLabel(s)) + '</option>').join('')
+      + '</select></div>'
+    : '<p class="note" id="bNoSheets"><b>Every sheet already has its glass.</b> Add the new surface on the Facilities page first.</p>')
   + '<p class="note">Measure the ice, not the boards. The corner radius is 27&#8242; 2&#8243; on'
   + ' rinks built to the usual template &mdash; change it only if you know yours differs.</p>'
   + '<div class="bld-grid">'
@@ -1012,7 +997,7 @@ function bldStep4(){
 /* What was measured against what the sheet says. The sheet is never written silently: the person chooses. */
 const ftIn = (ft, inch) => ft + '\u2032' + (inch ? ' ' + inch + '\u2033' : '');
 function bldShapeCmp(){
-  const sh = BLD.sheet !== '__new' && bldShapeOf(BLD.sheet);
+  const sh = bldShapeOf(BLD.sheet);
   if(!sh || (sh.L === BLD.L && sh.W === BLD.W && sh.Rft === BLD.Rft && sh.Rin === BLD.Rin)) return '';
   const u = BLD.shapeChoice === 'update';
   return '<div class="note" id="bShapeCmp" style="margin-top:14px"><b>What you measured is not what the sheet says.</b><br>'
@@ -1057,12 +1042,10 @@ function bldRender(){
       $b('bRead').innerHTML = bldStep1Read();
     };
     ['bL','bW','bRf','bRi'].forEach(id => $b(id).addEventListener('input', upd));
-    $b('bName').addEventListener('input', e => { BLD.name = e.target.value; });
-    $b('bSheet').addEventListener('change', e => {
+    if($b('bSheet')) $b('bSheet').addEventListener('change', e => {
       BLD.sheet = e.target.value;
-      if(BLD.sheet !== '__new') bldTakeShape(BLD.sheet);
+      bldTakeShape(BLD.sheet);
       bldRender();
-      if(BLD.sheet === '__new') $b('bName').focus();
     });
     upd();
   }
@@ -1120,8 +1103,7 @@ function bldValidate(){
     const R = bldR();
     if(!(BLD.L > 0 && BLD.W > 0)) return 'Give the sheet a length and a width.';
     if(!(BLD.L > 2*R && BLD.W > 2*R)) return 'That corner radius is too big for a sheet this size.';
-    if(BLD.sheet === '__new' && !BLD.name.trim())
-      return 'Give the rink a name so it can be told apart.';
+    if(!BLD.sheet) return 'There is no sheet without glass to walk.';
   }
   if(BLD.step === 2 && !(BLD.height > 0)) return 'Give the glass a height.';
   if(BLD.step === 3){
@@ -1144,7 +1126,7 @@ function bldBack(){
   if(BLD.step > 1){ BLD.step--; bldRender(); }
 }
 async function bldOpen(){
-  /* Re-read first: a surface added on the launcher since this page loaded is
+  /* Re-read first: a surface added on the Facilities page since this page loaded is
      exactly the one somebody is about to walk. */
   await loadSurfaces();
   const free = bldFreeSheets();
@@ -1154,12 +1136,12 @@ async function bldOpen(){
   /* The sheet in the address, when it has no glass yet - which is the reason you would be opening this at all. */
   const hs = hashSheet();
   BLD.sheet = (hs && free.some(s => s.id === hs)) ? hs
-            : (launcherSheet && free.some(s => s.id === launcherSheet)) ? launcherSheet
-            : free.length ? free[0].id : '__new';
-  if(BLD.sheet !== '__new') bldTakeShape(BLD.sheet);
+            : (hereSheet && free.some(s => s.id === hereSheet)) ? hereSheet
+            : free.length ? free[0].id : '';
+  if(BLD.sheet) bldTakeShape(BLD.sheet);
   const d = bldDraftRead();
-  if(d && (d.sheet === '__new' || free.some(s => s.id === d.sheet))){
-    const cur = d.sheet === '__new' ? null : bldShapeOf(d.sheet), s0 = d.shape0;
+  if(d && free.some(s => s.id === d.sheet)){
+    const cur = bldShapeOf(d.sheet), s0 = d.shape0;
     const same = !cur || !s0 || (cur.L === s0.L && cur.W === s0.W && cur.Rft === s0.Rft && cur.Rin === s0.Rin);
     BLD.sheet = d.sheet;
     if(same){ Object.assign(BLD, d.bld); BLD.shape0 = s0; BLD.draftNote = 'continue'; }
@@ -1170,30 +1152,16 @@ async function bldOpen(){
 function bldDraftDiscard(){
   bldDraftClear();
   Object.assign(BLD, {step:1, name:'', walls:[], wi:0, built:null, turn:false, flip:false, vary:false, shapeChoice:'keep', draftNote:null, pending:null});
-  if(BLD.sheet !== '__new') bldTakeShape(BLD.sheet);
+  if(BLD.sheet) bldTakeShape(BLD.sheet);
   bldRender();
 }
 function bldClose(){ $b('builder').hidden = true; }
 
 /* The bucket is the sheet id. That is the join: a rink walked here and a rink
-   added on the launcher are the same ice surface, so its glass, its rounds and
+   made on the Facilities page are the same ice surface, so its glass, its rounds and
    its schedule all hang off one record rather than two ideas of a rink. */
 async function bldSave(){
   let bucket = BLD.sheet;
-  if(bucket === '__new'){
-    /* Adding a rink is adding an ice surface, so it goes through the same
-       method the launcher uses and writes the same facility and sheet. */
-    const st = await Records.Repo.read();
-    const made = await Records.Repo.addSheet({
-      facilityId: (st && st.prefs && st.prefs.activeFacility) || null,
-      facilityName: BLD.name.trim(),
-      name: BLD.name.trim(),
-      size: {id:'custom', name:'Custom', L:BLD.L, W:BLD.W, corner:Math.round(bldR())}
-    });
-    bucket = made.sheetId;
-    FACILITY_NAMES[bucket] = BLD.name.trim();   // until the records are read back
-    await loadSurfaces();
-  }
   /* Rebuilt from the spec rather than kept from the preview, so what is saved
      is exactly what the walk produces - the same thing every other device will
      draw from the record. */
@@ -1203,7 +1171,7 @@ async function bldSave(){
   setBucket(bucket);                    // records, layout and `state`, together
   store();
   /* Only when asked to: the sheet takes the measured size, through the same method the Sheet settings page uses. */
-  const shNow = BLD.sheet !== '__new' && bldShapeOf(BLD.sheet);
+  const shNow = bldShapeOf(BLD.sheet);
   if(shNow && BLD.shapeChoice === 'update' && !(shNow.L === BLD.L && shNow.W === BLD.W && shNow.Rft === BLD.Rft && shNow.Rin === BLD.Rin)){
     const r = await Records.Repo.updateSheet(BLD.sheet, {shape:{L:BLD.L, W:BLD.W, Rft:BLD.Rft, Rin:BLD.Rin}});
     if(r && r.changed){ touchSheet(BLD.sheet); if(SYNC) SYNC.nudge(); await loadSurfaces(); }
@@ -1223,8 +1191,8 @@ async function bldSave(){
   /* The address says which rink you are at (the shared bar and the shell's pages write it), and
      the stored preference is only the fallback. */
   const here = (typeof Shell !== 'undefined') ? await Shell.whereFromAddress().catch(() => null) : null;
-  if(here){ launcherSheet = here.sid; launcherFacility = here.fid; }
-  /* The launcher says which rink you are at, so open on it. Only where this
+  if(here){ hereSheet = here.sid; hereFacility = here.fid; }
+  /* The shell says which rink you are at, so open on it. Only where this
      device actually has that surface's glass - otherwise stay put rather than
      show an empty plan for a rink nobody has walked. */
   const want = (here && here.sid) || (st && st.prefs && st.prefs.activeSheet);
@@ -1241,9 +1209,6 @@ async function bldSave(){
   defaultScope();
   buildPlan(); rail(); totals(); table(); detail(); paint(); paintFacility(); spares();
 
-  document.getElementById('addRink').addEventListener('click', bldOpen);
-  document.getElementById('rinkPick').addEventListener('change', e => switchRink(e.target.value));
-  document.getElementById('rinkDel').addEventListener('click', () => deleteRink(activeBucket));
   document.getElementById('bldNext').addEventListener('click', bldNext);
   document.getElementById('bldBack').addEventListener('click', bldBack);
   document.getElementById('bldClose').addEventListener('click', bldClose);
@@ -1432,7 +1397,7 @@ async function bldSave(){
   });
   /* What changes a record. Selectors, so the panel card and the stock rows, which are rebuilt on
      every selection, are covered too. Search, filters, printing and the plan itself stay open. */
-  SYNC.lockControls(['#addRink','[aria-label^="Remove this rink"]','.sbtn','#plabel','#ptag','#note','#noteClear',
+  SYNC.lockControls(['#glassTabs [data-page="build"]','.sbtn','#plabel','#ptag','#note','#noteClear',
     '#noteSave','#spSize','#spW','#spH','#spT','#spQty','#spNote','#spAdd','.sp-undo','.sp-qty-in','#bldRemove']);
   /* The pages of Glass. The address names one (#/f/FID/s/SID/rink|build|inventory); the page's cards are shown or put
      away by the wrapper's data-page. The Builder is still the dialog it was; it becomes a page of its own next. */
@@ -1478,6 +1443,7 @@ async function bldSave(){
     if(!w){ const hs = hashSheet(); if(hs && sheets[hs]) w = {fid:sheets[hs].facilityId, sid:hs, view:viewFromHash()}; }
     return w;
   }
+  window.__glassShow = (p, fromAddress) => showGlassPage(p, fromAddress);
   window.__glassRefresh = () => { if(gpage === 'build') showGlassPage('build', true); };
   document.querySelectorAll('#glassTabs [data-page]').forEach(b => b.addEventListener('click', () => showGlassPage(b.dataset.page)));
   document.getElementById('bldClose').addEventListener('click', () => { if(gpage === 'build') showGlassPage('rink'); });
@@ -1486,12 +1452,8 @@ async function bldSave(){
     const sid = hashSheet() || (glassAddress() && glassAddress().sid);
     if(sid && LAYOUTS[sid]) deleteRink(sid, () => showGlassPage('build', true));
   });
-  /* "+ Add a rink" is out of reach on a laptop; the shell says which layout this is. */
-  const layoutGate = () => {
-    const laptop = isLaptop();
-    document.getElementById('addRink').hidden = laptop;
-    if(gpage === 'build') showGlassPage('build', true);
-  };
+  /* The Builder page follows the layout: on a laptop it shows the message. */
+  const layoutGate = () => { if(gpage === 'build') showGlassPage('build', true); };
   if(typeof Shell !== 'undefined') Shell.onLayout(layoutGate);
   SYNC.start({title:'Arena Management System'}).then(() => {
     if(typeof Shell === 'undefined') return;
@@ -1503,7 +1465,7 @@ async function bldSave(){
         sayTool('No glass has been built for ' + ((sheets[w.sid] && sheets[w.sid].name) || 'that sheet') + ' yet. Use + Add a rink to walk it.');
       } else if(w && w.sid !== sid0){
         /* The address names another sheet that has glass: show that sheet's glass, and leave the address as it is. */
-        await switchRink(LAYOUTS[w.sid] ? w.sid : LEGACY); fillRinks();
+        await switchRink(LAYOUTS[w.sid] ? w.sid : LEGACY); 
       } else if(sh0 && sh0.facilityId) Shell.setAddress(sh0.facilityId, sid0);
       layoutGate();
       showGlassPage((w && w.view) || viewFromHash(), true);
@@ -1519,10 +1481,10 @@ async function bldSave(){
       return;
     }
     Shell.setAddress(w.fid, w.sid);               // and a facility alone is filled out to a sheet
-    launcherSheet = w.sid; launcherFacility = w.fid;
+    hereSheet = w.sid; hereFacility = w.fid;
     const b = LAYOUTS[w.sid] ? w.sid : (boundSheetId && w.sid === boundSheetId ? LEGACY : null);
-    if(b){ await switchRink(b); fillRinks(); return; }
-    fillRinks();
+    if(b){ await switchRink(b);  return; }
+    
     sayTool('No glass has been built for ' + ((sheets[w.sid] && sheets[w.sid].name) || 'that sheet') + ' yet. Use + Add a rink to walk it.');
   });
   window.addEventListener('hashchange', () => { const m = /\/s\/[^/]+\/([a-z]+)$/.exec(location.hash); const v = m && m[1]; if(v && GPAGES.includes(v) && v !== gpage) showGlassPage(v, true); });

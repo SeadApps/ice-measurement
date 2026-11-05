@@ -349,16 +349,6 @@ footer{font-size:12.5px;color:var(--ink-3);text-align:center;font-family:var(--m
   .bld-head .sub{font-size:12.5px;color:var(--ink-2)}
   .bld-x{margin-left:auto;appearance:none;font:inherit;font-size:13px;background:var(--surface);
     color:var(--ink-2);border:1px solid var(--line);border-radius:8px;padding:8px 14px;cursor:pointer}
-  /* The picker takes the auto margin while it is shown and hands it back to the
-     add button on a device that only has the one rink. */
-  .rinkwrap{margin-left:auto;display:inline-flex;align-items:center;gap:6px}
-  .rinkwrap:not([hidden])+.bld-x{margin-left:8px}
-  .rinkpick{appearance:none;font:inherit;font-size:13px;background:var(--surface);
-    color:var(--ink-2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer}
-  .rinkdel{appearance:none;font:inherit;font-size:15px;line-height:1;background:var(--surface);
-    color:var(--ink-3);border:1px solid var(--line);border-radius:8px;padding:7px 11px;cursor:pointer}
-  .rinkdel:hover{color:var(--replace);border-color:var(--replace)}
-  .rinkdel:focus-visible,.rinkpick:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   .bld-steps{display:flex;gap:6px;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;
     text-transform:uppercase}
   .bld-steps span{flex:1;padding:7px 8px;text-align:center;border-radius:7px;background:var(--surface);

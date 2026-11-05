@@ -1,12 +1,12 @@
 /* records.js — the v4 record store, shared.
 
    This lived inside ice.html, which was fine while Ice was the only page that
-   held facilities. It is out here because the launcher needs the same records:
-   it shows the fleet, and adding a rink there means writing a facility and a
+   held facilities. It is out here because the shell needs the same records:
+   it shows the fleet, and adding a sheet there means writing a facility and a
    sheet rather than a Glass-only layout with a local name.
 
-   The immediate reason is duplication that had already appeared. The launcher
-   re-implemented the facility/sheet/session join and Ice's overdue rule, under
+   The immediate reason is duplication that had already appeared. The first
+   front page re-implemented the facility/sheet/session join and Ice's overdue rule, under
    a comment saying it had to match — and a comment is not a compiler. Two
    copies of a merge rule is one copy too many.
 
@@ -18,7 +18,7 @@
      Repo.savePrefs()  device preferences only — never a synced record.
      Repo.save()       the whole state, records included.
 
-   The launcher uses the first three. That it cannot write a synced record by
+   The shell's read path uses the first three. That it cannot write a synced record by
    accident is now a property of what it is able to call, rather than of
    somebody remembering a rule written down elsewhere.
 
@@ -33,7 +33,7 @@
 
   /* Theme, units, which sheet you were last looking at, which screen you were
      on — held here and excluded from sync, so one device cannot move another's
-     view. This is also what makes the launcher's rink picker safe. */
+     view. This is also what makes choosing a sheet in the bar safe. */
   const PREF_KEYS = ["theme","unit","lastBackup","contourIdx","contoursOn","smoothIdx","overdueDays",
                      "activeFacility","activeSheet","activeSession","screen","lastView","lastPage","mapMode"];
 
@@ -46,8 +46,8 @@
                     try{ localStorage.setItem(k,v); }catch(e){} }};
 
   /* ---------- the shapes a new record takes ----------
-     These moved in with the store because the launcher creates facilities and
-     sheets now, and a sheet it made has to be indistinguishable from one Ice
+     These live with the store because the shell creates facilities and
+     sheets, and a sheet it made has to be indistinguishable from one Ice
      made. The specific way that goes wrong is a sheet with no session in it:
      Ice reaches straight for sheets[0].sessions[0] when it boots. */
   /* The standard corner is 27 ft 2 in. Ice's presets said 28 while the glass

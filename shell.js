@@ -8,7 +8,7 @@
      - WHERE YOU ARE, as a device preference (Repo.savePrefs). It is the only writer
        of the active facility and sheet; Ice and Glass read it.
 
-   Like the old launcher it writes no synced record by accident: it reads through
+   It writes no synced record by accident: it reads through
    Repo.read(), writes preferences through Repo.savePrefs(), and records only
    through Repo.addSheet(). Nothing about the rinks is read or drawn before the
    sign-in gate has been passed, and it never invents a facility.

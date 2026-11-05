@@ -4,26 +4,37 @@ Static site on GitHub Pages: `seadapps.github.io/ice-measurement/`.
 No build step, no framework, no dependencies. Edit a file, push, done.
 
 ```
-index.html    the shell's page: loads shell.js and home.js and mounts them (D2)
-shell.js      the shell: address, chrome, the one writer of where you are
-ice-core.js   the model of an Ice page with no page in it: geometry and spots, the sixteen labels and units, state, bands, saving, the interpolation (moved out of ice.html unchanged, D3 step 1)
-shell.css     the Ice Board look for the shell's own pages (rail, tab bar, rows, forms)
-shellbar.css  the shared bar's look, scoped under .sb so it can sit inside Ice and Glass without restyling them
-home.js       the shell's pages: Facilities, Sheets (holding pages for settings and Staff)
-launcher.html the old launcher, unlinked, kept as a fallback until D5 deletes it
-ice.html      Ice Manager  — thickness rounds, contour map, trends (multi-facility)
-glass.html    Glass Manager — 127 rink glass panels, condition record
-sync.js       shared: Supabase auth, pull/push, the access gate, the status pill
-records.js    shared: the v4 record store — decompose, merge, reassemble, prefs
-sw.js         service worker — offline + cache strategy
-manifest.json icon-192.png icon-512.png
+index.html     the shell's page: loads shell.js and home.js and mounts them
+shell.js       the shell: the address, the chrome, the shared bar, the one writer of where you are
+shell.css      the Ice Board look for the shell's own pages (rail, tab bar, rows, forms)
+shellbar.css   the shared bar's look, scoped under .sb so it sits inside Ice and Glass without restyling them
+home.js        the shell's pages: Facilities, Sheets, Sheet settings, Staff
+ice.html       Ice Manager: the page, its markup and its boot; the script is split into
+  ice-core.js    the model with no page in it: geometry and spots, the sixteen labels and units, state, bands, saving, the interpolation
+  ice-rink.js    the Rink view: map, live canvas, legend, readout, Compare to, exports (CSV, image, print)
+  ice-trends.js  the Trends page: series by sheet, third or spot, and the rounds list
+  ice-build.js   the Measurement builder: entry, undo, notes, new round, round complete, import, clear, the in-page confirmation
+  ice-prefs.js   Preferences as a window of steppers, the rounds list, backup and restore
+  ice.css        the Ice Board styling of Ice's pages (the band colours are tokens, one set per theme)
+glass.html     Glass Manager: the page, its markup and its boot; the script is split into
+  glass-gen.js   the pure layout code: boardWalk, generateLayout, layoutFromSpec - no page, no store
+  glass-core.js  the layouts and Conway's survey, panel state, the record buckets, spare glass and its arithmetic, widths, set(), the glue to sync
+  glass.css      the Ice Board styling of Glass's pages
+sync.js        shared: Supabase auth, pull/push, the access gate, the editing window, the status pill
+records.js     shared: the v4 record store - decompose, merge, reassemble, prefs - and what a backup holds
+sw.js          service worker: offline and cache strategy
+manifest.json  icon-192.png icon-512.png
 .github/workflows/keepalive.yml   pings Supabase so the free tier never sleeps
-supabase/     the server side of the people-and-access work: SQL, the manage-staff function, a README
-dev/          the test suites and the fake Supabase they run against (development only)
+supabase/      the server side of the people-and-access work: SQL, the manage-staff function, a README
+dev/           the test suites and the fake Supabase they run against (development only)
 ```
 
-Both apps are single files. `sync.js` and `records.js` are the shared code —
-the network, and the store.
+Each app is one page that routes by its address. Its script is split into classic scripts that
+share the page's globals, in a fixed order (`ice-core.js`, `ice-rink.js`, `ice-trends.js`,
+`ice-build.js`, `ice-prefs.js`, then the page's own glue; `glass-gen.js`, `glass-core.js`, then the
+glue). There are no modules and no build step: a top-level statement may only call what is in a
+file loaded before it, and everything else is reached at call time. `sync.js` and `records.js` are the
+shared code - the network, and the store.
 
 **Pages serves everything in this repo, `supabase/` and `dev/` included.** The scripts
 there are meant to be readable, but they must never hold a real code, a key other than
@@ -34,8 +45,8 @@ the public anon key, or a filled-in copy of `d1-03-first-manager.sql`.
 ## Where the store lives
 
 `records.js`. It was inside `ice.html`, which was fine while Ice was the only
-page holding facilities. It came out when the launcher needed the same records
-— and it came out because duplication had already appeared: the launcher had
+page holding facilities. It came out when the front page needed the same records
+— and it came out because duplication had already appeared: that page had
 re-implemented the facility/sheet/session join and Ice's overdue rule, under a
 comment saying it had to match. A comment is not a compiler.
 
@@ -52,15 +63,15 @@ line that ARCHITECTURE.md used to draw in prose:
 | `Repo.maps()` | the per-kind maps as last written: what sync collects. |
 | `Repo.persistMaps()` | write those maps as they stand, for a page that merged records but holds no nested state to hand `save()`. |
 
-The launcher uses the first three. That it cannot write a synced record by
-accident is now a property of what it is able to call rather than of somebody
-remembering the rule — and `homecheck` asserts it directly, including that
-opening the launcher on a device holding only the old blob does not migrate it.
+The shell's read path uses the first three. That it cannot write a synced record by
+accident is a property of what it is able to call rather than of somebody
+remembering the rule — and `gatetest` asserts it directly: `Repo.read()` writes
+nothing, and `savePrefs` touches preferences and no record.
 
-`Records.Store` is the storage wrapper all three pages had their own identical
+`Records.Store` is the storage wrapper all the pages had their own identical
 copy of, and the constructors — `newSheet`, `newFacility`, `RINK_SIZES`,
-`defaultSettings` — are in here for the same reason: a sheet the launcher made
-has to be indistinguishable from one Ice made.
+`defaultSettings` — are in here for the same reason: a sheet the shell makes
+has to be indistinguishable from one Ice makes.
 
 **`addSheet()` is a method rather than something the page assembles**, and the
 reason is `save()`. It stamps against the snapshot of what was last written,
@@ -75,9 +86,8 @@ reaches straight for `sheets[0].sessions[0]` when it boots, so a sheet with no
 round would take the app down rather than merely look odd.
 
 **A round is one somebody walked** — `Records.hasReadings()`. Every new sheet
-is created with an empty session, and counting those made the launcher's Ice
-card read "last round today" beside a fleet row saying "no rounds yet" about the
-same sheet.
+is created with an empty session, and counting those made an Ice card read
+"last round today" beside a fleet row saying "no rounds yet" about the same sheet.
 
 ---
 
@@ -321,8 +331,8 @@ own clock, so a tablet with the wrong date can't win every conflict forever.
 **Records pulled down are marked as sent.** Otherwise the next push echoes them
 straight back and bumps their timestamps.
 
-**A page that shows records must not pull unless it also applies them.** The
-launcher displays counts but owns no records, so it reads local storage and
+**A page that shows records must not pull unless it also applies them.** A page
+that displays counts but owns no records reads local storage and
 calls `Sync.verify()` — which checks the token and nothing else. Giving it the
 full loop would be worse than useless: a pull whose `apply()` has nothing to
 apply still advances the cursor, so the apps would never see the rows it
@@ -354,7 +364,7 @@ device's stored refresh token.
 
 **What a rotated code does, precisely.** The next time a device syncs, its
 refresh is rejected, `sync.js` drops the session and puts the gate back up — on
-all three pages, launcher included. Two things make that reliable:
+every page, the shell included. Two things make that reliable:
 
 - *A rejection is not the same as being offline.* Both fail to produce a token,
   and they need opposite responses: offline keeps the session and retries,
@@ -557,47 +567,65 @@ update its number in `dev/expected.json` by hand: the number is a claim.
 
 ```
 node dev/fake-supabase.js &
-node dev/synctest.js       # 26 checks: sign-in, two devices, offline, paused, and the readings inside a round
-node dev/conflicttest.js   # 10 checks: no churn, contested edits, retries
-node dev/e2e.js            # 15 checks: legacy migration, backup merge, the scoped home screen
-node dev/homecheck.js      # 78 checks: the gate, the fleet, adding a rink, syncing, a rotated code
-node dev/cursortest.js     #  6 checks: one pull cursor per app, not per device
-node dev/facilitytest.js   # 32 checks: facilities in Glass, ids scoped without a migration,
-                           #            and the glass bound to a sheet rather than a building
-node dev/layouttest.js     # 40 checks: the renderer draws a layout, and notes come off it - through the card, not just through set()
-node dev/layoutsynctest.js # 24 checks: a built rink crosses devices as its walk, and goes back off
-node dev/gentest.js        # 19 checks: the generator reproduces Conway's survey, either way round
-node dev/buildertest.js    # 72 checks: walking a rink in, what it writes, the surface it hangs off, removing it
-node dev/reg.js            # 14 checks: rounds persist, prefs stay separate, the switcher is reachable
-node dev/resume.js         #  9 checks: coming back lands where you left off
-node dev/phonetest.js      # 42 checks: no page scrolls sideways on a phone, tapping a panel shows it, and the desktop is untouched
-node dev/scheduletest.js   # 31 checks: the schedule opens on what needs attention, and print still carries all 127
-node dev/sparestest.js     # 46 checks: spare stock is a ledger per facility, tempered and plexi are different piles, and fitting a pane deducts the right one
-node dev/stamptest.js      # 25 checks: the server stamps who changed a record; a pulled stamp never looks like an edit
-node dev/authtest.js       # 57 checks: the two-step gate, a rotated code, a removed person, first sign-in offline, the rollout
-node dev/editlocktest.js   # 62 checks: writes refused until the editing code; the window ends, extends, closes; the unlock button
-node dev/scopetest.js      # 53 checks: a Staff person sees and writes only their facilities; the tag; the per-person cursor
 node dev/activitytest.js   # 48 checks: one log row per write with old and new, append-only, Management only
-node dev/handovertest.js   # 40 checks: changing hands on a shared iPad, offline, and the idle sign-out
-node dev/shapetest.js      # 69 checks: one shape per sheet, the migration, the builder's compare and update, updateSheet
-node dev/controlstest.js   # 35 checks: edit controls lock until unlocked; what only reads stays open
-node dev/whotest.js        # 19 checks: nobody types their name; the server's stamp is shown
-node dev/seedtest.js       # 20 checks: a fresh device's invented facility is a seed: never sent while untouched, sent whole when edited, dropped when real ones arrive
+node dev/authtest.js       # 57 checks: the two-step gate, a rotated code, a removed person, first sign-in offline, the rollout
+node dev/backuptest.js     # 44 checks: backup and restore from the account menu, merging, old files, units, Ice and the shell make the same file, Staff cannot restore and never export what they may not see
 node dev/bandmigrationtest.js # 31 checks: eighths keep every reading in its band (15 readings, defaults and 2,000 random edge sets); the migration; a settings edit reaches the server
-node dev/overduetest.js    # 16 checks: overdue days belong to the facility; Ice and the launcher agree
-node dev/routetest.js       # 40 checks: the shell's addresses, back/forward, a Staff person and a shared iPad, the apps follow where you are
-node dev/shelltest.js       # 91 checks: the chrome at 390/820/1024/1280, breakpoints, menus, theme, tab bar, rail
-node dev/facilitiestest.js  # 45 checks: Facilities and Sheets agree with Ice, trends, adding, nothing restamped, an empty device, people
-node dev/maptest.js          # 37 checks: Color map blend (zero span = old pixels, readings pure, no jumps), Lowest point scale and legend, the mode preference, no 3D
-node dev/bartest.js          # 58 checks: the shared bar inside Ice and Glass: the address, the menus, theme and unit reaching the app, what it replaced, phone and laptop, nothing restamped
-node dev/stafftest.js        # 65 checks: Staff page: add, edit, reset, remove, restore, shared codes, activity; a code shown once and stored nowhere; new people can sign in; Staff cannot reach it
-node dev/backuptest.js      # 44 checks: backup and restore from the account menu, merging, old files, units, Ice and the shell make the same file, Staff cannot restore and never export what they may not see
-node dev/settingstest.js    # 68 checks: Sheet settings writes name and shape and nothing else; draft, validation, glass check, Staff read-only, remove and undo; Ice draws the new outline
-node dev/restoretest.js    # 12 checks: restoring a backup (Ice) or a record file (Glass) is Management's; Staff are told and nothing merges
+node dev/bartest.js        # 57 checks: the shared bar inside Ice and Glass: the address, the menus, theme and unit reaching the app, what it replaced, phone and laptop, nothing restamped
+node dev/buildertest.js    # 58 checks: walking a rink in for a sheet, what it writes, the surface it hangs off, removing it
+node dev/conflicttest.js   # 10 checks: no churn, contested edits, retries
+node dev/controlstest.js   # 36 checks: edit controls lock until unlocked; what only reads stays open
+node dev/cursortest.js     # 6 checks: one pull cursor per app, not per device
+node dev/e2e.js            # 15 checks: legacy migration, backup merge, the shell-scoped front page
+node dev/editlocktest.js   # 62 checks: writes refused until the editing code; the window ends, extends, closes; the unlock button
+node dev/facilitiestest.js # 45 checks: Facilities and Sheets agree with Ice, trends, adding, nothing restamped, an empty device, people
+node dev/facilitytest.js   # 32 checks: facilities in Glass, ids scoped without a migration,
+node dev/gentest.js        # 19 checks: the generator reproduces Conway's survey, either way round
+node dev/genpuretest.js    # 8 checks: glass-gen.js runs with no page: a walk becomes the same layout every time
+node dev/navtest.js        # 89 checks: the flow chart's access table: every page by address, at four widths, for Management and Staff
+node dev/clicktest.js      # 36 checks: every page reached by clicking from sign-in
+node dev/swtest.js         # 14 checks: the precache list is exactly what ships; an activate drops old caches
+node dev/manifesttest.js   # 15 checks: the manifest is valid, its shortcuts open Facilities, its icons are the size they say
+node dev/freshdevicetest.js # 17 checks: a device with no records ends with exactly the server's facilities and sends none
+node dev/glassrinktest.js  # 20 checks: the Glass Rink view: no Marked by, Changed by in the order list, nearest-panel tap, the bottom sheet, stock deducted on a status change
+node dev/glassinvtest.js   # 23 checks: Inventory: the page tabs and addresses, a count edited as one signed correction, two devices add up, nothing stored as a total
+node dev/glassbuildtest.js # 30 checks: the Glass Builder: starts from the sheet's size, Update or Keep, a draft that survives a reload, Remove this layout in the page
+node dev/glasslaptoptest.js # 9 checks: on a laptop the Glass Builder shows the message; the Rink view and Inventory still edit
+node dev/glassbackuptest.js # 20 checks: Glass in the app-wide backup: every record kind exports and restores, newest wins, a pre-D4 Glass file still loads
+node dev/handovertest.js   # 40 checks: changing hands on a shared iPad, offline, and the idle sign-out
+node dev/gatetest.js       # 19 checks: the access gate on every page, offline versus revoked, a rotated code, the store's read-only contract, the very old blob
+node dev/icebuildtest.js   # 25 checks: the 21 reading keys, the builder's entry, undo, notes, new round, locked controls
+node dev/laptoptest.js     # 20 checks: on a laptop the Ice builder shows the message and cannot be used; the other pages work
+node dev/layoutsynctest.js # 24 checks: a built rink crosses devices as its walk, and goes back off
+node dev/layouttest.js     # 40 checks: the renderer draws a layout, and notes come off it - through the card, not just through set()
+node dev/maptest.js        # 37 checks: Color map blend (zero span = old pixels, readings pure, no jumps), Lowest point scale and legend, the mode preference, no 3D
+node dev/overduetest.js    # 16 checks: overdue days belong to the facility; Ice, the cards and the Fleet table agree
+node dev/pagestest.js      # 26 checks: (see the file header)
+node dev/phonetest.js      # 41 checks: no page scrolls sideways on a phone, tapping a panel shows it, and the desktop is untouched
+node dev/prefstest.js      # 22 checks: Preferences as a window of steppers in eighths, written to the facility only; Staff read only
+node dev/suretest.js       # 10 checks: Ice asks in the page, never with a browser dialog: delete a round (and not the last), clear a round
+node dev/trendtest.js      # 19 checks: Trends: the average by whole sheet, third or one spot, against a direct calculation
+node dev/themetest.js      # 9 checks: the canvas colours follow the theme: band tokens per theme, the ring and the trend line, no record written
+node dev/reg.js            # 15 checks: rounds persist, prefs stay separate, the switcher is reachable
+node dev/restoretest.js    # 12 checks: restoring a backup is Management's, for an Ice backup and for a Glass file through the account menu; Staff are told and nothing merges
+node dev/resume.js         # 8 checks: coming back lands where you left off
+node dev/rinktest.js       # 19 checks: the Rink view: Compare to and its delta legend, no 3D, the old Map | Trend buttons gone
+node dev/routetest.js      # 40 checks: the shell's addresses, back/forward, a Staff person and a shared iPad, the apps follow where you are
+node dev/scheduletest.js   # 31 checks: the schedule opens on what needs attention, and print still carries all 127
+node dev/scopetest.js      # 53 checks: a Staff person sees and writes only their facilities; the tag; the per-person cursor
+node dev/seedtest.js       # 23 checks: a fresh device's invented facility is a seed: never sent while untouched, sent whole when edited, dropped when real ones arrive
+node dev/settingstest.js   # 68 checks: Sheet settings writes name and shape and nothing else; draft, validation, glass check, Staff read-only, remove and undo; Ice draws the new outline
+node dev/shapetest.js      # 69 checks: one shape per sheet, the migration, the builder's compare and update, updateSheet
+node dev/shelltest.js      # 91 checks: the chrome at 390/820/1024/1280, breakpoints, menus, theme, tab bar, rail
+node dev/sparestest.js     # 46 checks: spare stock is a ledger per facility, tempered and plexi are different piles, and fitting a pane deducts the right one
+node dev/stafftest.js      # 65 checks: Staff page: add, edit, reset, remove, restore, shared codes, activity; a code shown once and stored nowhere; new people can sign in; Staff cannot reach it
+node dev/stamptest.js      # 25 checks: the server stamps who changed a record; a pulled stamp never looks like an edit
+node dev/synctest.js       # 26 checks: sign-in, two devices, offline, paused, and the readings inside a round
+node dev/whotest.js        # 18 checks: nobody types their name; the bar names the person; the server's stamp is shown; old marks keep their typed name
 node dev/widthstest.js     # 25 checks: a facility's one-tap widths (default 43/48, no record until changed); only Management resolves or reopens a flag
 ```
 
-848 checks in all. Tests point `window.__SYNC_CONFIG__` at the fake via
+1783 checks in all, over 56 suites. Tests point `window.__SYNC_CONFIG__` at the fake via
 `addInitScript`; the real pages never read it.
 
 **Lessons from the access work, each of which cost a debugging session:**
@@ -640,9 +668,8 @@ gate, but it can never reach a server.
 
 ## The shell (D2)
 
-`index.html` is a thin page; `shell.js` mounts into it and `home.js` draws the pages. It
-replaces the launcher, which lives on as `launcher.html` (unlinked, still tested by
-`homecheck`) until D5.
+`index.html` is a thin page; `shell.js` mounts into it and `home.js` draws the pages. It is
+the front door: the old front page is gone, and an address that names nothing lands here.
 
 - **The address is the truth.** `#/` Facilities, `#/f/FID` that facility's sheets,
   `#/f/FID/s/SID` the same with that sheet in hand, `#/f/FID/s/SID/settings` and `#/staff`
@@ -655,9 +682,10 @@ replaces the launcher, which lives on as `launcher.html` (unlinked, still tested
 - **The bar inside Ice and Glass.** Each app has a `<div id="shellbar">` above its page and calls
   `Shell.mountBar(el, {app})` after the sign-in gate; the bar is the same one the shell draws (logo,
   facility and sheet menus, Ice|Glass switch, sync pill, unlock, account menu), with `sb-app` on it so
-  the app switch stays on a phone (there is no tab bar or rail inside an app until D3 and D4). The apps
-  lost their own app switchers, theme and unit buttons and sign-out. Kept on purpose: Ice's Preferences
-  and its Sheets button, and Glass's *+ Add a rink* (the only way into its builder until D4).
+  the app switch stays on a phone (each app has its own page tabs instead of the shell's tab bar or rail).
+  The apps have no app switcher, theme or unit buttons or sign-out of their own. Kept on purpose: Ice's
+  Preferences window, opened from its gear. Glass has no header at all: its three pages are tabs, and a
+  sheet is walked by naming it in the address.
   *Where you are* is read from the address by `Shell.whereFromAddress()` at boot (the preference is only
   the fallback), kept in step by `Shell.setAddress(fid, sid)` when the app changes sheet itself (called on
   every Ice save, cheap when nothing moved), and followed on `hashchange`, which is what a choice in the
@@ -703,7 +731,8 @@ replaces the launcher, which lives on as `launcher.html` (unlinked, still tested
   in it; `Repo.importAll(obj)` merges, newest wins, readings inside a round kept from both. Restore is
   Management's (`Sync.canRestore`) and needs the editing window, and is confirmed in the page, not a
   browser dialog; messages are a toast on the body, which a redraw cannot take away. Ice's own
-  backup buttons call the same functions. Glass's separate record file is still its own until D4.
+  backup buttons call the same functions. Glass's own panel conditions, binding, walked layouts, spare-glass
+  movements and widths are part of that file too (see *Glass in the backup*).
 - **Staff** (`#/staff`, Management only; the rail and the account menu list it, and any other person
   is sent to Facilities with the one message even by address): People and Activity tabs. People:
   add, edit (name, role, facilities), reset code, remove and restore, with an in-page confirmation for
@@ -717,82 +746,39 @@ replaces the launcher, which lives on as `launcher.html` (unlinked, still tested
   `Sync.activity`, newest first, one line per change, filtered by person. `dev/fake-supabase.js` has a
   `/functions/v1/manage-staff` endpoint with the real function's actions, rules and wording, so the page is
   tested against the same contract; the real function has still not been run.
-- **Not yet**: the bar inside Ice and Glass. The
-  account menu, and the bar inside Ice and Glass. The Ice Board fonts are system stacks, so
-  the app stays offline-capable and makes no outside request.
+- **The Ice Board fonts are system stacks**, so the app stays offline-capable and makes no outside request.
 
 Suites: `routetest` (addresses, back/forward, Staff and the shared iPad, the apps follow),
 `shelltest` (the chrome at 390 to 1280, menus, theme, tab bar, rail), `facilitiestest`
 (cards and the Fleet table agree with Ice, trends, adding, nothing restamped, empty device,
 people).
 
-## The launcher (superseded by the shell; kept as `launcher.html` until D5)
+## The front page, and how a fresh device starts
 
-`index.html` is where you say which rink you are at; the tool comes second. You
-are *at* a rink doing work there, not hopping between arenas mid-task. It shows
-the fleet Ice's home screen shows — every live sheet, when it was last walked,
-and whether that is overdue.
+The front page is the shell's Facilities page: where you say which rink you are at; the tool comes
+second. You are *at* a rink doing work there, not hopping between arenas mid-task. Its Fleet table is the
+fleet Ice's old home screen showed: every live sheet, when it was last walked, and whether that is overdue.
 
-**It syncs, and that reverses the rule this page was built on.** It was
-read-only, and the reason was real: sync.js keeps one `rink_sync_sent` map per
-device, and a pull whose `collect()` cannot report what the device holds leaves
-every pulled row looking unsent — so the next push echoes them all back and the
-server restamps the lot, which is exactly the clobber the record store exists to
-prevent.
+**It reads through the store and syncs through Ice's `collect()`.** The first front page was read-only for a
+real reason: sync.js keeps one `rink_sync_sent` map per device, and a pull whose `collect()` cannot report what
+the device holds leaves every pulled row looking unsent, so the next push echoes them all back and the server
+restamps the lot — exactly the clobber the record store exists to prevent. The shell shares Ice's store, so the
+hazard is gone, and `gatetest`, `synctest` and `conflicttest` guard it: after any page pulls, an idle round
+restamps nothing.
 
-What made that unavoidable was this page having no record store of its own. It
-shares Ice's now, so its `collect()` **is** Ice's, off the same maps, and pulled
-rows get marked as sent. `homecheck` guards the hazard directly: after the
-launcher pulls, an idle round must restamp nothing.
+**Overdue is one rule.** `Records.lastRound()` and `Records.isOverdue()` — the last session that actually has
+readings in it, older than the facility's `overdueDays`. The cards, the Fleet table and Ice all call the same
+two functions, so they cannot drift (`overduetest`).
 
-The half of the rule about writing had already gone when adding a rink moved
-here. Keeping the other half had a plain cost that turned up in use: **a rink
-added on the launcher never left the device until somebody opened Ice, and never
-reached another device until somebody opened Ice there too.**
+**Nothing about the rinks is read or drawn before the gate is passed**, and a device never invents a facility
+that anybody else can see. Ice has to start from *something* to draw, so on a device with no records it starts
+from a fresh state — but that state is a **seed**: every record in it is marked, `Repo.outgoing()` never sends
+a marked record, and it is dropped the moment real facilities arrive in a pull. Editing it for real clears the
+mark and sends it whole. `seedtest` pins that, and `freshdevicetest` checks the end state: a new device ends
+with exactly the facilities the server holds, and sends none.
 
-Which sheet you are looking at is still `ice_v4_prefs` and still excluded from
-sync — that is a device's own view, not a shared fact. Ice opens on that sheet
-because it restores from those preferences.
-
-**Overdue is Ice's rule, not a second one.** `Records.lastRound()` and
-`Records.isOverdue()` — the last session that actually has readings in it,
-older than `overdueDays` (7 by default, read from those same preferences). An
-empty session is a sheet nobody has been to yet. Both screens call the same two
-functions, so they cannot drift into disagreeing about what is behind; before
-the store came out they were two copies held together by a comment.
-
-**One sheet is not a choice.** The section hides itself below two, because a
-mandatory "choose where you are" step for a one-rink operation is friction
-wearing the costume of structure.
-
-**The Ice/Glass switcher is in Ice's workspace at every width.** It used to be
-hidden below 1180px — exactly the width you are on standing in the rink whose
-glass you want to look at, mid-round, on a tablet. The `≡` that shared that bar
-is gone, and Ice's own entry in the switcher does its job instead: it was a link
-to the page you are already on, so it goes back to the sheets. The bar loses a
-button rather than the route home.
-
-**Nothing renders before the gate.** That already mattered for the card
-figures; the fleet is worse, because it names every facility outright.
-
-**Where you are and how the sheet is doing are two chips, not one.** They were
-one, and standing on an overdue rink was then the thing that hid it was overdue.
-
-**Adding a rink is adding an ice surface.** It writes a `facility` and a
-`sheet` — the records Ice owns — rather than the Glass-only rink with a local
-name the builder produces. The control sits in the bar rather than in the fleet,
-so it is still reachable on a one-rink device where the fleet hides itself.
-
-The page still does not sync. Those records sit here until Ice next opens and
-pushes them, which is the same moment you would be opening it anyway to walk the
-new sheet. Giving the launcher its own sync attachment is a separate decision:
-the shared store now makes a faithful `collect()` possible, but the rule that
-keeps this page out of the sent-map has not been revisited.
-
-The Glass card no longer claims 127 pieces whatever rink you have — that is
-Conway's figure and it was written into this page. Glass writes a piece count
-per rink into its own storage for this page to read, and a device that has not
-opened Glass since that shipped says nothing rather than guessing.
+**Glass's piece count** comes from `Records.glassSummary(sheetId)`, which reads Glass's own storage on this
+device. A device that has not opened Glass says "Glass not loaded" rather than guessing.
 
 ---
 
@@ -828,29 +814,24 @@ gate is tagged differently threw there and took the whole plan down with it,
 not just the label. Openings are counted from the run instead of assumed to be
 two benches, and the uniform-joint row appears only where a survey supplied one.
 
-### The launcher's choice scopes both apps
+### The address scopes both apps
 
-Where you are is one fact and the launcher owns it, so the apps follow it rather
-than each offering their own way to set it.
+Where you are is one fact and the address carries it, so the apps follow it rather than each offering
+their own way to set it. The bar's facility and sheet menus change the address; Ice and Glass hear the
+`hashchange` and move to that sheet. Ice's Rink view is the sheet in the address; Glass shows the glass built
+for it (or says there is none, and offers the Builder for it). There is no rink picker in Glass any more.
 
-**Ice's home screen is the facility you are standing in.** It listed every
-facility, which was a second way to choose one and could disagree with the
-launcher. The fleet is that facility's sheets, and the facility row names it
-with a link back to the launcher to go somewhere else. Every facility is still
-listed in **settings**, where they are renamed and deleted — an imported backup
-brings facilities in, and they have to be visible somewhere.
-
-**Glass's rink picker offers that facility's surfaces.** A bucket whose facility
-cannot be worked out is left in rather than hidden — hiding something you cannot
-classify is worse than showing it — and so is whatever is on screen, so the
-picker never hides the rink you are looking at.
+**Glass has three pages**, named by the address: `#/f/FID/s/SID/rink` (the default), `…/build` and
+`…/inventory`. Glass reads the page from the hash itself as well as from `Shell.whereFromAddress()`, because a
+device that has only ever opened Glass may not yet hold the sheet in the store the shell looks it up in. When
+the address names a sheet that has glass, Glass switches to it and leaves the address alone; it never rewrites
+the address to the glass it happens to be showing.
 
 ### Taking a rink's glass back off
 
-Glass walked by mistake had no way off the device: the picker listed it for ever
-and there was nothing to press. The picker has a ✕ for whatever it is showing,
-except Conway — that layout is compiled into the file rather than walked, so
-there is nothing to take off.
+Glass walked by mistake had no way off the device. The Builder page for a sheet that already has
+glass says so and offers **Remove this layout**, which asks in the page. Conway's has no such button —
+that layout is compiled into the file rather than walked, so there is nothing to take off.
 
 **It tombstones rather than drops.** The layout has been on the server, so the
 other devices have to be told it is gone; forgetting it locally would only mean
@@ -944,15 +925,18 @@ Three things follow that are worth knowing:
 
 ### Switching rink, and a spec strip that follows
 
-`bldSave()` moves to the rink it has just made. Until the picker existed
-nothing could move you off it again short of clearing site data, which made the
-builder a one-way door.
-
-`fillRinks()` lists every layout the device holds and hides itself below two,
-because a mandatory "choose where you are" step for a one-rink operation is
-friction wearing the costume of structure. `switchRink()` writes through
-`Store.set` rather than `store()`: looking at a different rink changes no
+`bldSave()` moves to the rink it has just made, and the bar's sheet menu moves you off it again.
+`switchRink()` writes through `Store.set` rather than `store()`: looking at a different rink changes no
 record, so it should neither nudge sync nor claim a save.
+
+**The Builder is for the sheet in the address.** Its size boxes start from that sheet's `shape`; step 4
+compares what was measured with the sheet and offers *Update the sheet* (`Repo.updateSheet`) or *Keep the
+sheet's size* (the default; the sheet is never written silently). The walk is kept as a draft on the device
+as it goes (`glass_build_draft_v1`, never synced), with the size the sheet had when the walk began, so a draft
+against a sheet that has since changed says so and asks. A sheet that has glass is not walked again, and a
+laptop shows the "phone or tablet" message instead (`glassbuildtest`, `glasslaptoptest`). A sheet this device
+changed through the Builder is the only sheet Glass sends; it merges incoming facilities and sheets into the
+shared store the way Ice does, so the bar and the Builder have something to work on.
 
 Three figures in the spec strip — sheet size, corner radius and glass in run —
 were Conway's, written into the markup, and stayed Conway's on any rink you
@@ -988,32 +972,77 @@ where that facility has more than one surface, so Conway still reads
 
 ---
 
+## Maps
+
+The Rink view draws the map on a canvas, which cannot read a stylesheet variable by itself, so the colours
+are read when they are needed.
+
+- **Two modes**, a device preference (`mapMode`, `color` by default): *Color map* and *Lowest point*.
+  Color map uses the facility's bands. `colorFor(v)` blends toward the next band over the last 1/16" below each
+  edge (`0` reproduces the old pixels exactly - `maptest` checks that), and a reading on a band is exactly that
+  band's colour. Lowest point is scaled from the round being viewed: lowest red, highest dark blue, yellow
+  halfway from the lowest up to ideal, green at ideal, light blue halfway from ideal to the highest; with nothing
+  below (or above) ideal the scale starts (or ends) at green; ties are ringed; the legend prints the numbers.
+  Compare keeps its own change colours.
+- **Bands are in eighths.** A reading is one of sixteen labels in eighths (plus `2+`, read as 2.1), so rounding
+  an edge *up* to the next eighth keeps every reading in the band it is in now. `Records.settingsOf` reads
+  settings in that form without writing; a Management step stores them (see *The data model*).
+- **Band colours are theme tokens.** `--b-thin ... --b-thick` are defined per theme in `ice.css`, and
+  `recolorBands()` re-reads them when the bands are built and when the theme changes in the shared bar. The
+  selection ring and the Trends line use `--frost`. Changing the theme writes no record (`themetest`).
+- **There is no 3D view.** A device whose saved last view was 3D opens on the map.
+
+## Glass in the backup
+
+Glass keeps its panel conditions, the binding, the walks of the layouts it built, the spare-glass movements and
+the one-tap widths under one local key, `glass_record_v2`. `Repo.exportAll()` puts that in the backup file as
+`glass` (a person who may see only some facilities gets none of it, because those records are not tagged by
+facility), and `Repo.importAll()` merges it back by the same rule as everything else: newest wins per panel,
+movements and widths by id, a layout by its timestamp, a removal beats an older layout, and nothing is deleted.
+A Glass file from before this (`{rink, saved, panels}`) is read as panels of Conway's glass and merged the same
+way, so it can still be loaded once from the account menu (`glassbackuptest`).
+
 ## Known open items
 
-- **Zamboni end, panel 111.** A 43″ panel inferred to close a 43½″ shortfall,
-  drawn dashed and flagged in the schedule. Never confirmed on site. Either a
-  missed panel or the Zamboni doorway is wider than its two 57½″ leaves. The app
-  can now be told the answer: clearing that panel's tag retires the dashes, the
-  tick and the standing explanation together.
-- **Glass Manager on a phone** has not been looked at. Desktop and tablet are fine.
-- **Ice shows no "changed by".** Both apps now get the server's stamp on every
-  record (`changedBy`), but only Glass displays it. Ice's Rink view will once the
-  pages are rebuilt (D3).
-- **No realtime.** Sync happens on open and on focus. Supabase realtime would
-  make the desktop update while you watch; not needed so far.
-- **A fresh device used to invent a facility (fixed).** Ice's `freshState()` made a "Main
-  facility" that was pushed before the first pull, adding a phantom rink to everyone's list
-  and shifting the real one's `ord`. The invention is a seed now (see *Seeds*): kept off
-  the wire until somebody really edits it, dropped when real facilities arrive. The shell
-  never creates a facility on its own. `facilitytest` still pins the active facility, as
+- **The SQL in `supabase/` has not been run against a real database**, nor has the `manage-staff` function:
+  the D1 scripts, `d3-01a` and `d3-01b` (the settings preview and apply). `supabase/README.md` has the
+  checklist, including the two behaviours the client depends on: the "editing is locked" wording, and what
+  the auth service answers for a removed person. The fake server is the only test bed they have had.
+- **The live site is still the build before the people-and-access work**, and this branch has not been pushed.
+  A real-device check on an iPad belongs before it is.
+- **Zamboni end, panel 111.** A 43″ panel inferred to close a 43½″ shortfall, drawn dashed and flagged in the
+  schedule. Never confirmed on site. Either a missed panel or the Zamboni doorway is wider than its two 57½″
+  leaves. Clearing that panel's tag retires the dashes, the tick and the standing explanation together.
+- **Backup and restore are still in Ice's Preferences window** as well as in the account menu; the spec has
+  them in the account menu only. Ice's own restore code is separate from the shell's and `backuptest` and
+  `restoretest` check both.
+- **Ice's image export keeps a dark background**, so in the light theme its legend draws the light band colours
+  on it. Not looked at.
+- **Staff cannot update a sheet from the glass builder.** Writing a sheet is Management-only, so the builder's
+  offer to update the sheet's size is refused for a Staff person. Staff exports and backups also carry no
+  Glass records, because those are not tagged by facility.
+- **Glass-only rinks.** The builder cannot make one any more (a rink is always a sheet), but one that already
+  exists keeps working through `FACILITY_NAMES`, and there is no one-time step yet that offers to attach it to a
+  sheet.
+- **One browser `confirm()` is left**, in `sync.js` for signing out; everything else asks in the page.
+- **No realtime.** Sync happens on open and on focus. Supabase realtime would make the desktop update while you
+  watch; not needed so far.
+- **Quality review and flags (D6) are not built.** The flow chart has them (`dev/navdata.js` lists the four
+  pages as `built:false`); the server side of flags exists and is tested in the fake (`widthstest`).
+- **The very old single-blob migration stays** (`Repo.load()` moves a device off `ice_sheet_v3`) until nobody
+  has such a device.
+- **A fresh device's seed** is checked in `freshdevicetest`; `facilitytest` still pins the active facility as
   belt and braces.
-- **The SQL in `supabase/` has not been run against a real database.** The README
-  has the checklist, including the two behaviours the client depends on: the
-  "editing is locked" wording, and what the auth service answers for a removed
-  person.
-- **Staff cannot update a sheet from the glass builder.** Writing a sheet is
-  Management-only, so the builder's offer to update the sheet's shape (D4) needs
-  to say so, or hand the update to a Manager.
-- **A surface added on the launcher has no glass until somebody walks it.** That
-  is the intended shape — glass comes off a tape measure, not a form — but the
-  launcher does not yet say which of its rinks have none.
+
+## Releasing
+
+1. Run the whole suite: `node dev/runall.js` (about half an hour). It must report no failed and no flaky
+   suite, every suite at its count.
+2. Run the SQL in `supabase/` on the real project in the order `supabase/README.md` gives, then
+   `manage-staff`, and check them against the fake's behaviour.
+3. Walk the program by hand on an iPad, a phone and a laptop, following the flow chart once, as each role.
+4. Confirm a second device has run the settings migration (a facility's `settingsVersion` is 2).
+5. Bump `CACHE_VERSION` in `sw.js` (`swtest` fails if a shipped file is missing from the precache list), push, and
+   open the site once on each device so the service worker updates.
+6. **The way back:** the redesign is on one branch, so reverting the merge restores the old pages. The server
+   rules keep their own saved restore script (`supabase/`).

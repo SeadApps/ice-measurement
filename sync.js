@@ -909,7 +909,7 @@
     attach: function (h) { hooks = h; },
     /* Check the stored session is still good, without syncing anything.
        For a page that shows a local summary and never reads or writes records
-       — the launcher — running the full loop would be wrong: a pull whose
+       — the shell's read path — running the full loop would be wrong: a pull whose
        apply() does nothing still advances the cursor, and the apps would then
        never see the rows it skipped. This validates the token, re-gates if it
        has been revoked, and leaves the cursor and the sent-map untouched. */

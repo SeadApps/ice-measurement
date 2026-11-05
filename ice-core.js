@@ -95,8 +95,8 @@ function buildBands(){const e=EF().edges,lts=[e[0],e[1],e[2],e[3],Infinity];
   BANDS=BAND_META.map((m,i)=>({...m,lt:lts[i],color:bandHex(m),rng:rngs[i]}));BAND_RGB=BANDS.map(b=>rgbOf(b.color));}
 const bandOf=v=>{for(const b of BANDS)if(v<b.lt)return b;return BANDS[BANDS.length-1];};
 
-/* Shapes come from the store, so a rink added on the launcher is
-   indistinguishable from one added here. */
+/* Shapes come from the store, so a sheet added on the Facilities page is
+   indistinguishable from one made anywhere else. */
 const { uid, newSession, newSheet, defaultSettings, newFacility } = Records;
 function freshState(){const f=newFacility();return{theme:"dark",unit:"in",lastBackup:null,contourIdx:2,contoursOn:true,smoothIdx:2,overdueDays:7,facilities:[f],activeFacility:f.id,activeSheet:f.sheets[0].id,activeSession:f.sheets[0].sessions[0].id};}
 
@@ -115,9 +115,9 @@ function baselineSession(){const sh=sheet();if(compareId){const s=sh.sessions.fi
   const ord=[...sh.sessions].sort((a,b)=>new Date(b.date)-new Date(a.date));const ai=ord.findIndex(s=>s.id===session().id);return ord[ai+1]||null;}
 
 /* ---------- persistence ----------
-   The record store moved to records.js, which the launcher shares. What that
+   The record store is in records.js, which the shell shares. What that
    buys is one copy of the merge rule and one copy of "overdue", instead of
-   this file's and a second in the launcher that only a comment kept in step.
+   a second in the shell that only a comment kept in step.
    ARCHITECTURE.md still explains the model; `state` here is unchanged. */
 const { Store, Repo, decompose, nowISO } = Records;
 

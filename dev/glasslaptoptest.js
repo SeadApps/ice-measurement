@@ -33,7 +33,6 @@ ok('the shell calls this a laptop', await R(() => Shell.layout()) === 'laptop');
 await p.click('#glassTabs [data-page=build]'); await sleep(500);
 ok('the Builder shows the message instead of the builder', await vis('#bldLaptop') && !(await vis('#builder')) && /phone or tablet/i.test(await p.textContent('#bldLaptop')));
 ok('and offers the way back to the Rink view', await vis('#bldLaptopRink'));
-ok('"+ Add a rink" cannot be used', await R(() => { const e = document.getElementById('addRink'); return e.disabled || e.hidden || !!e.closest('[inert]'); }));
 await p.click('#bldLaptopRink'); await sleep(400);
 ok('the way back works', await vis('#plan') && !(await vis('#bldLaptop')) && /\/rink$/.test(await R(() => location.hash)));
 

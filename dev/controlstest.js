@@ -153,8 +153,8 @@ ok('a note cannot be typed', (await G.p.inputValue('#note'))==='');
 await cancel(G.p);
 await G.p.evaluate(()=>document.getElementById('spAdd').click()); await sleep(300);   // the stock section is collapsed
 ok('nor stock recorded', await asking(G.p)); await cancel(G.p);
-await G.p.click('#addRink'); await sleep(300);
-ok('nor a rink added', await asking(G.p) && !(await G.p.isVisible('#builder'))); await cancel(G.p);
+await G.p.click('#glassTabs [data-page=build]'); await sleep(300);
+ok('nor a rink walked: the Builder asks to unlock first', await asking(G.p) && !(await G.p.isVisible('#builder'))); await cancel(G.p);
 await G.p.fill('#q','045'); await sleep(300);
 ok('searching and filtering are never locked', !(await asking(G.p)) && (await G.p.inputValue('#q'))==='045');
 await G.p.evaluate(c=>window.Sync.unlockEditing(c),EDIT); await sleep(1500);

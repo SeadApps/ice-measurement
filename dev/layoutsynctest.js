@@ -57,7 +57,12 @@ async function seed(rec) {
    with a Zamboni gate on the first end - deliberately not Conway, so nothing
    can pass by falling back to the compiled-in layout. */
 async function walkAndSave(name) {
-  BLD.name = name; BLD.sheet = '__new';
+  /* A rink is a sheet: make the surface the way the Facilities page would, then walk it. */
+  const st = await Records.Repo.read();
+  const made = await Records.Repo.addSheet({ facilityId: (st && st.prefs && st.prefs.activeFacility) || null, facilityName: name, name,
+    size: { id: 'custom', name: 'Custom', L: 185, W: 85, corner: 28 } });
+  FACILITY_NAMES[made.sheetId] = name; await loadSurfaces();
+  BLD.name = name; BLD.sheet = made.sheetId;
   BLD.L = 185; BLD.W = 85; BLD.Rft = 28; BLD.Rin = 0;
   BLD.height = 72; BLD.start = 'end'; BLD.thickness = '1/2"';
   BLD.walls = []; BLD.wi = 0;
@@ -183,9 +188,7 @@ await F.p.goto(B + '/glass.html'); await signIn(F.p);
 await sleep(3500);
 ok('a device that never saw it does not draw it',
    await F.p.evaluate(k => !LAYOUTS[k], bucket));
-ok('and it is not offered in the picker',
-   await F.p.evaluate(k => [...document.getElementById('rinkPick').options]
-     .every(o => o.value !== k), bucket));
+ok('and there is no picker to offer it in', await F.p.evaluate(() => !document.getElementById('rinkPick')));
 await F.ctx.close();
 
 await D.p.evaluate(() => Sync.sync('again')); await sleep(3000);

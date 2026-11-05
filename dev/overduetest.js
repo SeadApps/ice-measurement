@@ -5,7 +5,7 @@
    then:                         node dev/overduetest.js
 
    It used to be a device preference, so one person's "3 days" never reached the
-   next, and the launcher and Ice could disagree about the same sheet. Now the
+   next, and the front page and Ice could disagree about the same sheet. Now the
    facility holds it, a facility that has none falls back to the device's value and
    then to 7, and every screen that asks "is it overdue?" asks the same function. */
 const { chromium } = require('playwright');
@@ -70,19 +70,23 @@ await R(a => { state.activeFacility = a.f; state.activeSheet = a.s; buildHome();
 ok('and 30 from the relaxed one, where it is not', await R(() => Records.overdueDaysOf(facility(), state)) === 30);
 
 await R(a => Records.Repo.savePrefs({ activeSheet: a.s, activeFacility: a.f }), strict);
-await p.goto(B + '/launcher.html'); await sleep(2500);
-const fleet = await R(() => fleetRows());
-const row = n => fleet.rows.find(r => r.f.name === n);
-ok('the launcher agrees: the strict rink is overdue', row('Strict Rink') && row('Strict Rink').over === true);
+/* the Fleet table on the shell's front page, read the way a person would */
+const fleetOver = async () => {
+  await p.goto(B + '/index.html#/'); await p.waitForSelector('#page .screen'); await sleep(1500);
+  await p.click('#viewFleet'); await sleep(400);
+  return p.$$eval('#fleetTable tbody tr', r => r.map(x => ({ name: x.children[0].textContent, over: /Overdue/.test(x.children[3].textContent) })));
+};
+const fleet = await fleetOver();
+const row = n => fleet.find(r => r.name === n);
+ok('the Fleet table agrees: the strict rink is overdue', row('Strict Rink') && row('Strict Rink').over === true);
 ok('and the relaxed one is not', row('Relaxed Rink') && row('Relaxed Rink').over === false);
 
 /* a facility with none of its own uses the device's value */
 await p.goto(B + '/ice.html'); await sleep(2000);
 await R(() => { delete state.facilities[1].settings.overdueDays; state.overdueDays = 5; persist(); });
 await sleep(1200);
-await p.goto(B + '/launcher.html'); await sleep(2500);
-const fleet2 = await R(() => fleetRows());
-ok('a facility with no value of its own falls back to the device preference (5 days: overdue at 10)', fleet2.rows.find(r => r.f.name === 'Relaxed Rink').over === true);
+const fleet2 = await fleetOver();
+ok('a facility with no value of its own falls back to the device preference (5 days: overdue at 10)', fleet2.find(r => r.name === 'Relaxed Rink').over === true);
 
 /* ---- it is a facility setting: it syncs, and Preferences edits it ----------------------- */
 await p.goto(B + '/ice.html'); await sleep(2000);
@@ -95,8 +99,7 @@ await sleep(1200); await R(() => Sync.sync('t')); await sleep(2000);
 const srv = (await rows()).filter(r => r.kind === 'facility').find(r => r.body.name === 'Strict Rink');
 ok('editing it changes the facility and reaches the server', srv && srv.body.settings.overdueDays === 14, JSON.stringify(srv && srv.body.settings));
 ok('and not the other facility', (await rows()).filter(r => r.kind === 'facility').find(r => r.body.name === 'Relaxed Rink').body.settings.overdueDays !== 14);
-await p.goto(B + '/launcher.html'); await sleep(2500);
-ok('so the launcher no longer calls the 10-day-old round overdue', (await R(() => fleetRows())).rows.find(r => r.f.name === 'Strict Rink').over === false);
+ok('so the Fleet table no longer calls the 10-day-old round overdue', (await fleetOver()).find(r => r.name === 'Strict Rink').over === false);
 
 /* an idle device sends nothing */
 const stamps = async () => JSON.stringify((await rows()).map(r => [r.kind, r.id, r.updated_at]).sort());

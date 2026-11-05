@@ -367,18 +367,6 @@ function facilityName(bucket){
   return (f && f.name) || FACILITY_NAMES[bucket]
       || (bucket === LEGACY ? 'Conway Arena' : 'Unnamed facility');
 }
-/* A piece count per rink, for the launcher. That page reads local storage and
-   never loads a layout, so without this the only figure it could show was
-   Conway's 127, written into its markup and wrong for every other rink. */
-function GLASS_COUNTS(){
-  const out = {};
-  for(const k in LAYOUTS){
-    if(k.indexOf('__') === 0) continue;
-    out[k] = ((LAYOUTS[k] && LAYOUTS[k].panels) || []).filter(p => p.kind === 'glass').length;
-  }
-  return out;
-}
-
 /* Everything except Conway, whose layout is compiled into this file. */
 function BUILT_SPECS(){
   const out = {};
@@ -415,7 +403,6 @@ function paintFacility(){
   set('specRadius', fmtFt(R * 12));
   set('specRun', fmtFt(GLASS.reduce((a, p) => a + p.width_in, 0)));
   paintNotes();
-  fillRinks();
 }
 
 /* This rink's survey notes. A note tied to a tag is about something still
@@ -443,32 +430,6 @@ function facilityOfBucket(k){
   const sh = sheets[k === LEGACY ? boundSheetId : k];
   return sh ? sh.facilityId : null;
 }
-function fillRinks(){
-  const sel = document.getElementById('rinkPick');
-  if(!sel) return;
-  let keys = Object.keys(LAYOUTS).filter(k => k.indexOf('__') !== 0);
-  /* The launcher says which facility you are at, so offer that facility's
-     surfaces rather than every rink this device has ever held. A bucket whose
-     facility is unknown is left in - hiding something you cannot classify is
-     worse than showing it - and so is whatever is on screen. */
-  if(launcherFacility){
-    keys = keys.filter(k => k === activeBucket
-      || facilityOfBucket(k) === null || facilityOfBucket(k) === launcherFacility);
-  }
-  keys.sort((a, b) => a === LEGACY ? -1 : b === LEGACY ? 1
-                    : facilityName(a).localeCompare(facilityName(b)));
-  sel.innerHTML = keys.map(k => '<option value="' + esc(k) + '"'
-    + (k === activeBucket ? ' selected' : '') + '>' + esc(facilityName(k)) + '</option>').join('');
-  /* One rink is not a choice. A mandatory picker for a one-rink operation is
-     friction wearing the costume of structure. */
-  sel.hidden = keys.length < 2;
-  const wrap = document.getElementById('rinkWrap'), del = document.getElementById('rinkDel');
-  if(wrap) wrap.hidden = sel.hidden;
-  /* Conway's layout is compiled into this file rather than walked, so there is
-     nothing to take off. */
-  if(del) del.hidden = (activeBucket === LEGACY);
-}
-
 /* Glass walked by mistake had no way off the device: the picker listed it for
    ever and there was nothing to press. Conway is not removable - its layout is
    compiled into this file, not something anybody built. */
@@ -507,7 +468,7 @@ async function switchRink(b){
      sync and claim a save. Looking at a different rink changes no record. */
   Store.set(KEY, snapshot());
   /* Which rink you are at is one fact, not one per app. Moving it here moves
-     it for the launcher and for Ice too. */
+     it for the shell and for Ice too. */
   const sid = (b === LEGACY) ? boundSheetId : b;
   if(sid){
     const patch = {activeSheet: sid}, sh = sheets[sid];
@@ -545,12 +506,12 @@ function ensureBinding(){
   return true;
 }
 
-let launcherSheet = null;     // which surface the launcher says you are standing in
-let launcherFacility = null;  // and which facility that surface is at
+let hereSheet = null;     // which surface the shell says you are standing in
+let hereFacility = null;  // and which facility that surface is at
 let LAYOUT_GONE = {};         // bucket -> updatedAt, for glass that has been removed
 
-/* The facilities and sheets Ice and the launcher keep. Read from this device
-   rather than waited for over sync: a surface added on the launcher a moment
+/* The facilities and sheets Ice and the shell keep. Read from this device
+   rather than waited for over sync: a surface added on the Facilities page a moment
    ago is in local storage long before it has been near the server, and a
    builder that could not see it would be no join at all. */
 async function loadSurfaces(){
@@ -562,15 +523,15 @@ async function loadSurfaces(){
       sheets[s.id] = {id:s.id, facilityId:f.id, name:s.name, ord:s.ord, shape:Records.shapeOf(s)};
     });
   });
-  launcherSheet = (st.prefs && st.prefs.activeSheet) || null;
-  launcherFacility = (st.prefs && st.prefs.activeFacility) || null;
+  hereSheet = (st.prefs && st.prefs.activeSheet) || null;
+  hereFacility = (st.prefs && st.prefs.activeFacility) || null;
   return st;
 }
 
 const SYNC=(typeof Sync!=="undefined")?Sync:null;   // absent if sync.js failed to load; the page still works locally
 const snapshot = () => JSON.stringify({records, boundSheetId, pendingFacilityId, bindingAt,
                                        activeBucket, names: FACILITY_NAMES, at: LAYOUT_AT, gone: LAYOUT_GONE,
-                                       counts: GLASS_COUNTS(), spares: SPARES, widths: WIDTHS,
+                                       spares: SPARES, widths: WIDTHS,
                                        specs: BUILT_SPECS(), built: BUILT_DRAWN()});
 function store(){ Store.set(KEY, snapshot()); say('Saved'); if(SYNC) SYNC.nudge(); }
 
