@@ -472,12 +472,18 @@ function fillRinks(){
 /* Glass walked by mistake had no way off the device: the picker listed it for
    ever and there was nothing to press. Conway is not removable - its layout is
    compiled into this file, not something anybody built. */
-async function deleteRink(bucket){
+/* Asks in the page (askG), never with a browser dialog. `then` runs once it is gone. */
+function deleteRink(bucket, then){
   if(bucket === LEGACY || !LAYOUTS[bucket]) return;
   const name = facilityName(bucket);
-  if(!confirm('Remove the glass walked for "' + name + '"?\n\n'
-    + 'The panel run and anything recorded against it go with it, on every device.\n\n'
-    + 'The ice surface itself stays - delete that in Ice if you want it gone too.')) return;
+  askG({title:'Remove this layout?',
+        text:'The glass walked for "' + name + '", its panel run and anything recorded against it go, on every device. '
+           + 'The ice surface itself stays - delete that in Ice if you want it gone too.',
+        ok:'Remove layout'}, async () => { await removeRink(bucket); if(then) then(); });
+}
+async function removeRink(bucket){
+  if(bucket === LEGACY || !LAYOUTS[bucket]) return;
+  const name = facilityName(bucket);
   /* Tombstoned rather than quietly dropped. The layout has been on the server,
      so the other devices have to be told it is gone; forgetting it here would
      just mean the next pull brought it back. */
@@ -553,7 +559,7 @@ async function loadSurfaces(){
   (st.facilities || []).forEach(f => {
     facilities[f.id] = {id:f.id, name:f.name, ord:f.ord};
     (f.sheets || []).forEach(s => {
-      sheets[s.id] = {id:s.id, facilityId:f.id, name:s.name, ord:s.ord};
+      sheets[s.id] = {id:s.id, facilityId:f.id, name:s.name, ord:s.ord, shape:Records.shapeOf(s)};
     });
   });
   launcherSheet = (st.prefs && st.prefs.activeSheet) || null;

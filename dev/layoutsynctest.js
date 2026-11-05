@@ -172,7 +172,7 @@ ok('the marked panel came too', (await E.p.evaluate(k =>
 /* Glass walked by mistake has to go everywhere, not just on the device that
    noticed. */
 A.p.on('dialog', d => d.accept());
-await A.p.evaluate(async k => { await switchRink(k); await deleteRink(k); }, bucket);
+await A.p.evaluate(async k => { await switchRink(k); deleteRink(k); await new Promise(r => setTimeout(r, 200)); document.getElementById('sureYes').click(); await new Promise(r => setTimeout(r, 300)); }, bucket);
 await sleep(4000);
 const tomb = (await layoutRows()).find(r => r.id === bucket);
 ok('removing a rink tombstones its layout', !!tomb && tomb.deleted === true,

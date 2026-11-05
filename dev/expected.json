@@ -16,6 +16,8 @@
  "genpuretest": 8,
  "glassrinktest": 20,
  "glassinvtest": 23,
+ "glassbuildtest": 30,
+ "glasslaptoptest": 10,
  "handovertest": 40,
  "homecheck": 78,
  "icebuildtest": 25,

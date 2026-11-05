@@ -288,6 +288,15 @@ footer{font-size:12.5px;color:var(--ink-3);text-align:center;font-family:var(--m
    Nothing is dropped that is not said elsewhere on the page. 560px is the
    breakpoint ice.html already uses, so the two pages turn together. */
 .sheet-x{display:none}
+.gscrim{position:fixed;inset:0;z-index:1000;background:#06090dcc;display:none;align-items:center;justify-content:center;padding:16px}
+.gscrim.on{display:flex}
+.gsure{background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:16px;padding:20px;max-width:440px;width:100%}
+.gsure h2{margin:0 0 8px;font-size:17px}.gsure p{margin:0 0 16px;color:var(--ink-2);font-size:14px;line-height:1.5}
+.gsure-foot{display:flex;gap:8px;justify-content:flex-end}
+.gsure-foot .btn{min-height:44px}
+.bld-page[hidden]{display:none}
+#glassWrap:not([data-page="build"]) .bld-page{display:none}
+#glassWrap[data-page="build"] .specstrip,#glassWrap[data-page="build"] .rail,#glassWrap[data-page="build"] #planCard,#glassWrap[data-page="build"] .grid{display:none}
 /* the three pages of Glass: the address names one, and the others' cards are put away */
 .gtabs{display:flex;gap:6px;flex-wrap:wrap}
 .gtabs button{appearance:none;font:inherit;font-size:13px;min-height:44px;padding:0 16px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink-2);cursor:pointer}
@@ -447,6 +456,17 @@ document.documentElement.setAttribute("data-theme",_t==="light"?"light":"dark");
   <button type="button" data-page="inventory" aria-current="false">Inventory</button>
 </nav>
 
+<section class="card pad bld-page" id="bldHasGlass" hidden>
+  <h2 style="margin:0 0 6px">This sheet already has its glass</h2>
+  <p id="bldHasGlassText" style="margin:0 0 12px"></p>
+  <button type="button" class="btn" id="bldRemove">Remove this layout</button>
+</section>
+<section class="card pad bld-page" id="bldLaptop" hidden>
+  <h2 style="margin:0 0 6px">Measuring is for a phone or tablet</h2>
+  <p style="margin:0 0 12px">The Builder walks the boards with a tape, so it is switched off on a laptop. Rink view and Inventory work here as they do anywhere.</p>
+  <button type="button" class="btn" id="bldLaptopRink">Back to the Rink view</button>
+</section>
+
 <div class="specstrip">
   <p class="lede"><span id="facName">Conway Arena</span><span id="ledeRest"></span></p>
   <div class="specs">
@@ -549,6 +569,13 @@ document.documentElement.setAttribute("data-theme",_t==="light"?"light":"dark");
 <script src="shell.js"></script>
 <script src="glass-gen.js"></script>
 <script src="glass-core.js"></script>
+<div class="gscrim" id="sureScrim">
+  <div class="gsure" role="alertdialog" aria-labelledby="sureTitle">
+    <h2 id="sureTitle"></h2><p id="sureText"></p>
+    <div class="gsure-foot"><button type="button" class="btn" id="sureNo">Cancel</button><button type="button" class="btn btn-go" id="sureYes">OK</button></div>
+  </div>
+</div>
+
 <div class="bld" id="builder" hidden role="dialog" aria-modal="true" aria-labelledby="bldTitle">
   <div class="bld-box">
     <div class="bld-head">
@@ -1214,8 +1241,47 @@ const BLD = {
   step: 1, name: '', L: 200, W: 85, Rft: 27, Rin: 2,
   height: 75, vary: false, thickness: '1/2"',
   start: 'centre', walls: [], wi: 0, built: null, turn: false, flip: false,
-  sheet: '__new'          // the surface being walked, or a new one
+  sheet: '__new',         // the surface being walked, or a new one
+  shapeChoice: 'keep',    // step 4: 'update' writes the measured size to the sheet, 'keep' leaves it
+  shape0: null,           // the sheet's size when this walk began, kept in the draft
+  draftNote: null,        // 'continue' (a draft was restored) or 'changed' (the sheet's size moved under it)
+  pending: null           // a draft waiting on the person's say-so
 };
+/* In-page replacement for confirm(): ask({title,text,ok,cancel}, onYes, onNo). */
+function askG(o, yes, no){
+  const sc = document.getElementById('sureScrim');
+  document.getElementById('sureTitle').textContent = o.title || 'Are you sure?';
+  document.getElementById('sureText').textContent = o.text || '';
+  document.getElementById('sureYes').textContent = o.ok || 'OK';
+  document.getElementById('sureNo').textContent = o.cancel || 'Cancel';
+  const done = fn => { sc.classList.remove('on'); document.getElementById('sureYes').onclick = document.getElementById('sureNo').onclick = sc.onclick = null; if(fn) fn(); };
+  document.getElementById('sureYes').onclick = () => done(yes);
+  document.getElementById('sureNo').onclick = () => done(no);
+  sc.onclick = e => { if(e.target === sc) done(no); };
+  sc.classList.add('on'); document.getElementById('sureNo').focus();
+}
+/* Sheets this device changed (through the Builder's "update the sheet"), kept so the change is still sent after a reload. */
+const touchedSheets = () => { try { return JSON.parse(localStorage.getItem('glass_sheets_touched') || '[]'); } catch(e){ return []; } };
+const touchSheet = id => { try { const t = touchedSheets(); if(!t.includes(id)) localStorage.setItem('glass_sheets_touched', JSON.stringify(t.concat(id))); } catch(e){} };
+const hashSheet = () => { const m = /#\/f\/[^/]+\/s\/([^/]+)/.exec(location.hash); return m ? m[1] : null; };
+const bldShapeOf = sid => (sid && sheets[sid] && sheets[sid].shape) || null;
+function bldTakeShape(sid){
+  const sh = bldShapeOf(sid); if(!sh) return;
+  BLD.L = sh.L; BLD.W = sh.W; BLD.Rft = sh.Rft; BLD.Rin = sh.Rin;
+  BLD.shape0 = {L:sh.L, W:sh.W, Rft:sh.Rft, Rin:sh.Rin};
+}
+/* The walk is kept on this device as it goes - never in what syncs - so a locked phone, a reload or a switch to
+   another app comes back to the same stretch. It is keyed by the sheet and remembers the size that sheet had when
+   the walk began, so a draft against a sheet that has since changed can say so. */
+const DRAFT_KEY = 'glass_build_draft_v1';
+const DRAFT_FIELDS = ['step','name','L','W','Rft','Rin','height','vary','thickness','start','walls','wi','turn','flip'];
+function bldDraftRead(){ try { const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); return d && d.sheet && d.bld ? d : null; } catch(e){ return null; } }
+function bldDraftClear(){ try { localStorage.removeItem(DRAFT_KEY); } catch(e){} }
+function bldDraftWrite(){
+  if(BLD.pending || BLD.step < 2) return;
+  const bld = {}; DRAFT_FIELDS.forEach(k => { bld[k] = BLD[k]; });
+  try { localStorage.setItem(DRAFT_KEY, JSON.stringify({v:1, sheet:BLD.sheet, shape0:BLD.shape0, at:nowISO(), bld})); } catch(e){}
+}
 const THICKNESSES = ['1/2"', '5/8"'];
 const KINDS = { glass:{label:'Glass'}, door:{label:'Door'},
                 gate:{label:'Zamboni gate'}, open:{label:'Opening, no glass'} };
@@ -1395,7 +1461,22 @@ function bldStep4(){
   + rows + '</tbody></table>'
   + (off.length ? '<p class="note" style="margin-top:14px;color:var(--plexi)"><b>' + off.length
       + ' stretch' + (off.length === 1 ? '' : 'es') + '</b> came out with joints unlike the others.'
-      + ' Worth a second look before saving.</p>' : '');
+      + ' Worth a second look before saving.</p>' : '')
+  + bldShapeCmp();
+}
+/* What was measured against what the sheet says. The sheet is never written silently: the person chooses. */
+const ftIn = (ft, inch) => ft + '\u2032' + (inch ? ' ' + inch + '\u2033' : '');
+function bldShapeCmp(){
+  const sh = BLD.sheet !== '__new' && bldShapeOf(BLD.sheet);
+  if(!sh || (sh.L === BLD.L && sh.W === BLD.W && sh.Rft === BLD.Rft && sh.Rin === BLD.Rin)) return '';
+  const u = BLD.shapeChoice === 'update';
+  return '<div class="note" id="bShapeCmp" style="margin-top:14px"><b>What you measured is not what the sheet says.</b><br>'
+    + 'The sheet: ' + ftIn(sh.L) + ' \u00d7 ' + ftIn(sh.W) + ', corner ' + ftIn(sh.Rft, sh.Rin) + '.<br>'
+    + 'You measured: ' + ftIn(BLD.L) + ' \u00d7 ' + ftIn(BLD.W) + ', corner ' + ftIn(BLD.Rft, BLD.Rin) + '.'
+    + '<div class="bld-seg" role="group" aria-label="What to do about the sheet" style="margin-top:10px">'
+    + '<button type="button" id="bShapeUpdate" aria-pressed="' + u + '">Update the sheet</button>'
+    + '<button type="button" id="bShapeKeep" aria-pressed="' + !u + '">Keep the sheet\'s size</button></div>'
+    + '<div style="margin-top:6px;font-size:12px;color:var(--ink-3)">Updating changes the size Ice and Glass both draw. Ice\'s readings are not touched.</div></div>';
 }
 
 function bldSay(msg, bad){
@@ -1403,8 +1484,18 @@ function bldSay(msg, bad){
 }
 function bldRender(){
   const body = $b('bldBody');
-  body.innerHTML = BLD.step === 1 ? bldStep1() : BLD.step === 2 ? bldStep2()
-                 : BLD.step === 3 ? bldStep3() : bldStep4();
+  body.innerHTML = (BLD.draftNote === 'continue'
+      ? '<div class="note" id="bDraft">Continuing the walk you started on this device. <button type="button" class="btn" id="bDraftDiscard">Discard it</button></div>'
+    : BLD.draftNote === 'changed'
+      ? '<div class="note" id="bDraftChanged"><b>The sheet\'s size has changed since you started this walk.</b> '
+        + 'Continue it as measured, or discard it and start again from the sheet\'s size. '
+        + '<button type="button" class="btn" id="bDraftContinue">Continue the walk</button> '
+        + '<button type="button" class="btn" id="bDraftDiscard">Discard it</button></div>' : '')
+    + (BLD.step === 1 ? bldStep1() : BLD.step === 2 ? bldStep2() : BLD.step === 3 ? bldStep3() : bldStep4());
+  if($b('bDraftDiscard')) $b('bDraftDiscard').addEventListener('click', bldDraftDiscard);
+  if($b('bDraftContinue')) $b('bDraftContinue').addEventListener('click', () => {
+    Object.assign(BLD, BLD.pending.bld); BLD.shape0 = bldShapeOf(BLD.sheet) ? Object.assign({}, bldShapeOf(BLD.sheet)) : null;
+    BLD.pending = null; BLD.draftNote = 'continue'; bldRender(); });
   Array.prototype.forEach.call($b('bldSteps').children, (el, n) => {
     el.classList.toggle('on', n + 1 === BLD.step);
     el.classList.toggle('done', n + 1 < BLD.step);
@@ -1424,7 +1515,8 @@ function bldRender(){
     $b('bName').addEventListener('input', e => { BLD.name = e.target.value; });
     $b('bSheet').addEventListener('change', e => {
       BLD.sheet = e.target.value;
-      $b('bNewWrap').hidden = BLD.sheet !== '__new';
+      if(BLD.sheet !== '__new') bldTakeShape(BLD.sheet);
+      bldRender();
       if(BLD.sheet === '__new') $b('bName').focus();
     });
     upd();
@@ -1473,7 +1565,9 @@ function bldRender(){
     document.querySelectorAll('#bldPlan .pnl').forEach(el => el.setAttribute('fill', 'var(--ok-soft)'));
     useLayout(keep); buildPlan();
     delete LAYOUTS.__preview;
+    ['bShapeUpdate','bShapeKeep'].forEach(id => { const e = $b(id); if(e) e.addEventListener('click', () => { BLD.shapeChoice = id === 'bShapeUpdate' ? 'update' : 'keep'; bldRender(); }); });
   }
+  bldDraftWrite();
 }
 
 function bldValidate(){
@@ -1511,11 +1605,28 @@ async function bldOpen(){
   const free = bldFreeSheets();
   BLD.step = 1; BLD.wi = 0; BLD.walls = []; BLD.name = ''; BLD.built = null;
   BLD.turn = false; BLD.flip = false;
-  /* Default to where the launcher says you are, when that surface has no glass
-     yet - which is the reason you would be opening this at all. */
-  BLD.sheet = (launcherSheet && free.some(s => s.id === launcherSheet)) ? launcherSheet
+  BLD.shapeChoice = 'keep'; BLD.shape0 = null; BLD.draftNote = null; BLD.pending = null;
+  /* The sheet in the address, when it has no glass yet - which is the reason you would be opening this at all. */
+  const hs = hashSheet();
+  BLD.sheet = (hs && free.some(s => s.id === hs)) ? hs
+            : (launcherSheet && free.some(s => s.id === launcherSheet)) ? launcherSheet
             : free.length ? free[0].id : '__new';
+  if(BLD.sheet !== '__new') bldTakeShape(BLD.sheet);
+  const d = bldDraftRead();
+  if(d && (d.sheet === '__new' || free.some(s => s.id === d.sheet))){
+    const cur = d.sheet === '__new' ? null : bldShapeOf(d.sheet), s0 = d.shape0;
+    const same = !cur || !s0 || (cur.L === s0.L && cur.W === s0.W && cur.Rft === s0.Rft && cur.Rin === s0.Rin);
+    BLD.sheet = d.sheet;
+    if(same){ Object.assign(BLD, d.bld); BLD.shape0 = s0; BLD.draftNote = 'continue'; }
+    else { bldTakeShape(d.sheet); BLD.pending = d; BLD.draftNote = 'changed'; }
+  } else if(d) bldDraftClear();
   $b('builder').hidden = false; bldRender();
+}
+function bldDraftDiscard(){
+  bldDraftClear();
+  Object.assign(BLD, {step:1, name:'', walls:[], wi:0, built:null, turn:false, flip:false, vary:false, shapeChoice:'keep', draftNote:null, pending:null});
+  if(BLD.sheet !== '__new') bldTakeShape(BLD.sheet);
+  bldRender();
 }
 function bldClose(){ $b('builder').hidden = true; }
 
@@ -1546,6 +1657,13 @@ async function bldSave(){
   LAYOUT_AT[bucket] = nowISO();
   setBucket(bucket);                    // records, layout and `state`, together
   store();
+  /* Only when asked to: the sheet takes the measured size, through the same method the Sheet settings page uses. */
+  const shNow = BLD.sheet !== '__new' && bldShapeOf(BLD.sheet);
+  if(shNow && BLD.shapeChoice === 'update' && !(shNow.L === BLD.L && shNow.W === BLD.W && shNow.Rft === BLD.Rft && shNow.Rin === BLD.Rin)){
+    const r = await Records.Repo.updateSheet(BLD.sheet, {shape:{L:BLD.L, W:BLD.W, Rft:BLD.Rft, Rin:BLD.Rin}});
+    if(r && r.changed){ touchSheet(BLD.sheet); if(SYNC) SYNC.nudge(); await loadSurfaces(); }
+  }
+  bldDraftClear(); BLD.draftNote = null; BLD.pending = null;
   bldClose();
   defaultScope();
   buildPlan(); rail(); totals(); table(); detail(); paint(); paintFacility(); spares();
@@ -1555,6 +1673,7 @@ async function bldSave(){
 (async function boot(){
   applyTheme(document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark');
   await restore();
+  try { await Records.Repo.load(); } catch(e){}      // so a sheet changed here is there to send
   const st = await loadSurfaces();
   /* The address says which rink you are at (the shared bar and the shell's pages write it), and
      the stored preference is only the fallback. */
@@ -1636,7 +1755,11 @@ async function bldSave(){
       for(const id in SPARES){ const m=SPARES[id]; if(m) spares[id]=Object.assign({}, m, {id:id}); }
       const widths={};
       for(const id in WIDTHS){ const v=WIDTHS[id]; if(v) widths[id]=Object.assign({}, v, {id:id}); }
-      return {glass_panel:panels, glass_binding:binding, glass_layout:layouts, glass_spare:spares, glass_widths:widths};
+      /* A sheet whose size the Builder was asked to update travels like any other change to it. Only those: Glass holds the
+         other sheets as Ice's store has them, and is not the one to send them. */
+      const sheetOut={}, allSh=Records.Repo.outgoing().sh;
+      touchedSheets().forEach(id => { if(allSh[id]) sheetOut[id]=allSh[id]; });
+      return {glass_panel:panels, glass_binding:binding, glass_layout:layouts, glass_spare:spares, glass_widths:widths, sheet:sheetOut};
     },
     apply:(incoming)=>{
       let taken=0;
@@ -1652,7 +1775,18 @@ async function bldSave(){
       for(const id in shs){
         const s=shs[id];
         if(s.deleted){ if(sheets[id]){ delete sheets[id]; taken++; } continue; }
-        sheets[id]={id:id, facilityId:s.facilityId, name:s.name, ord:s.ord}; taken++;
+        sheets[id]={id:id, facilityId:s.facilityId, name:s.name, ord:s.ord, shape:Records.shapeOf(s)}; taken++;
+      }
+
+      /* Glass is a way into the same facilities and sheets Ice keeps. A device that has only ever opened Glass would
+         otherwise hold none of them in the shared store, and the bar, the address and the Builder's "update the sheet"
+         would have nothing to work on. Merged the way Ice merges them; load() first, so what is already there is kept. */
+      if(Object.keys(facs).length || Object.keys(shs).length){
+        (async () => { try {
+          await Records.Repo.load();
+          Records.Repo.merge({facilities:facs, sheets:shs, sessions:{}});
+          await Records.Repo.persistMaps();
+        } catch(e){} })();
       }
 
       const binds=incoming.glass_binding||{};
@@ -1746,6 +1880,7 @@ async function bldSave(){
         setBucket(activeBucket);
         Store.set(KEY, snapshot());
         paintFacility(); rail(); table(); detail(); paint(); spares();
+        if(window.__glassRefresh) window.__glassRefresh();    // the Builder page depends on which sheets have glass
       }
       return taken;
     }
@@ -1753,11 +1888,13 @@ async function bldSave(){
   /* What changes a record. Selectors, so the panel card and the stock rows, which are rebuilt on
      every selection, are covered too. Search, filters, printing and the plan itself stay open. */
   SYNC.lockControls(['#addRink','[aria-label^="Remove this rink"]','.sbtn','#plabel','#ptag','#note','#noteClear',
-    '#noteSave','#load','#spSize','#spW','#spH','#spT','#spQty','#spNote','#spAdd','.sp-undo','.sp-qty-in']);
+    '#noteSave','#load','#spSize','#spW','#spH','#spT','#spQty','#spNote','#spAdd','.sp-undo','.sp-qty-in','#bldRemove']);
   /* The pages of Glass. The address names one (#/f/FID/s/SID/rink|build|inventory); the page's cards are shown or put
      away by the wrapper's data-page. The Builder is still the dialog it was; it becomes a page of its own next. */
   const GPAGES = ['rink', 'build', 'inventory'];
   let gpage = 'rink';
+  /* The shell's name for the layout, and the width it means (above 1100px): before the bar has mounted the shell's answer is a default. */
+  const isLaptop = () => typeof Shell !== 'undefined' && Shell.layout() === 'laptop' && innerWidth > 1100;
   function glassAddress(){
     const sid = (activeBucket === LEGACY) ? boundSheetId : activeBucket, sh = sid && sheets[sid];
     return sh && sh.facilityId ? {fid: sh.facilityId, sid} : null;
@@ -1768,31 +1905,69 @@ async function bldSave(){
     document.getElementById('glassWrap').dataset.page = p;
     document.querySelectorAll('#glassTabs [data-page]').forEach(b => b.setAttribute('aria-current', b.dataset.page === p ? 'page' : 'false'));
     if(p === 'inventory') spares();
-    if(p === 'build'){ if(document.getElementById('builder').hidden) bldOpen(); }
+    /* The Builder is for the sheet in the address: measuring is for a phone or tablet, and a sheet that already has
+       its glass is not walked again (its layout can be removed first). */
+    const laptop = isLaptop();
+    const sid = hashSheet() || (glassAddress() && glassAddress().sid);
+    const has = sid ? (LAYOUTS[sid] ? sid : (sid === boundSheetId ? LEGACY : null)) : null;
+    document.getElementById('bldLaptop').hidden = !(p === 'build' && laptop);
+    document.getElementById('bldHasGlass').hidden = !(p === 'build' && !laptop && has);
+    if(p === 'build' && !laptop && has){
+      const n = (LAYOUTS[has].panels || []).filter(x => x.kind === 'glass').length;
+      document.getElementById('bldHasGlassText').textContent = has === LEGACY
+        ? 'This is Conway\'s own glass (' + n + ' pieces), part of the program. It cannot be walked again or removed.'
+        : n + ' pieces are walked for this sheet. To change them, remove this layout and walk the sheet again.';
+      document.getElementById('bldRemove').hidden = has === LEGACY;
+    }
+    if(p === 'build' && !laptop && !has){ if(document.getElementById('builder').hidden) bldOpen(); }
     else if(!document.getElementById('builder').hidden) bldClose();
     const a = glassAddress();
     if(!fromAddress && a && typeof Shell !== 'undefined') Shell.setAddress(a.fid, a.sid, p);
   }
   /* The page is read from the address itself too: a Glass-only device may not yet hold the sheet the bar would look it up in. */
   const viewFromHash = () => { const m = /\/s\/[^/]+\/([a-z]+)$/.exec(location.hash); return m ? m[1] : null; };
+  /* Where the address says this is. The bar looks the sheet up in Ice's store, which a Glass-only device may not hold yet; Glass has its own list of sheets,
+     so it falls back to that rather than rewriting the address to the glass it happens to be showing. */
+  async function addressWhere(){
+    let w = await Shell.whereFromAddress().catch(() => null);
+    if(!w){ const hs = hashSheet(); if(hs && sheets[hs]) w = {fid:sheets[hs].facilityId, sid:hs, view:viewFromHash()}; }
+    return w;
+  }
+  window.__glassRefresh = () => { if(gpage === 'build') showGlassPage('build', true); };
   document.querySelectorAll('#glassTabs [data-page]').forEach(b => b.addEventListener('click', () => showGlassPage(b.dataset.page)));
   document.getElementById('bldClose').addEventListener('click', () => { if(gpage === 'build') showGlassPage('rink'); });
+  document.getElementById('bldLaptopRink').addEventListener('click', () => showGlassPage('rink'));
+  document.getElementById('bldRemove').addEventListener('click', () => {
+    const sid = hashSheet() || (glassAddress() && glassAddress().sid);
+    if(sid && LAYOUTS[sid]) deleteRink(sid, () => showGlassPage('build', true));
+  });
+  /* "+ Add a rink" is out of reach on a laptop; the shell says which layout this is. */
+  const layoutGate = () => {
+    const laptop = isLaptop();
+    document.getElementById('addRink').hidden = laptop;
+    if(gpage === 'build') showGlassPage('build', true);
+  };
+  if(typeof Shell !== 'undefined') Shell.onLayout(layoutGate);
   SYNC.start({title:'Arena Management System'}).then(() => {
     if(typeof Shell === 'undefined') return;
     const sid0 = (activeBucket === LEGACY) ? boundSheetId : activeBucket, sh0 = sid0 && sheets[sid0];
-    return Shell.mountBar(document.getElementById('shellbar'), {app:'glass'}).then(() => Shell.whereFromAddress().catch(() => null)).then(w => {
+    return Shell.mountBar(document.getElementById('shellbar'), {app:'glass'}).then(() => addressWhere()).then(async w => {
       /* An address that names a sheet with no glass is left as the person chose it, and Glass says so,
          rather than rewriting it to the glass it happens to be showing. */
       if(w && w.sid !== sid0 && !LAYOUTS[w.sid] && !(boundSheetId && w.sid === boundSheetId)){
         sayTool('No glass has been built for ' + ((sheets[w.sid] && sheets[w.sid].name) || 'that sheet') + ' yet. Use + Add a rink to walk it.');
+      } else if(w && w.sid !== sid0){
+        /* The address names another sheet that has glass: show that sheet's glass, and leave the address as it is. */
+        await switchRink(LAYOUTS[w.sid] ? w.sid : LEGACY); fillRinks();
       } else if(sh0 && sh0.facilityId) Shell.setAddress(sh0.facilityId, sid0);
+      layoutGate();
       showGlassPage((w && w.view) || viewFromHash(), true);
     });
   });
   /* A sheet chosen in the bar's menus is an address change. Glass follows it to that sheet's glass
      if there is any; if there is none it says so and keeps showing the glass it has. */
   window.addEventListener('hashchange', async () => {
-    const w = await Shell.whereFromAddress().catch(() => null);
+    const w = await addressWhere();
     if(!w){                                       // an address that names nothing goes back to where Glass is
       const sid1 = (activeBucket === LEGACY) ? boundSheetId : activeBucket, sh1 = sid1 && sheets[sid1];
       if(sh1 && sh1.facilityId) Shell.setAddress(sh1.facilityId, sid1);

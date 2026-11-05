@@ -20,7 +20,7 @@ const ok = (n, c, x) => { c ? pass++ : fail++; console.log((c ? '  PASS  ' : '  
 
 (async () => {
 const b = await chromium.launch();
-const ctx = await b.newContext({ viewport: { width: 1280, height: 1000 } });
+const ctx = await b.newContext({ viewport: { width: 1000, height: 1000 } });
 await ctx.addInitScript(() => { window.__SYNC_CONFIG__ = { url: 'http://localhost:8200', anon: 'test', email: 'x@y.z' }; });
 const p = await ctx.newPage();
 const errs = [];
@@ -33,7 +33,7 @@ ok('a device with only Conway has no picker',
    await p.evaluate(() => document.getElementById('rinkPick').hidden));
 
 /* ---------------- step 1: the sheet ---------------- */
-await p.click('#addRink');
+await p.evaluate(() => localStorage.removeItem('glass_build_draft_v1')); await p.click('#addRink');
 ok('the builder opens', await p.isVisible('#builder'));
 
 await p.fill('#bL', '185'); await p.fill('#bW', '85');
@@ -227,7 +227,7 @@ ok('and the rink you chose survives a reload',
 
 /* Changing where the walk starts changes the shape of the stretches, so what
    was entered against the old ones cannot be carried across. */
-await p.click('#addRink'); await sleep(200);
+await p.evaluate(() => localStorage.removeItem('glass_build_draft_v1')); await p.click('#addRink'); await sleep(200);
 await p.fill('#bName', 'Third rink'); await p.click('#bldNext'); await sleep(200);
 await p.selectOption('#bStart', 'end'); await sleep(200);
 await p.click('#bldNext'); await sleep(250);
@@ -251,7 +251,7 @@ await p.evaluate(t => {
   localStorage.setItem('ice_v4_prefs', JSON.stringify(pr));
 }, '2026-09-01T00:00:00.000Z');
 
-await p.click('#addRink'); await sleep(500);
+await p.evaluate(() => localStorage.removeItem('glass_build_draft_v1')); await p.click('#addRink'); await sleep(500);
 const surfaces = await p.evaluate(() =>
   [...document.getElementById('bSheet').options].map(o => ({ v: o.value, t: o.textContent })));
 ok('the builder offers the surfaces that have no glass yet',
@@ -288,7 +288,7 @@ ok('walking it keys the glass by the surface itself', onSb === 'sb', String(onSb
 ok('so the plan is named after that surface',
    /Laconia Ice/.test(await p.textContent('#facName')), await p.textContent('#facName'));
 
-await p.click('#addRink'); await sleep(500);
+await p.evaluate(() => localStorage.removeItem('glass_build_draft_v1')); await p.click('#addRink'); await sleep(500);
 const left = await p.evaluate(() =>
   [...document.getElementById('bSheet').options].map(o => o.value));
 ok('a surface that already has glass is not offered again', left.indexOf('sb') < 0,
@@ -324,7 +324,7 @@ ok('and Glass opens on that surface next time',
 /* ---------------- and which way round it is drawn ---------------- */
 
 /* Step 4 is where you are already holding the drawing up against the room. */
-await p.click('#addRink'); await sleep(500);
+await p.evaluate(() => localStorage.removeItem('glass_build_draft_v1')); await p.click('#addRink'); await sleep(500);
 await p.evaluate(() => {
   BLD.L = 185; BLD.W = 85; BLD.Rft = 28; BLD.Rin = 0; BLD.height = 72;
   BLD.start = 'end'; BLD.walls = []; BLD.wi = 0; BLD.step = 4;
@@ -375,7 +375,7 @@ await p.evaluate(t => {
   localStorage.setItem('ice_v4_prefs', JSON.stringify(pr));
 }, '2026-09-01T00:00:00.000Z');
 
-await p.click('#addRink'); await sleep(500);
+await p.evaluate(() => localStorage.removeItem('glass_build_draft_v1')); await p.click('#addRink'); await sleep(500);
 ok('the builder starts on the new site\'s surface',
    (await p.evaluate(() => BLD.sheet)) === 'sc', await p.evaluate(() => BLD.sheet));
 const onSc = await p.evaluate(walkIn, null); await sleep(400);
@@ -407,7 +407,7 @@ ok('Conway does not, being compiled in rather than walked',
    await p.evaluate(() => document.getElementById('rinkDel').hidden));
 
 await p.evaluate(async () => { await switchRink('sb'); }); await sleep(300);
-await p.evaluate(async () => { await deleteRink('sb'); }); await sleep(500);
+await p.evaluate(async () => { deleteRink('sb'); await new Promise(r => setTimeout(r, 200)); document.getElementById('sureYes').click(); }); await sleep(500);
 const gone = await p.evaluate(() => ({
   layout: !!LAYOUTS['sb'], bucket: activeBucket, tombstoned: !!LAYOUT_GONE['sb'],
   options: [...document.getElementById('rinkPick').options].map(o => o.value) }));
