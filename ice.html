@@ -78,6 +78,7 @@
             <button class="step" id="next" aria-label="Next point">›</button>
             <span class="where">Selected: <span class="zone" id="selZone">—</span></span>
             <span class="val">reading: <b id="selVal">not set</b></span>
+            <button class="mini" id="flagBtn" type="button" aria-label="Flag this spot">⚑ Flag</button>
           </div>
           <div class="note-row"><span class="tag">note</span><input id="noteInput" type="text" placeholder="e.g. crack, soft spot, near drain…" autocomplete="off"></div>
           <div class="mapmode" id="mapModeRow"><div class="seg" id="mapModeSeg" role="group" aria-label="Map mode"><button id="mmColor" aria-pressed="true">Color map</button><button id="mmLowest" aria-pressed="false">Lowest point</button></div></div>
@@ -220,6 +221,16 @@
   </div>
 </div>
 
+<!-- ===================== FLAG ===================== -->
+<div class="scrim" id="flagScrim">
+  <div class="modal small" role="dialog" aria-labelledby="flagTitle">
+    <h2 id="flagTitle">Flag this</h2><div class="lead" id="flagWhat"></div>
+    <label class="fl-f">Why<select id="flagReason"></select></label>
+    <label class="fl-f">Note<input id="flagNote" type="text" placeholder="What looks wrong?" autocomplete="off"></label>
+    <div class="modal-foot"><button class="btn ghost" id="flagCancel" type="button">Cancel</button><button class="btn primary" id="flagGo" type="button">Raise flag</button></div>
+  </div>
+</div>
+
 <!-- ===================== ARE YOU SURE ===================== -->
 <div class="scrim" id="sureScrim">
   <div class="modal small" role="alertdialog" aria-labelledby="sureTitle">
@@ -232,6 +243,7 @@
 
 <script src="sync.js"></script>
 <script src="records.js"></script>
+<script src="flags.js"></script>
 <script src="shell.js"></script>
 <script src="ice-core.js"></script>
 <script src="ice-rink.js"></script>
@@ -339,11 +351,12 @@ async function boot(){state=await Repo.load();
 boot().then(()=>{
   if(!SYNC) return;
   SYNC.attach({
-    kinds:["facility","sheet","session"],
-    collect:()=>{const m=Repo.outgoing();return {facility:m.fac, sheet:m.sh, session:m.se};},
+    kinds:["facility","sheet","session","flag"],
+    collect:()=>{const m=Repo.outgoing();return {facility:m.fac, sheet:m.sh, session:m.se, flag:Flags.collect()};},
     apply:(incoming)=>{
+      const ft=Flags.applyIncoming(incoming);
       const res=Repo.merge({facilities:incoming.facility||{}, sheets:incoming.sheet||{}, sessions:incoming.session||{}});
-      if(!res.taken) return 0;
+      if(!res.taken) return ft;
       state.facilities=res.facilities;
       state.facilities.forEach(fa=>{if(!fa.settings)fa.settings=defaultSettings();if(!fa.settings.edges)fa.settings.edges=[...DEFAULT_EDGES];
         (fa.sheets||[]).forEach(sh=>{if(!sh.size)sh.size=NHL_SIZE();(sh.sessions||[]).forEach(se=>{if(!se.mode)se.mode="moderate";});});});
@@ -353,12 +366,12 @@ boot().then(()=>{
       Repo.save(state);
       if(state.screen==="work"){applyGeometry(Records.sizeOf(sheet()),session().mode);computeField();computeDelta();buildSessSel();refresh();}
       else buildHome();
-      return res.taken;
+      return res.taken+ft;
     }
   });
   /* What changes a record. Selectors, so controls built on the fly are covered too. Theme, units,
      view switches, exports and the map itself are device preferences or reading, and stay open. */
-  SYNC.lockControls(["#logNew","#newRound","#roundCreate",
+  SYNC.lockControls(["#flagBtn","#logNew","#newRound","#roundCreate",
     "#resetBands","#undoBtn","#clearBtn","#impBtn","#backupImport","#noteInput",".chip[data-opt]",".chip.clear",
     "#overdueIn","#targetIn","#floodIn","#shaveIn","#tieChk","#edges input",".stp button","#roundManage input","#roundManage .del",".rdel"]);
   SYNC.start({title:"Arena Management System"}).then(()=>{

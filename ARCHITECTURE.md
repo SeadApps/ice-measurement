@@ -9,6 +9,8 @@ shell.js       the shell: the address, the chrome, the shared bar, the one write
 shell.css      the Ice Board look for the shell's own pages (rail, tab bar, rows, forms)
 shellbar.css   the shared bar's look, scoped under .sb so it sits inside Ice and Glass without restyling them
 home.js        the shell's pages: Facilities, Sheets, Sheet settings, Staff
+review.js      Quality review (laptop): Changes, Current state, Flags, Reports
+flags.js       the flag record: raise, resolve, reopen, merge; shared by the shell, Ice and Glass
 ice.html       Ice Manager: the page, its markup and its boot; the script is split into
   ice-core.js    the model with no page in it: geometry and spots, the sixteen labels and units, state, bands, saving, the interpolation
   ice-rink.js    the Rink view: map, live canvas, legend, readout, Compare to, exports (CSV, image, print)
@@ -582,7 +584,9 @@ node dev/facilitiestest.js # 45 checks: Facilities and Sheets agree with Ice, tr
 node dev/facilitytest.js   # 32 checks: facilities in Glass, ids scoped without a migration,
 node dev/gentest.js        # 19 checks: the generator reproduces Conway's survey, either way round
 node dev/genpuretest.js    # 8 checks: glass-gen.js runs with no page: a walk becomes the same layout every time
-node dev/navtest.js        # 89 checks: the flow chart's access table: every page by address, at four widths, for Management and Staff
+node dev/navtest.js        # 121 checks: the flow chart's access table: every page, Quality review included, by address at four widths for Management and Staff
+node dev/reviewtest.js     # 39 checks: Quality review: Flags, Current state agreeing with the Fleet table, Changes (sentences, filters, paging, the Large change hint, offline), Reports (sections, same in either theme, print black on white, a PDF)
+node dev/flagtest.js       # 23 checks: flags: raised from a reading and a panel on any width, only Management resolves or reopens (the server says so), counts on the cards and the Fleet table, marks, nothing restamped by looking
 node dev/clicktest.js      # 36 checks: every page reached by clicking from sign-in
 node dev/swtest.js         # 14 checks: the precache list is exactly what ships; an activate drops old caches
 node dev/manifesttest.js   # 15 checks: the manifest is valid, its shortcuts open Facilities, its icons are the size they say
@@ -625,7 +629,7 @@ node dev/whotest.js        # 18 checks: nobody types their name; the bar names t
 node dev/widthstest.js     # 25 checks: a facility's one-tap widths (default 43/48, no record until changed); only Management resolves or reopens a flag
 ```
 
-1783 checks in all, over 56 suites. Tests point `window.__SYNC_CONFIG__` at the fake via
+1877 checks in all, over 58 suites. Tests point `window.__SYNC_CONFIG__` at the fake via
 `addInitScript`; the real pages never read it.
 
 **Lessons from the access work, each of which cost a debugging session:**
@@ -972,6 +976,36 @@ where that facility has more than one surface, so Conway still reads
 
 ---
 
+## Quality review and flags
+
+The laptop's tool for looking back, under `#/review/changes|state|flags|reports`, drawn by `review.js` into the shell's
+content area. The shell resolves those routes itself: on a phone or an iPad they land on Facilities with the one message
+"That page is not available."; Staff reach Flags only (the rail shows them nothing else); Changes, Current state and Reports
+are Management's, and the server refuses the change log to anyone else whatever a page does. Nothing here writes a reading, a
+panel or a setting. `dev/navdata.js` is the flow chart's access table as data and `navtest` checks every page against it.
+
+- **A flag is a record of its own kind** (`flag`, `flags.js`): what it points at (a reading on a spot of a round, a panel, or any
+  record), the facility tag, a reason from a fixed list of five (Wrong reading, Missing data, Glass does not match the building,
+  Check reading, Other), a free note, and a status of open or resolved. It is held on the device under `rink_flags_v1`, synced
+  by whichever page is open (the shell, Ice and Glass all attach the kind), merged newest-wins, and stamped by the server with
+  who last changed it. Anyone with access to the facility can raise one, from the Flag button in Ice's Rink view (the spot you
+  tapped) or on a panel's card in Glass, on every device. **Only Management resolves or reopens**, enforced by the server (the
+  rule in `d1-01-add.sql`, mirrored in the fake); the page hides the buttons from Staff as well. A flag whose sheet has gone still
+  lists and says so. Open flags are counted on the Facilities cards, the sheet rows and the Fleet table, and marked on the map
+  (a dashed amber ring and a small flag) and on the plan (a dashed outline).
+- **Changes** is read from the server (`Sync.activity`), never from the device: 50 at a time, newest first, filtered by area
+  (Ice, Glass, Inventory, Settings, Flags), facility, person and period, paged with `seq=lt.`. The sentence for each row is the
+  one the Staff page's Activity tab uses (`Home.describe`), and a reading that moved by half an inch or more in one edit carries a
+  "Large change" hint (a prompt, not a verdict). A row can be flagged. With no connection the page says so rather than showing an
+  empty list.
+- **Current state** is a row per sheet from the same functions as the cards and the Fleet table (`Shell.status`,
+  `Records.trendOf`, `Records.glassSummary`), so the three cannot disagree (`reviewtest` compares them).
+- **Reports** build a paper preview from the ticked sections (summary, Ice latest round, thickness trend, glass condition, flagged
+  items, changes in the period) and print it through a hidden `#printRoot` with print-only rules, Letter portrait, black on white
+  in either theme. Save as PDF is the print dialog's PDF destination; there is no library. **Not done as specified:** the
+  report has tables where the spec has a map image and a plan drawing, because those drawing functions live in Ice and Glass and
+  are not loaded in the shell; and `review.js` is loaded at every width rather than only on a laptop.
+
 ## Maps
 
 The Rink view draws the map on a canvas, which cannot read a stylesheet variable by itself, so the colours
@@ -1027,8 +1061,8 @@ way, so it can still be loaded once from the account menu (`glassbackuptest`).
 - **One browser `confirm()` is left**, in `sync.js` for signing out; everything else asks in the page.
 - **No realtime.** Sync happens on open and on focus. Supabase realtime would make the desktop update while you
   watch; not needed so far.
-- **Quality review and flags (D6) are not built.** The flow chart has them (`dev/navdata.js` lists the four
-  pages as `built:false`); the server side of flags exists and is tested in the fake (`widthstest`).
+- **Reports have no map image or glass plan** (see *Quality review and flags*), and the order list is not in the report; it is
+  in Glass, Rink view.
 - **The very old single-blob migration stays** (`Repo.load()` moves a device off `ice_sheet_v3`) until nobody
   has such a device.
 - **A fresh device's seed** is checked in `freshdevicetest`; `facilitytest` still pins the active facility as

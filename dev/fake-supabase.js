@@ -323,6 +323,10 @@ const server = http.createServer(async (req,res)=>{
     for (const k of ['id','kind','facility_id','changed_by']) { const v = eq(k); if (v !== null) out = out.filter(r=>String(r[k]) === v); }
     const gt = u.query.at && /^gt\.(.*)$/.exec(u.query.at);
     if (gt) out = out.filter(r=>r.at > decodeURIComponent(gt[1]));
+    const kin = u.query.kind && /^in\.\((.*)\)$/.exec(u.query.kind);
+    if (kin) { const ks = decodeURIComponent(kin[1]).split(','); out = out.filter(r=>ks.includes(r.kind)); }
+    const lt = u.query.seq && /^lt\.(.*)$/.exec(u.query.seq);
+    if (lt) out = out.filter(r=>r.seq < +decodeURIComponent(lt[1]));
     if (u.query.order === 'seq.desc') out.reverse();
     if (u.query.limit) out = out.slice(0, +u.query.limit);
     return json(res,200,out);

@@ -118,6 +118,8 @@
     var chips = h("div", { cls: "chips" });
     chips.appendChild(over ? chip("bad", over + " overdue") : withRounds ? chip("ok", "All up to date") : chip("", "No rounds yet"));
     if (flags) chips.appendChild(chip("warn", plural(flags, "glass flag")));
+    var open = (d.flags || []).filter(function (x) { return x.fac === f.id; }).length;
+    if (open) chips.appendChild(chip("bad", plural(open, "open flag")));
     return h("a", { cls: "row frow", href: "#/f/" + f.id, "data-fid": f.id }, [
       h("div", {}, [h("div", { cls: "name", text: f.name }), h("div", { cls: "meta", text: plural(sheets.length, "sheet") })]),
       chips, h("span", { cls: "go", text: "Open sheets →" })]);
@@ -131,11 +133,12 @@
           onclick: function () { Shell.go("#/f/" + f.id + "/s/" + s.id); } }, [
           h("td", { text: f.name }), h("td", { text: s.name || "Sheet" }),
           h("td", { text: st.last ? ago(st.last.date) || "unknown" : "No rounds" }),
-          h("td", {}, [iceChip(st)]), h("td", {}, [glassChip(d.glass[s.id])])]));
+          h("td", {}, [iceChip(st)]), h("td", {}, [glassChip(d.glass[s.id])]),
+          h("td", { cls: "flagcell", text: String((d.flags || []).filter(function (x) { return x.sheetId === s.id; }).length || "") })]));
       });
     });
     var table = h("table", { id: "fleetTable" }, [
-      h("thead", {}, [h("tr", {}, ["Facility", "Sheet", "Last round", "Ice", "Glass"].map(function (t) { return h("th", { text: t }); }))]), tb]);
+      h("thead", {}, [h("tr", {}, ["Facility", "Sheet", "Last round", "Ice", "Glass", "Open flags"].map(function (t) { return h("th", { text: t }); }))]), tb]);
     return h("div", { cls: "tablewrap" }, [table]);
   }
   function facilities(d) {
@@ -174,7 +177,9 @@
     return h("div", { cls: "row srow", "data-sid": s.id }, [
       h("div", {}, [h("div", { cls: "name", text: s.name || "Sheet" }),
         h("div", { cls: "meta", text: sizeText(s) + " · last round: " + (st.last ? ago(st.last.date) || "unknown" : "No rounds") })]),
-      h("div", { cls: "stat" }, [h("div", { cls: "chips" }, [iceChip(st), glassChip(d.glass[s.id])]), spark(trend)]),
+      h("div", { cls: "stat" }, [h("div", { cls: "chips" }, [iceChip(st), glassChip(d.glass[s.id])].concat(
+        (d.flags || []).filter(function (x) { return x.sheetId === s.id; }).length
+          ? [chip("bad", plural((d.flags || []).filter(function (x) { return x.sheetId === s.id; }).length, "open flag"))] : [])), spark(trend)]),
       h("div", { cls: "apps" }, [open("ice"), open("glass"),
         h("a", { cls: "btn ghost sm", href: "#/f/" + f.id + "/s/" + s.id + "/settings", "data-open": "settings", text: "Sheet settings" })])]);
   }
@@ -631,9 +636,11 @@
       if (route.page === "sheets") return sheets(route, d);
       if (route.page === "settings") return settings(route, d);
       if (route.page === "staff") return staff(route, d);
+      if (route.page === "review") return global.Review ? global.Review.render(route, d, shell) : facilities(d);
       return facilities(d);
     },
-    view: function () { return view; }
+    view: function () { return view; },
+    describe: describe, placeOf: placeOf, when: when
   };
   global.Home = Home;
 

@@ -196,3 +196,29 @@ label.field,.field{display:grid;gap:4px;font-size:13px;color:var(--ink-dim)}
   border:2px solid var(--frost);background:var(--frost);color:var(--on-frost);cursor:pointer;max-width:320px}
 .abtn[disabled]{opacity:.35;cursor:not-allowed}
 @media (max-width:760px){.two{grid-template-columns:minmax(0,1fr)}.sb{width:56px}}
+
+/* Quality review */
+.subbar.filters{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px}
+.fl-f.inl{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--ink-dim)}
+.fl-f.inl select{font:inherit;font-size:14px;padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:var(--panel-2);color:var(--ink);min-height:40px}
+.flagrow .chips .chip.ok{background:var(--good-soft,#1c3527);color:var(--good,#7fcf9a)}
+.log .e.flagged{border-left:3px solid var(--warn,#e8b54a);background:var(--warn-soft,#3a2f16)}
+.log .e .chip{margin-left:8px}
+.log .e .flagit{margin-left:8px;min-height:32px}
+.repsecs{display:flex;gap:6px 18px;flex-wrap:wrap;margin-bottom:14px}
+.repsecs .chk{font-size:14px;display:flex;align-items:center;gap:6px}
+.paper{background:#fff;color:#000;border:1px solid var(--line);border-radius:6px;padding:28px 34px;max-width:780px;font:13px/1.5 Georgia,serif}
+.paper h1{font-size:20px;margin:0 0 4px}.paper h2{font-size:15px;margin:20px 0 6px;border-bottom:1px solid #000}
+.paper table{border-collapse:collapse;width:100%;font-size:12px}.paper th,.paper td{border-bottom:1px solid #bbb;padding:4px 8px;text-align:left}
+#printRoot{display:none}
+@media print{
+  @page{size:letter portrait;margin:14mm}
+  body.printing-report{background:#fff!important}
+  body.printing-report>*:not(#printRoot){display:none!important}
+  body.printing-report #printRoot{display:block!important;color:#000;background:#fff;font:12px/1.5 Georgia,serif}
+  body.printing-report #printRoot h1{font-size:20px;margin:0 0 4px}
+  body.printing-report #printRoot h2{font-size:14px;margin:18px 0 6px;border-bottom:1px solid #000;break-after:avoid}
+  body.printing-report #printRoot section{break-inside:avoid}
+  body.printing-report #printRoot table{border-collapse:collapse;width:100%}
+  body.printing-report #printRoot th,body.printing-report #printRoot td{border-bottom:1px solid #999;padding:3px 6px;text-align:left}
+}

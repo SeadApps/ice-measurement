@@ -617,3 +617,17 @@ function set(id, patch, quiet){
   }
 }
 
+/* ---------- Flags ----------
+   Open flags on the panels of the rink on screen, so the plan can mark them and the card can say so. */
+function flaggedPanels(){
+  const out = {};
+  if(typeof Flags === 'undefined') return out;
+  Flags.all().forEach(f => { if(f.status === 'open' && f.targetKind === 'panel' && f.sheetId === flagSheetId()) out[f.panelId] = f; });
+  return out;
+}
+const flagSheetId = () => activeBucket === LEGACY ? boundSheetId : activeBucket;
+function panelFlags(pid){
+  const f = flaggedPanels()[pid];
+  return f ? `<span class="flag-open">Flagged: ${esc(f.reason)}${f.note ? ' — ' + esc(f.note) : ''}</span>` : '';
+}
+const panelStatus = id => (state[id] && state[id].status) || 'ok';

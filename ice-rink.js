@@ -51,6 +51,9 @@ function drawDots(ctx,ox,oy,s,opt){const d=data(),nt=notes(),base=opt.trend?base
     if(opt.labels&&nt[keyOf(p)]){ctx.beginPath();ctx.arc(px+6,py-6,2.6,0,7);ctx.fillStyle=themeInk("--frost","#6fd6ec");ctx.fill();}
     if(opt.labels&&set){let txt;if(opt.trend){if(base&&base.data[keyOf(p)]!=null){const dd=decOf.get(lab)-decOf.get(base.data[keyOf(p)]);txt=isMM()?(dd>0?'+':dd<0?'−':'±')+Math.abs(mmOf(dd)).toFixed(1):(dd>0?'+':dd<0?'−':'±')+Math.abs(dd).toFixed(2);}else txt="new";}else txt=fmtLabelShort(lab);
       ctx.font="600 11px ui-monospace,Menlo,monospace";ctx.textAlign="center";ctx.textBaseline="bottom";const tw=ctx.measureText(txt).width;ctx.fillStyle="rgba(8,13,18,.78)";ctx.fillRect(px-tw/2-3,py-9-13,tw+6,13);ctx.fillStyle="#eaf3f8";ctx.fillText(txt,px,py-9);}}
+  const fs=flaggedSpots();for(let k=0;k<POINTS.length;k++){const p=POINTS[k];if(!fs[keyOf(p)])continue;const px=FX(ox,s,p.x),py=FY(oy,s,p.y);
+    ctx.save();ctx.beginPath();ctx.arc(px,py,8,0,7);ctx.lineWidth=2.2;ctx.strokeStyle="#e8b54a";ctx.setLineDash([3,2.5]);ctx.stroke();ctx.setLineDash([]);
+    ctx.beginPath();ctx.moveTo(px+6,py-14);ctx.lineTo(px+6,py-5);ctx.lineTo(px+14,py-9.5);ctx.closePath();ctx.fillStyle="#e8b54a";ctx.fill();ctx.restore();}
   if(opt.sel){const p=POINTS[selIdx],px=FX(ox,s,p.x),py=FY(oy,s,p.y);ctx.beginPath();ctx.arc(px,py,9,0,7);ctx.lineWidth=2.4;ctx.strokeStyle=themeInk("--frost","#6fd6ec");ctx.stroke();ctx.beginPath();ctx.arc(px,py,12.5,0,7);ctx.lineWidth=1;ctx.globalAlpha=.4;ctx.stroke();ctx.globalAlpha=1;}}
 /* Which map colours are in use, and the scale behind them. The mode is a device preference. */
 const mapMode=()=>state&&state.mapMode==="lowest"?"lowest":"color";
@@ -72,6 +75,9 @@ function drawLive(){if(!cv.clientWidth)return;ctx.clearRect(0,0,cv.clientWidth,W
 function pickPoint(cxp,cyp){const r=cv.getBoundingClientRect();const fx=(cxp-r.left)/r.width*L,fy=W-(cyp-r.top)/r.height*W;let best=-1,bd=1e9;
   for(let k=0;k<POINTS.length;k++){const dx=fx-POINTS[k].x,dy=fy-POINTS[k].y,d=dx*dx+dy*dy;if(d<bd){bd=d;best=k;}}const tolFt=Math.max(7,28/(r.width/L));return Math.sqrt(bd)<=tolFt?best:-1;}
 cv.addEventListener("pointerdown",e=>{const k=pickPoint(e.clientX,e.clientY);if(k>=0)selectPoint(k);});
+/* Spots on this round that somebody has flagged and nobody has resolved, so the map can mark them. */
+function flaggedSpots(){const out={};if(typeof Flags==="undefined"||!state)return out;
+  Flags.openFor(sheet().id).forEach(f=>{if(f.targetKind==="reading"&&f.sessionId===session().id&&f.spot)out[f.spot]=f;});return out;}
 function selectPoint(k){hideSel=false;selIdx=k;if(entryMode==="guided"){const gp=guidedOrder.indexOf(k);if(gp>=0)guidedPos=gp;}refresh();}
 
 
@@ -184,3 +190,20 @@ $("expPdf").addEventListener("click",()=>{const img=renderToImage(2000).toDataUR
     `<div class="ptables">${tables.join("")}</div>`;
   setTimeout(()=>window.print(),60);});
 
+/* ---------- Flag ----------
+   Anyone can say "this looks wrong" from where they are: a reading on a spot of this round. The flag is a record of its
+   own kind (flags.js); Quality review reads them, and only Management resolves one. The form asks in the page. */
+if(typeof Flags!=="undefined"){
+  Flags.load().then(()=>{if(state&&state.screen==="work")drawLive();});
+  Flags.onChange(()=>{if(state&&state.screen==="work"){drawLive();refresh();}});
+  $("flagReason").innerHTML=Flags.REASONS.map(r=>`<option>${r}</option>`).join("");
+  $("flagBtn").addEventListener("click",()=>{const p=POINTS[selIdx],lab=data()[keyOf(p)];
+    $("flagWhat").textContent=`${facility().name} · ${sheet().name} · ${zoneOf(p)}`+(lab?` · now ${fmtLabel(lab)}`:" · no reading yet");
+    $("flagNote").value="";$("flagScrim").classList.add("on");$("flagNote").focus();});
+  const closeFlag=()=>$("flagScrim").classList.remove("on");
+  $("flagCancel").addEventListener("click",closeFlag);$("flagScrim").addEventListener("click",e=>{if(e.target===$("flagScrim"))closeFlag();});
+  $("flagGo").addEventListener("click",async()=>{const p=POINTS[selIdx],key=keyOf(p),lab=data()[key];
+    await Flags.raise({fac:facility().id,targetKind:"reading",sheetId:sheet().id,sessionId:session().id,spot:key,
+      label:`${zoneOf(p)}`,reading:lab||null,reason:$("flagReason").value,note:$("flagNote").value.trim()});
+    closeFlag();if(SYNC)SYNC.nudge();flashNote("flag raised");});
+}

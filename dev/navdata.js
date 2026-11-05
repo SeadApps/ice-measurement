@@ -19,10 +19,10 @@ module.exports = {
     { id: 'Glass: Builder', url: '/glass.html' + G3 + '/build', probe: '#builder', msg: '#bldLaptop', ph: 1, tp: 1, tl: 1, lp: 'message', mgmt: 1, staff: 1 },
     { id: 'Glass: Inventory', url: '/glass.html' + F + '/inventory', probe: '#spares', ph: 1, tp: 1, tl: 1, lp: 1, mgmt: 1, staff: 1 },
     { id: 'Staff', url: '/index.html#/staff', probe: '#sharedCodes', ph: 1, tp: 1, tl: 1, lp: 1, mgmt: 1, staff: 0 },
-    /* Quality review is the laptop's, and is built in D6. */
-    { id: 'Quality review: Changes', built: false, ph: 0, tp: 0, tl: 0, lp: 1, mgmt: 1, staff: 0 },
-    { id: 'Quality review: Current state', built: false, ph: 0, tp: 0, tl: 0, lp: 1, mgmt: 1, staff: 0 },
-    { id: 'Quality review: Flags', built: false, ph: 0, tp: 0, tl: 0, lp: 1, mgmt: 1, staff: 1 },
-    { id: 'Quality review: Reports', built: false, ph: 0, tp: 0, tl: 0, lp: 1, mgmt: 1, staff: 0 }
+    /* Quality review is the laptop's. */
+    { id: 'Quality review: Changes', url: '/index.html#/review/changes', probe: '#pageReview[data-view="changes"]', ph: 0, tp: 0, tl: 0, lp: 1, mgmt: 1, staff: 0 },
+    { id: 'Quality review: Current state', url: '/index.html#/review/state', probe: '#pageReview[data-view="state"]', ph: 0, tp: 0, tl: 0, lp: 1, mgmt: 1, staff: 0 },
+    { id: 'Quality review: Flags', url: '/index.html#/review/flags', probe: '#pageReview[data-view="flags"]', ph: 0, tp: 0, tl: 0, lp: 1, mgmt: 1, staff: 1 },
+    { id: 'Quality review: Reports', url: '/index.html#/review/reports', probe: '#pageReview[data-view="reports"]', ph: 0, tp: 0, tl: 0, lp: 1, mgmt: 1, staff: 0 }
   ]
 };

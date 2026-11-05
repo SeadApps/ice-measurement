@@ -132,9 +132,19 @@ document.documentElement.setAttribute("data-theme",_t==="light"?"light":"dark");
 
 <script src="sync.js"></script>
 <script src="records.js"></script>
+<script src="flags.js"></script>
 <script src="shell.js"></script>
 <script src="glass-gen.js"></script>
 <script src="glass-core.js"></script>
+<div class="gscrim" id="flagScrim">
+  <div class="gsure" role="dialog" aria-labelledby="flagTitle">
+    <h2 id="flagTitle">Flag this panel</h2><p id="flagWhat"></p>
+    <label class="fl-f">Why<select id="flagReason"></select></label>
+    <label class="fl-f">Note<input id="flagNote" type="text" placeholder="What looks wrong?" autocomplete="off"></label>
+    <div class="gsure-foot"><button type="button" class="btn" id="flagCancel">Cancel</button><button type="button" class="btn btn-go" id="flagGo">Raise flag</button></div>
+  </div>
+</div>
+
 <div class="gscrim" id="sureScrim">
   <div class="gsure" role="alertdialog" aria-labelledby="sureTitle">
     <h2 id="sureTitle"></h2><p id="sureText"></p>
@@ -279,6 +289,7 @@ function paint(){
     const s = st(p.id);
     el.setAttribute('fill', s==='ok' ? (tagOf(p)==='zamdoor'?'var(--surface-3)':'var(--ok-soft)') : `var(--${STATUS[s].cls})`);
     el.classList.toggle('sel', sel===p.id);
+    el.classList.toggle('flagged', !!(flaggedPanels()[p.id]));
     el.classList.toggle('dim', !inView(p));
     const n = document.getElementById('num-'+p.id);
     if(n){ n.classList.toggle('on', sel===p.id); n.style.fill = (s!=='ok')?'var(--surface)':''; }
@@ -548,6 +559,7 @@ function detail(){
       <dt>Thickness</dt><dd>${p.thickness} tempered</dd>
       <dt>Section</dt><dd style="font-family:var(--body)">${esc(p.section)}</dd>
     </dl>
+    <div class="flag-row"><button class="btn" id="flagBtn" type="button">⚑ Flag this panel</button>${panelFlags(p.id)}</div>
     <div class="stat-btns">
       ${Object.entries(STATUS).map(([k,v])=>`<button class="sbtn" data-s="${k}" aria-pressed="${s===k}"><i class="sw-${v.cls}"></i>${v.label}</button>`).join('')}
     </div>
@@ -1221,7 +1233,7 @@ async function bldSave(){
     /* facility and sheet are pulled, never pushed - the Ice app owns those
        records, and collect() deliberately omits them so nothing here can
        restamp one. */
-    kinds:['facility','sheet','glass_panel','glass_binding','glass_layout','glass_spare','glass_widths'],
+    kinds:['facility','sheet','glass_panel','glass_binding','glass_layout','glass_spare','glass_widths','flag'],
     collect:()=>{
       const panels={};
       for(const bucket in records){
@@ -1269,10 +1281,10 @@ async function bldSave(){
          other sheets as Ice's store has them, and is not the one to send them. */
       const sheetOut={}, allSh=Records.Repo.outgoing().sh;
       touchedSheets().forEach(id => { if(allSh[id]) sheetOut[id]=allSh[id]; });
-      return {glass_panel:panels, glass_binding:binding, glass_layout:layouts, glass_spare:spares, glass_widths:widths, sheet:sheetOut};
+      return {glass_panel:panels, glass_binding:binding, glass_layout:layouts, glass_spare:spares, glass_widths:widths, sheet:sheetOut, flag:Flags.collect()};
     },
     apply:(incoming)=>{
-      let taken=0;
+      let taken=Flags.applyIncoming(incoming);
 
       const facs=incoming.facility||{};
       for(const id in facs){
@@ -1397,7 +1409,7 @@ async function bldSave(){
   });
   /* What changes a record. Selectors, so the panel card and the stock rows, which are rebuilt on
      every selection, are covered too. Search, filters, printing and the plan itself stay open. */
-  SYNC.lockControls(['#glassTabs [data-page="build"]','.sbtn','#plabel','#ptag','#note','#noteClear',
+  SYNC.lockControls(['#glassTabs [data-page="build"]','#flagBtn','.sbtn','#plabel','#ptag','#note','#noteClear',
     '#noteSave','#spSize','#spW','#spH','#spT','#spQty','#spNote','#spAdd','.sp-undo','.sp-qty-in','#bldRemove']);
   /* The pages of Glass. The address names one (#/f/FID/s/SID/rink|build|inventory); the page's cards are shown or put
      away by the wrapper's data-page. The Builder is still the dialog it was; it becomes a page of its own next. */
@@ -1447,6 +1459,24 @@ async function bldSave(){
   window.__glassRefresh = () => { if(gpage === 'build') showGlassPage('build', true); };
   document.querySelectorAll('#glassTabs [data-page]').forEach(b => b.addEventListener('click', () => showGlassPage(b.dataset.page)));
   document.getElementById('bldClose').addEventListener('click', () => { if(gpage === 'build') showGlassPage('rink'); });
+  /* Flag: anyone can say "this panel looks wrong"; Quality review reads them and only Management resolves one. */
+  Flags.load().then(() => { rail(); table(); paint(); detail(); });
+  Flags.onChange(() => { paint(); if(sel) detail(); });
+  document.getElementById('flagReason').innerHTML = Flags.REASONS.map(r => '<option>' + r + '</option>').join('');
+  const closeFlag = () => document.getElementById('flagScrim').classList.remove('on');
+  document.addEventListener('click', e => {
+    const b = e.target.closest && e.target.closest('#flagBtn'); if(!b || !sel) return;
+    document.getElementById('flagWhat').textContent = facilityName(activeBucket) + ' · panel ' + sel.replace(/^0+/, '') + ' · ' + STATUS[panelStatus(sel)].label;
+    document.getElementById('flagNote').value = ''; document.getElementById('flagScrim').classList.add('on'); document.getElementById('flagNote').focus();
+  });
+  document.getElementById('flagCancel').addEventListener('click', closeFlag);
+  document.getElementById('flagScrim').addEventListener('click', e => { if(e.target.id === 'flagScrim') closeFlag(); });
+  document.getElementById('flagGo').addEventListener('click', async () => {
+    const pid = sel; if(!pid) return;
+    await Flags.raise({fac:facilityOfBucket(activeBucket), targetKind:'panel', sheetId:flagSheetId(), panelId:pid,
+      label:'panel ' + pid.replace(/^0+/, ''), reading:panelStatus(pid), reason:document.getElementById('flagReason').value, note:document.getElementById('flagNote').value.trim()});
+    closeFlag(); if(SYNC) SYNC.nudge(); say('Flag raised.');
+  });
   document.getElementById('bldLaptopRink').addEventListener('click', () => showGlassPage('rink'));
   document.getElementById('bldRemove').addEventListener('click', () => {
     const sid = hashSheet() || (glassAddress() && glassAddress().sid);

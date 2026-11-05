@@ -68,6 +68,7 @@
     if (m === "" || m === "/") return { page: "facilities" };
     var p = m.split("/").filter(Boolean);
     if (p.length === 1 && p[0] === "staff") return { page: "staff" };
+    if (p.length === 2 && p[0] === "review" && /^(changes|state|flags|reports)$/.test(p[1])) return { page: "review", view: p[1] };
     if (p[0] === "f" && p[1]) {
       if (p.length === 2) return { page: "sheets", fid: p[1] };
       if (p[2] === "s" && p[3] && p.length === 4) return { page: "sheets", fid: p[1], sid: p[3] };
@@ -83,6 +84,12 @@
   function resolve(r) {
     if (r.page === "facilities") return r;
     if (r.page === "staff") return isManager() ? r : null;
+    /* Quality review is the laptop's. Flags are everyone's to see (their own facilities); the rest are Management's. */
+    if (r.page === "review") {
+      if (layoutName !== "laptop") return null;
+      if (r.view === "flags") return r;
+      return (!SYNC || !SYNC.person() || isManager()) ? r : null;
+    }
     if (r.page === "unknown") return null;
     var f = (data.facilities || []).filter(function (x) { return x.id === r.fid; })[0];
     if (!f) return null;
@@ -114,7 +121,10 @@
     }
     var live = {}; facs.forEach(function (f) { live[f.id] = true; });
     var removed = (await Repo.readRemoved()).filter(function (r) { return live[r.facilityId]; });
-    return { prefs: (st && st.prefs) || {}, facilities: facs, sessions: (st && st.sessions) || [], glass: glass, removed: removed };
+    /* Open flags, so the cards and the Fleet table can count them (flags.js; only what this person may see). */
+    var flags = [];
+    if (global.Flags) { await global.Flags.load(); flags = global.Flags.all().filter(function (r) { return r.status === "open" && (!r.fac || live[r.fac]); }); }
+    return { prefs: (st && st.prefs) || {}, facilities: facs, sessions: (st && st.sessions) || [], glass: glass, removed: removed, flags: flags };
   }
 
   /* How a sheet is doing. The overdue rule is the store's, read from the
@@ -380,6 +390,11 @@
             st.over ? h("i", { cls: "dot", title: "overdue" }) : null, h("span", { text: s.name || "Sheet" })]));
       });
     });
+    rail.appendChild(h("h3", { text: "Quality review" }));
+    [["changes", "Changes"], ["state", "Current state"], ["flags", "Flags"], ["reports", "Reports"]].forEach(function (x) {
+      if (x[0] !== "flags" && SYNC && SYNC.person() && !isManager()) return;     // Staff reach Flags only
+      rail.appendChild(h("a", { href: "#/review/" + x[0], text: x[1], "aria-current": route.page === "review" && route.view === x[0] ? "true" : null }));
+    });
     if (isManager()) {
       rail.appendChild(h("h3", { text: "Account" }));
       rail.appendChild(h("a", { href: "#/staff", text: "Staff", "aria-current": route.page === "staff" ? "true" : null }));
@@ -533,17 +548,20 @@
 
     if (SYNC) {
       await Repo.load();                          // hydrate the snapshot, so collect() can report it
+      if (global.Flags) await global.Flags.load();
       SYNC.attach({
-        kinds: ["facility", "sheet", "session"],
-        collect: function () { var m = Repo.outgoing(); return { facility: m.fac, sheet: m.sh, session: m.se }; },
+        kinds: ["facility", "sheet", "session", "flag"],
+        collect: function () { var m = Repo.outgoing(); return { facility: m.fac, sheet: m.sh, session: m.se, flag: global.Flags ? global.Flags.collect() : {} }; },
         apply: function (incoming) {
+          var ft = global.Flags ? global.Flags.applyIncoming(incoming) : 0;
           var res = Repo.merge({ facilities: incoming.facility || {}, sheets: incoming.sheet || {}, sessions: incoming.session || {} });
-          if (!res.taken) return 0;
+          if (!res.taken) { if (ft && data) refresh(); return ft; }
           Repo.persistMaps();
           if (data) refresh();
-          return res.taken;
+          return res.taken + ft;
         }
       });
+      if (global.Flags) global.Flags.onChange(function () { if (data) refresh(); });
       await SYNC.start({ title: "Arena Management System" });
       await SYNC.verify();                         // catches a rotated code even when nothing needed syncing
       statusEl = SYNC.statusEl();
