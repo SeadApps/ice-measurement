@@ -51,7 +51,11 @@ function applyGeometry(size,mode){
 applyGeometry();
 
 /* ---------- thickness ---------- */
-const OPTIONS=['1/4"','3/8"','1/2"','5/8"','3/4"','7/8"','1"','1 1/8"','1 1/4"','1 3/8"','1 1/2"','1 5/8"','1 3/4"','1 7/8"','2"','2+"'];
+/* Every label a stored reading can carry. The 21 KEYS are what the builder offers (1/2" to 3" in
+   eighths: a complete 3x7 or 7x3 grid). The rest are older readings that still display, colour the
+   map and feed the field, but have no key of their own: 1/4", 3/8" and "2+" (counted as 2.1). */
+const KEYS=['1/2"','5/8"','3/4"','7/8"','1"','1 1/8"','1 1/4"','1 3/8"','1 1/2"','1 5/8"','1 3/4"','1 7/8"','2"','2 1/8"','2 1/4"','2 3/8"','2 1/2"','2 5/8"','2 3/4"','2 7/8"','3"'];
+const OPTIONS=['1/4"','3/8"'].concat(KEYS,['2+"']);
 function parseFrac(f){f=f.replace(/"/g,'').trim();if(f==="2+")return 2.1;
   if(f.includes(" ")){const[w,fr]=f.split(" ");const[n,d]=fr.split("/");return +w+(+n)/(+d);}
   if(f.includes("/")){const[n,d]=f.split("/");return (+n)/(+d);}return +f;}

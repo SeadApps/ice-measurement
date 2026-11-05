@@ -123,7 +123,7 @@ ok('and it is saved as one, in the preferences, not in any record', JSON.parse(a
 /* ---- what it leaves alone -------------------------------------------------------------------------------- */
 await sleep(300);
 ok('the thickness keys keep the band colours in both modes: the builder\'s keys, the dots and the map agree while entering',
-   await R(() => { const chips = [...document.querySelectorAll('#chips .chip[data-opt] .dot')]; return chips.length === 16 && chips.every((c, i) => c.style.backgroundColor.replace(/\s/g, '') === rgbCss(BAND_RGB[BANDS.indexOf(bandOf(decOf.get(OPTIONS[i])))])); }));
+   await R(() => { const chips = [...document.querySelectorAll('#chips .chip[data-opt] .dot')]; return chips.length === 21 && chips.every((c, i) => c.style.backgroundColor.replace(/\s/g, '') === rgbCss(BAND_RGB[BANDS.indexOf(bandOf(decOf.get(KEYS[i])))])); }));
 await R(() => { document.getElementById('viewTrend').click(); });
 await sleep(400);
 ok('the Compare (Trend) view is untouched, and the toggle is not offered there', await R(() => document.getElementById('mapModeRow').style.display) === 'none' && /thinner/.test(await text(p, '#legend')));

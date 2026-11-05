@@ -202,7 +202,12 @@
   .gprog .lab{font-size:11px;color:var(--ink-dim);font-family:var(--mono);margin-bottom:5px;display:flex;justify-content:space-between}
   .gprog .track{height:6px;border-radius:999px;background:var(--panel-2);overflow:hidden}
   .gprog .fill{height:100%;background:var(--frost);width:0}
-  .chips{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+  .chips{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+  @media(min-width:600px) and (max-width:879px){.chips{grid-template-columns:repeat(7,1fr)}}
+  .chip{flex-direction:column;justify-content:center;align-items:center;gap:3px;text-align:center;min-height:60px;padding:6px 3px}
+  @media(min-width:600px){.chip{min-height:64px}}
+  .chip .w{font-size:10px;color:var(--ink-dim);letter-spacing:.02em;line-height:1}
+  .chip .dot{width:9px;height:9px}
   .chip{appearance:none;display:flex;align-items:center;gap:8px;background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:9px 8px;color:var(--ink);font:inherit;cursor:pointer;text-align:left;min-height:42px;transition:border-color .12s,transform .04s}
   .chips.guided .chip{min-height:54px}
   .chip:hover{border-color:#3a5b72}.chip:active{transform:translateY(1px)}
@@ -654,8 +659,8 @@ $("doneExport").addEventListener("click",()=>$("expPng").click());
 $("donePrint").addEventListener("click",()=>{$("doneScrim").classList.remove("on");$("expPdf").click();});
 
 /* ---------- UI build ---------- */
-function buildChips(){const el=$("chips");el.innerHTML="";for(const o of OPTIONS){const b=bandOf(decOf.get(o)),btn=document.createElement("button");btn.className="chip";btn.dataset.opt=o;
-  btn.innerHTML=`<span class="dot" style="background:${b.color}"></span><span class="f">${fmtLabel(o)}</span>`;btn.addEventListener("click",()=>assign(o));el.appendChild(btn);}
+function buildChips(){const el=$("chips");el.innerHTML="";for(const o of KEYS){const b=bandOf(decOf.get(o)),btn=document.createElement("button");btn.className="chip";btn.dataset.opt=o;
+  btn.innerHTML=`<span class="dot" style="background:${b.color}"></span><span class="f">${fmtLabel(o)}</span><span class="w">${b.word||b.label}</span>`;btn.addEventListener("click",()=>assign(o));el.appendChild(btn);}
   const clr=document.createElement("button");clr.className="chip clear";clr.textContent="Clear this point";clr.addEventListener("click",clearPoint);el.appendChild(clr);}
 function buildLegend(){const el=$("legend");if(viewMode==="trend"){el.className="legend trend";el.innerHTML=`<span class="lbl">−½″ thinner</span><span class="bar"></span><span class="lbl">+½″ thicker</span>`;return;}
   if(mapMode()==="lowest"){el.className="legend";el.innerHTML="";const sc=mapScale();

@@ -41,8 +41,8 @@ await p.goto(B + '/ice.html'); await signIn(p);
 const R = (fn, arg) => p.evaluate(fn, arg);
 
 /* ---- the claim ----------------------------------------------------------------- */
-const readings = await R(() => OPTIONS.filter(o => o !== '2+"').map(o => decOf.get(o)));
-ok('there are fifteen readings in eighths besides "2+"', readings.length === 15, String(readings.length));
+const readings = await R(() => OPTIONS.filter(o => o !== '2+"' && decOf.get(o) <= 2).map(o => decOf.get(o)));
+ok('there are fifteen readings in eighths up to 2" besides "2+"', readings.length === 15, String(readings.length));
 const bandIdx = (v, e) => { for (let i = 0; i < 4; i++) if (v < e[i]) return i; return 4; };
 const same = (a, b2) => readings.every(v => bandIdx(v, a) === bandIdx(v, b2));
 const mig = s => R(s => Records.settingsOf(s), s);
