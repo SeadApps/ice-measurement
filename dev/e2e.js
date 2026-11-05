@@ -95,11 +95,9 @@ await pb.waitForTimeout(1800);
 /* Both names used to appear on the home screen, because it listed every
    facility. It is scoped to the one you are at now - the launcher says which -
    so the merge is checked where every facility is still managed. */
-await pb.evaluate(()=>openSettings()); await pb.waitForTimeout(500);
-const managed=await pb.evaluate(()=>[...document.querySelectorAll('#facManage input')].map(i=>i.value));
+const managed=await pb.evaluate(()=>state.facilities.map(f=>f.name));
 ok("A's facility arrives on B",       managed.includes('Conway Arena'), JSON.stringify(managed));
 ok('B keeps its own facility too',    managed.includes('Main facility'), JSON.stringify(managed));
-await pb.click('#scrimClose').catch(()=>{}); await pb.waitForTimeout(300);
 const n=await pb.evaluate(()=>Object.values(JSON.parse(localStorage.getItem('ice_v4_sessions')||'{}')).filter(r=>!r.deleted).length);
 ok('B holds both sets of rounds ('+n+')', n===3);
 

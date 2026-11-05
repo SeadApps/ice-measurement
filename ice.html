@@ -276,6 +276,13 @@
   .edges{display:grid;gap:8px}
   .edge{display:grid;grid-template-columns:14px 1fr auto auto;align-items:center;gap:9px}
   .edge .sw{width:14px;height:14px;border-radius:4px;border:1px solid #ffffff22}.edge .nm{font-size:12px}
+  /* a stepper: minus, the value, plus. The number box stays so a value can still be typed. */
+  .stp{display:inline-flex;align-items:center;gap:6px}
+  .stp button{appearance:none;width:44px;height:44px;border-radius:9px;border:1px solid var(--line);background:var(--panel-2);color:var(--ink);font:600 20px var(--mono);cursor:pointer;line-height:1}
+  .stp button:hover:not(:disabled){border-color:#3a5b72}.stp button:disabled{opacity:.4;cursor:default}
+  .stp input[type=number]{-moz-appearance:textfield;appearance:textfield;width:74px;text-align:center}
+  .stp input[type=number]::-webkit-outer-spin-button,.stp input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  .ro-note{background:var(--warn-soft,var(--panel-2));padding:8px 12px;border-radius:8px}
   .manage{display:flex;flex-direction:column;gap:7px;margin-bottom:10px}
   .mrow{display:flex;align-items:center;gap:8px}
   .mrow input{flex:1;font:inherit;font-size:13px;color:var(--ink);background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:7px 9px}
@@ -450,17 +457,14 @@
 <div class="scrim" id="scrim">
   <div class="modal" role="dialog" aria-label="Preferences">
     <h2>Preferences</h2>
-    <div class="lead">Display is global. Target, bands, and attention apply to the selected facility.</div>
+    <div class="lead ro-note" id="prefRo" hidden>You can see these settings but only Management can change them.</div>
+    <div class="lead">These apply to <b id="prefFac"></b>, on every device. Theme and units are in the account menu; facilities and sheets are on their own pages.</div>
     <div class="msec">
-      <h3>Display</h3>
-      <div class="row"><label>Theme</label>
-        <div class="themeseg" role="group" aria-label="Theme"><button id="thLight2">Light</button><button id="thDark2">Dark</button></div></div>
-      <div class="row"><label>Units</label>
-        <div class="themeseg" role="group" aria-label="Units"><button id="unitPrefIn">Inches</button><button id="unitPrefMM">Millimeters</button></div></div>
+      <h3>Overdue</h3>
       <div class="row"><label for="overdueIn">Flag overdue after</label><input type="number" id="overdueIn" min="1" max="90" step="1"><span class="frac">days</span></div>
     </div>
     <div class="msec">
-      <h3>Target &amp; bands · <span class="who" id="prefFac"></span></h3>
+      <h3>Target &amp; bands</h3>
       <div class="row"><label for="targetIn">Target thickness</label><input type="number" id="targetIn" step="0.125" min="0.5" max="3"><span class="frac" id="targetFrac"></span></div>
       <div class="edges" id="edges"></div>
       <div class="row" style="margin-top:8px"><button class="mini" id="resetBands">Reset bands to default</button></div>
@@ -471,16 +475,6 @@
       <div id="manualAtt" style="margin-top:10px">
         <div class="row"><label for="floodIn">Flood when below</label><input type="number" id="floodIn" step="0.125" min="0.5" max="3"><span class="frac" id="floodFrac"></span></div>
         <div class="row"><label for="shaveIn">Shave when at/above</label><input type="number" id="shaveIn" step="0.125" min="0.5" max="3"><span class="frac" id="shaveFrac"></span></div></div>
-    </div>
-    <div class="msec">
-      <h3>Facilities</h3>
-      <div class="manage" id="facManage"></div>
-      <button class="mini" id="addFacBtn">+ Add facility</button>
-    </div>
-    <div class="msec">
-      <h3>Sheets · <span class="who" id="prefFac2"></span></h3>
-      <div class="manage" id="sheetManage"></div>
-      <button class="mini" id="addSheetBtn">+ Add sheet</button>
     </div>
     <div class="msec">
       <h3>Rounds · <span class="who" id="prefSheet"></span></h3>
@@ -511,16 +505,6 @@
   </div>
 </div>
 
-<!-- ===================== NEW SHEET ===================== -->
-<div class="scrim" id="sheetScrim">
-  <div class="modal small" role="dialog" aria-label="New sheet">
-    <h2>New sheet</h2>
-    <div class="lead">Name the sheet and pick its rink size — sheets in the same facility can be different sizes.</div>
-    <div class="row"><label for="newSheetName">Sheet name</label><input type="text" id="newSheetName" placeholder="e.g. Main rink, Studio"></div>
-    <div class="row"><label for="newSheetSize">Rink size</label><select id="newSheetSize"></select></div>
-    <div class="modal-foot"><button class="btn ghost" id="sheetCancel">Cancel</button><button class="btn primary" id="sheetCreate">Create sheet</button></div>
-  </div>
-</div>
 
 <!-- ===================== ROUND COMPLETE ===================== -->
 <div class="scrim" id="doneScrim">
@@ -813,7 +797,7 @@ function applyTheme(){document.documentElement.setAttribute("data-theme",state.t
   const dark=state.theme==="dark";
   [["thLight2",!dark],["thDark2",dark]].forEach(([id,on])=>{const el=$(id);if(el)el.setAttribute("aria-pressed",String(on));});}
 function setTheme(t){state.theme=t;Store.set("rink_theme",t);applyTheme();persist();if(state.screen==="work"){drawLive();buildLegend();}else buildHome();}
-$("thLight2").addEventListener("click",()=>setTheme("light"));$("thDark2").addEventListener("click",()=>setTheme("dark"));
+
 
 /* ---------- units ---------- */
 function applyUnitButtons(){const mm=isMM();
@@ -821,8 +805,7 @@ function applyUnitButtons(){const mm=isMM();
 function setUnit(u){if(state.unit===u)return;state.unit=u;applyUnitButtons();buildBands();buildChips();persist();
   if(state.screen==="work"){drawLive();buildLegend();renderStats();updateContourReadout();}else buildHome();
   if($("scrim").classList.contains("on"))buildSettings();}
-$("unitPrefIn").addEventListener("click",()=>setUnit("in"));
-$("unitPrefMM").addEventListener("click",()=>setUnit("mm"));
+
 
 /* ---------- backup staleness ---------- */
 const BACKUP_STALE_DAYS=30;
@@ -907,31 +890,35 @@ function drawHistory(withData){const c=$("histChart"),wrap=c.parentElement,cssW=
 
 $("logNew").addEventListener("click",()=>openNewRound(()=>showPage("build")));
 
-function addFacility(){const n=prompt("New facility name:","Facility "+(state.facilities.length+1));if(n===null)return;const f=newFacility(n.trim()||("Facility "+(state.facilities.length+1)));state.facilities.push(f);state.activeFacility=f.id;state.activeSheet=f.sheets[0].id;state.activeSession=f.sheets[0].sessions[0].id;buildBands();buildHome();persist();}
-let addSheetAfter=null;
-function openAddSheet(after){addSheetAfter=after||null;$("newSheetName").value="";const sel=$("newSheetSize");sel.innerHTML="";RINK_SIZES.forEach(r=>{const o=document.createElement("option");o.value=r.id;o.textContent=r.name;sel.appendChild(o);});sel.value="nhl";$("sheetScrim").classList.add("on");}
-const closeAddSheet=()=>$("sheetScrim").classList.remove("on");
-$("sheetCancel").addEventListener("click",closeAddSheet);
-$("sheetScrim").addEventListener("click",e=>{if(e.target===$("sheetScrim"))closeAddSheet();});
-$("sheetCreate").addEventListener("click",()=>{const name=$("newSheetName").value.trim()||("Sheet "+(facility().sheets.length+1));const size={...(RINK_SIZES.find(r=>r.id===$("newSheetSize").value)||NHL_SIZE())};const sh=newSheet(name,size);facility().sheets.push(sh);state.activeSheet=sh.id;state.activeSession=sh.sessions[0].id;closeAddSheet();persist();const cb=addSheetAfter;addSheetAfter=null;if(cb)cb(sh);});
+
 
 /* ---------- preferences ---------- */
 function openSettings(){buildSettings();$("scrim").classList.add("on");}
 const closeSettings=()=>$("scrim").classList.remove("on");
 $("gear").addEventListener("click",openSettings);$("gearHome").addEventListener("click",openSettings);
 $("settingsDone").addEventListener("click",closeSettings);$("scrim").addEventListener("click",e=>{if(e.target===$("scrim"))closeSettings();});
+/* A stepper around a number box: the buttons move it one step and fire the same input event typing does. */
+function stepper(inp,step,min,max){if(inp.parentNode.classList.contains("stp"))return;
+  const w=document.createElement("span");w.className="stp";inp.parentNode.insertBefore(w,inp);
+  const mk=(t,d,lab)=>{const b=document.createElement("button");b.type="button";b.textContent=t;b.setAttribute("aria-label",lab);
+    b.addEventListener("click",()=>{const cur=parseFloat(inp.value);const v=Math.max(min,Math.min(max,Math.round(((isNaN(cur)?min:cur)+d*step)/step)*step));inp.value=v;inp.dispatchEvent(new Event("input",{bubbles:true}));});return b;};
+  w.appendChild(mk("−",-1,"Less"));w.appendChild(inp);w.appendChild(mk("+",1,"More"));}
+/* Staff see the window, but only Management changes what is in it. */
+function applyPrefsRole(){const ro=typeof Shell!=="undefined"&&!Shell.canManage();$("prefRo").hidden=!ro;
+  document.querySelectorAll("#scrim .modal input:not([type=file]),#scrim .modal .stp button,#resetBands,#roundManage .del").forEach(e=>{if(ro)e.disabled=true;else if(e.dataset.roLocked!=="1")e.disabled=false;});}
 function buildSettings(){applyTheme();applyUnitButtons();
-  $("prefFac").textContent=facility().name;$("prefFac2").textContent=facility().name;$("prefSheet").textContent=sheet().name;
+  $("prefFac").textContent=facility().name;$("prefSheet").textContent=sheet().name;
   const ef=EF();
   $("overdueIn").value=ef.overdueDays;
   $("targetIn").value=ef.target;$("targetFrac").textContent=fmtSet(ef.target);
   const names=["Too thin below","Thin below","Ideal below","Thick below"],ed=$("edges");ed.innerHTML="";
   ef.edges.forEach((v,i)=>{const row=document.createElement("div");row.className="edge";
     row.innerHTML=`<span class="sw" style="background:${BAND_META[i].c}"></span><span class="nm">${names[i]}</span><input type="number" step="0.125" min="0.5" max="3" value="${v}"><span class="frac">${fmtSet(v)}</span>`;
-    const inp=row.querySelector("input"),frc=row.querySelector(".frac");inp.addEventListener("input",()=>{let nv=parseFloat(inp.value);if(isNaN(nv))return;nv=Records.eighthNear(nv);editSettings().edges[i]=nv;frc.textContent=fmtSet(nv);applySettings();});ed.appendChild(row);});
+    const inp=row.querySelector("input"),frc=row.querySelector(".frac");stepper(inp,0.125,0.5,3);inp.addEventListener("input",()=>{let nv=parseFloat(inp.value);if(isNaN(nv))return;nv=Records.eighthNear(nv);editSettings().edges[i]=nv;frc.textContent=fmtSet(nv);applySettings();});ed.appendChild(row);});
   $("tieChk").checked=ef.tieAttention;$("manualAtt").classList.toggle("on",!ef.tieAttention);
   $("floodIn").value=ef.floodBelow;$("floodFrac").textContent=fmtSet(ef.floodBelow);$("shaveIn").value=ef.shaveAbove;$("shaveFrac").textContent=fmtSet(ef.shaveAbove);
-  buildFacManage();buildSheetManage();buildRoundManage();updateBackupStatus();}
+  [["overdueIn",1,1,90],["targetIn",.125,.5,3],["floodIn",.125,.5,3],["shaveIn",.125,.5,3]].forEach(a=>stepper($(a[0]),a[1],a[2],a[3]));
+  buildRoundManage();updateBackupStatus();applyPrefsRole();}
 $("targetIn").addEventListener("input",e=>{let v=parseFloat(e.target.value);if(isNaN(v))return;v=Records.eighthNear(v);editSettings().target=v;$("targetFrac").textContent=fmtSet(v);applySettings();});
 $("tieChk").addEventListener("change",e=>{editSettings().tieAttention=e.target.checked;$("manualAtt").classList.toggle("on",!e.target.checked);applySettings();});
 $("floodIn").addEventListener("input",e=>{let v=parseFloat(e.target.value);if(isNaN(v))return;v=Records.eighthNear(v);editSettings().floodBelow=v;$("floodFrac").textContent=fmtSet(v);applySettings();});
@@ -962,16 +949,6 @@ $("backupFile").addEventListener("change",e=>{const f=e.target.files[0];if(!f)re
   }catch(err){alert("That doesn't look like a valid Ice Sheet backup file.");}
   $("backupFile").value="";};rd.readAsText(f);});
 function applySettings(){buildBands();buildChips();buildLegend();computeField();if(state.screen==="work"){drawLive();renderStats();}else buildHome();persist();}
-function buildFacManage(){const el=$("facManage");el.innerHTML="";state.facilities.forEach(f=>{const row=document.createElement("div");row.className="mrow";
-  const inp=document.createElement("input");inp.value=f.name;inp.addEventListener("input",()=>{f.name=inp.value||"Facility";persist();if(state.screen!=="work")buildHome();else buildSessSel();});
-  const del=document.createElement("button");del.className="del";del.textContent="✕";del.title="Delete facility";del.addEventListener("click",()=>{if(state.facilities.length<=1){flashNote("keep at least one facility");return;}if(confirm(`Delete "${f.name}" and all its sheets?`)){state.facilities=state.facilities.filter(x=>x.id!==f.id);if(state.activeFacility===f.id){state.activeFacility=state.facilities[0].id;state.activeSheet=facility().sheets[0].id;state.activeSession=facility().sheets[0].sessions[0].id;}buildBands();buildSettings();persist();if(state.screen==="work"){applyGeometry(Records.sizeOf(sheet()),session().mode);computeField();computeDelta();buildSessSel();refresh();}else buildHome();}});
-  row.appendChild(inp);row.appendChild(del);el.appendChild(row);});}
-function buildSheetManage(){const el=$("sheetManage");el.innerHTML="";facility().sheets.forEach(sh=>{const row=document.createElement("div");row.className="mrow";
-  const inp=document.createElement("input");inp.value=sh.name;inp.addEventListener("input",()=>{sh.name=inp.value||"Sheet";persist();if(state.screen!=="work")buildHome();else buildSessSel();});
-  const del=document.createElement("button");del.className="del";del.textContent="✕";del.title="Delete sheet";del.addEventListener("click",()=>{if(facility().sheets.length<=1){flashNote("keep at least one sheet");return;}if(confirm(`Delete "${sh.name}"?`)){facility().sheets=facility().sheets.filter(x=>x.id!==sh.id);if(state.activeSheet===sh.id){state.activeSheet=facility().sheets[0].id;state.activeSession=facility().sheets[0].sessions[0].id;}buildSettings();persist();if(state.screen==="work"){applyGeometry(Records.sizeOf(sheet()),session().mode);computeField();computeDelta();buildSessSel();refresh();}else buildHome();}});
-  row.appendChild(inp);row.appendChild(del);el.appendChild(row);});}
-$("addFacBtn").addEventListener("click",()=>{addFacility();buildSettings();});
-$("addSheetBtn").addEventListener("click",()=>openAddSheet(()=>buildSettings()));
 
 /* ---------- new-round dialog ---------- */
 let roundAfter=null;
@@ -1061,10 +1038,9 @@ boot().then(()=>{
   });
   /* What changes a record. Selectors, so controls built on the fly are covered too. Theme, units,
      view switches, exports and the map itself are device preferences or reading, and stay open. */
-  SYNC.lockControls(["#logNew","#newRound","#roundCreate","#sheetCreate","#addFacBtn","#addSheetBtn",".fac.add",
+  SYNC.lockControls(["#logNew","#newRound","#roundCreate",
     "#resetBands","#undoBtn","#clearBtn","#impBtn","#backupImport","#noteInput",".chip[data-opt]",".chip.clear",
-    "#targetIn","#floodIn","#shaveIn","#tieChk","#edges input","#facManage input","#facManage .del",
-    "#sheetManage input","#sheetManage .del","#roundManage input","#roundManage .del",".rdel"]);
+    "#overdueIn","#targetIn","#floodIn","#shaveIn","#tieChk","#edges input",".stp button","#roundManage input","#roundManage .del",".rdel"]);
   SYNC.start({title:"Arena Management System"}).then(()=>{
     if(typeof Shell==="undefined")return;
     return Shell.mountBar($("shellbar"),{app:"ice"}).then(()=>Shell.setAddress(facility().id,sheet().id,page));

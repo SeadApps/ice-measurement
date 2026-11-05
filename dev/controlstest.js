@@ -100,14 +100,19 @@ ok('and exporting', !(await asking(D.p)));
 
 /* preferences */
 await D.p.click('#gear'); await sleep(500);
-await D.p.click('#targetIn'); await D.p.keyboard.type('9'); await sleep(300);
-ok('a preference that changes the facility cannot be typed into', (await D.p.inputValue('#targetIn'))!=='9' && await asking(D.p));
-await cancel(D.p);
-await D.p.click('#addSheetBtn'); await sleep(300);
-ok('nor a sheet added', await asking(D.p)); await cancel(D.p);
+ok('Staff see the preferences read only: the target and the overdue days cannot be touched', await D.p.isDisabled('#targetIn') && await D.p.isDisabled('#overdueIn') && await D.p.isVisible('#prefRo'));
 await D.p.click('#backupImport'); await sleep(300);
 ok('nor a backup restored', await asking(D.p)); await cancel(D.p);
 await D.p.click('#settingsDone'); await sleep(300);
+/* Management are locked the same way until they unlock: tapping asks, it does not change */
+{ const P=await device(b,'P1'); await P.p.goto(B+'/ice.html'); await sleep(1200); await signInAs(P.p,'pete','pete-code-1');
+  await P.p.click('#gear'); await sleep(500);
+  await P.p.click('#targetIn'); await P.p.keyboard.type('9'); await sleep(300);
+  ok('Management: a preference that changes the facility cannot be typed into until unlocked', (await P.p.inputValue('#targetIn'))!=='9' && await asking(P.p));
+  await cancel(P.p);
+  await P.p.click('#overdueIn'); await P.p.keyboard.type('9'); await sleep(300);
+  ok('nor the overdue days', (await P.p.inputValue('#overdueIn'))!=='9' && await asking(P.p)); await cancel(P.p);
+  await P.ctx.close(); }
 
 /* unlocking through the dialog ("+ New round" lives on the Measurement builder) */
 await D.p.click('#iceTabs [data-page=build]'); await sleep(300);

@@ -47,7 +47,7 @@ ok('the logo goes to the shell\'s Facilities page', await p.getAttribute('#shell
 /* ---- what the bar replaced is gone ------------------------------------------------------------------ */
 ok('Ice\'s own app switcher is gone, from the home bar and the workspace bar', !(await p.$('#home .appsw')) && !(await p.$('#app .appsw')));
 ok('and its theme and unit buttons, and the sign-out it used to add', !(await p.$('#thLight')) && !(await p.$('#thDark')) && !(await p.$('#unitHomeBtn')) && !(await p.$('#unitBtn')) && !(await p.$('#themeBtn')) && !(await p.$('#home .sync-signout')));
-ok('Preferences, which is Ice\'s own, keeps its display buttons until D3', !!(await p.$('#thLight2')) && !!(await p.$('#unitPrefIn')));
+ok('Preferences no longer carries display buttons: theme and units are in the bar', !(await p.$('#thLight2')) && !(await p.$('#unitPrefIn')) && !(await p.$('#unitPrefMM')));
 ok('and the gear that opens it is still there', !!(await p.$('#gearHome')) && !!(await p.$('#gear')));
 ok('the way back to the sheets is the shell is now, and Ice has a tab row in its place', await p.evaluate(() => !document.getElementById('homeBtn') && document.querySelectorAll('#iceTabs button').length === 3));
 
@@ -108,11 +108,10 @@ ok('Millimetres in the bar: Ice is in millimetres, and saves it', await p.evalua
 await p.click('#shellbar #acctMenu');
 ok('the menu marks the unit and the theme as they are', await p.$eval('#shellbar .dropdown .it:has-text("Millimetres")', e => e.getAttribute('aria-current') === 'true') && await p.$eval('#shellbar .dropdown .it:has-text("Light")', e => e.getAttribute('aria-current') === 'true'));
 await p.keyboard.press('Escape');
-await p.evaluate(() => document.getElementById('gearHome').click()); await sleep(400);
-await p.click('#thDark2'); await sleep(500);
+await p.click('#shellbar #acctMenu'); await p.click('#shellbar .dropdown .it:has-text("Dark")'); await sleep(500);
 ok('Ice\'s own Preferences buttons still work, and the bar\'s menu follows', await p.evaluate(() => document.documentElement.getAttribute('data-theme')) === 'dark' && (await prefs(p)).theme === 'dark');
-await p.click('#unitPrefIn'); await sleep(500);
-ok('including the unit', await p.evaluate(() => isMM()) === false && (await prefs(p)).unit === 'in');
+await p.click('#shellbar #acctMenu'); await p.click('#shellbar .dropdown .it:has-text("Inches")'); await sleep(500);
+ok('and Inches the unit', await p.evaluate(() => isMM()) === false && (await prefs(p)).unit === 'in');
 await p.goto(B + '/glass.html#/f/f1/s/s1'); await p.waitForSelector('#shellbar .nav'); await sleep(3000);
 await p.click('#shellbar #acctMenu'); await p.click('#shellbar .dropdown .it:has-text("Light")'); await sleep(600);
 ok('Glass takes the theme from the bar as well, in the shared key', await p.evaluate(() => document.documentElement.getAttribute('data-theme')) === 'light' && await p.evaluate(() => localStorage.getItem('rink_theme')) === 'light');
