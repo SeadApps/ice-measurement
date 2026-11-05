@@ -143,7 +143,7 @@
   .mini{appearance:none;background:var(--panel);border:1px solid var(--line);color:var(--ink);font:inherit;font-size:12px;font-weight:600;padding:7px 11px;border-radius:8px;cursor:pointer}
   .mini:hover{border-color:#3a5b72}
   .sub-spacer{margin-left:auto}
-  #cmpWrap{display:none}#cmpWrap.on{display:inline-flex}
+  #cmpWrap{display:inline-flex}
 
   main{display:flex;flex-direction:column;gap:12px;padding:12px 0}
   .work-top{display:grid;gap:12px;grid-template-columns:1fr}
@@ -341,10 +341,6 @@
   <header class="bar">
     <div class="brand-mini"><b id="wsName">Sheet</b><span class="sub" id="wsFac"></span></div>
     <div class="count-pill" id="countPill"><b id="countNum">0</b> / <span id="countTot">33</span> logged</div>
-    <div class="seg" role="group" aria-label="View">
-      <button id="viewMap" aria-pressed="true">Map</button>
-      <button id="viewTrend" aria-pressed="false">Trend</button>
-    </div>
     <button class="iconbtn" id="gear" title="Preferences" aria-label="Preferences">⚙</button>
   </header>
 
@@ -670,9 +666,9 @@ function buildLegend(){const el=$("legend");if(viewMode==="trend"){el.className=
   el.className="legend";el.innerHTML="";for(const b of BANDS){const d=document.createElement("div");d.className="key";d.innerHTML=`<span class="sw" style="background:${b.color}"></span><div><div class="lab">${b.label}</div><div class="rng">${b.rng}</div></div>`;el.appendChild(d);}}
 function buildSessSel(){const sh=sheet(),es=$("sessSel");es.innerHTML="";[...sh.sessions].sort((a,b)=>new Date(b.date)-new Date(a.date)).forEach(s=>{const o=document.createElement("option");o.value=s.id;o.textContent=fmtDate(s.date)+(s.label?` · ${s.label}`:"")+` (${Object.keys(s.data).length})`;if(s.id===state.activeSession)o.selected=true;es.appendChild(o);});
   const cs=$("cmpSel");cs.innerHTML="";const others=sh.sessions.filter(s=>s.id!==state.activeSession).sort((a,b)=>new Date(b.date)-new Date(a.date));
-  const a=document.createElement("option");a.value="";a.textContent="previous round";cs.appendChild(a);
-  others.forEach(s=>{const o=document.createElement("option");o.value=s.id;o.textContent=fmtDate(s.date)+(s.label?` · ${s.label}`:"");if(s.id===compareId)o.selected=true;cs.appendChild(o);});
-  $("cmpWrap").classList.toggle("on",viewMode==="trend");
+  const off=document.createElement("option");off.value="off";off.textContent="Nothing";if(viewMode==="map")off.selected=true;cs.appendChild(off);
+  const a=document.createElement("option");a.value="";a.textContent="Previous round";if(viewMode==="trend"&&!compareId)a.selected=true;cs.appendChild(a);
+  others.forEach(s=>{const o=document.createElement("option");o.value=s.id;o.textContent=fmtDate(s.date)+(s.label?` · ${s.label}`:"");if(viewMode==="trend"&&s.id===compareId)o.selected=true;cs.appendChild(o);});
   $("wsName").textContent=sheet().name;$("wsFac").textContent=facility().name;$("modeSel").value=session().mode||"moderate";}
 const fmtDate=iso=>{const d=new Date(iso);return d.toLocaleDateString(undefined,{month:"short",day:"numeric"})+" "+d.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"});};
 const fmtDay=iso=>new Date(iso).toLocaleDateString(undefined,{month:"short",day:"numeric"});
@@ -718,10 +714,10 @@ $("noteInput").addEventListener("input",e=>setNote(e.target.value));
 
 /* ---------- views ---------- */
 function setView(v){if(v!=="map"&&v!=="trend")v="map";   // a saved 3D view, which no longer exists, opens on the map
-  viewMode=v;if(state){state.lastView=v;persist();}$("mapModeRow").style.display=v==="map"?"flex":"none";syncMapMode();$("viewMap").setAttribute("aria-pressed",String(v==="map"));$("viewTrend").setAttribute("aria-pressed",String(v==="trend"));
+  viewMode=v;if(state){state.lastView=v;persist();}$("mapModeRow").style.display=v==="map"?"flex":"none";syncMapMode();
   $("contourBar").style.display=v==="map"?"flex":"none";$("smoothBar").style.display=v==="map"?"flex":"none";buildLegend();buildSessSel();
   drawLive();renderStats();updateContourReadout();updateSmoothReadout();}
-$("viewMap").addEventListener("click",()=>setView("map"));$("viewTrend").addEventListener("click",()=>{computeDelta();setView("trend");});
+
 function syncMapMode(){const lo=mapMode()==="lowest";$("mmColor").setAttribute("aria-pressed",String(!lo));$("mmLowest").setAttribute("aria-pressed",String(lo));}
 function setMapMode(m){state.mapMode=m;persist();syncMapMode();buildLegend();drawLive();}
 $("mmColor").addEventListener("click",()=>setMapMode("color"));$("mmLowest").addEventListener("click",()=>setMapMode("lowest"));
@@ -739,7 +735,10 @@ function changeMode(mode){const s=session();if(mode===(s.mode||"moderate"))retur
   if(orphan.length){pushUndo();orphan.forEach(k=>{delete cur[k];delete s.notes[k];});}
   s.mode=mode;selIdx=0;guidedPos=0;applyGeometry(Records.sizeOf(sheet()),mode);computeField();computeDelta();buildSessSel();refresh();persist();flashNote(MODES[mode].label+" · "+MODES[mode].n+" spots");}
 $("modeSel").addEventListener("change",e=>changeMode(e.target.value));
-$("cmpSel").addEventListener("change",e=>{compareId=e.target.value||null;computeDelta();drawLive();renderStats();persist();});
+/* Compare to is a choice on the Rink view: Nothing is the colour map, anything else draws each spot
+   as the change since that round (the old Trend view, now an option rather than a separate mode). */
+$("cmpSel").addEventListener("change",e=>{const v=e.target.value;if(v==="off"){compareId=null;setView("map");return;}
+  compareId=v||null;computeDelta();setView("trend");});
 $("newRound").addEventListener("click",()=>openNewRound(s=>{compareId=null;clearUndo();selIdx=0;guidedPos=0;applyGeometry(Records.sizeOf(sheet()),s.mode);computeField();computeDelta();buildSessSel();refresh();persist();flashNote("round added "+fmtDay(s.date));}));
 
 /* ---------- CSV / files ---------- */

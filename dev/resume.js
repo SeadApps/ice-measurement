@@ -31,7 +31,7 @@ p.on('console',m=>{if(m.type()==='error'&&!/sw\.js|404/i.test(m.text()))errs.pus
 await p.goto('http://localhost:8200/ice.html'); await p.waitForTimeout(1400);
 ok('a first visit lands on the Rink view', await p.isVisible('#rink') && !(await p.isVisible('#home')));
 const sheetName = await p.$eval('#wsName',e=>e.textContent);
-await p.click('#viewTrend'); await p.waitForTimeout(500);   // and leave it on Compare
+await p.selectOption('#cmpSel',''); await p.waitForTimeout(500);   // and leave it on Compare
 
 await p.goto('http://localhost:8200/glass.html'); await p.waitForTimeout(900);
 ok('glass app loads', (await p.$$('.pnl')).length===127);
@@ -40,7 +40,7 @@ ok('glass app loads', (await p.$$('.pnl')).length===127);
 await p.click('#shellbar .appsw a:has-text("Ice")'); await p.waitForTimeout(1600);
 ok('returns straight to the sheet', await p.isVisible('#rink') && !(await p.isVisible('#home')));
 ok('same sheet as before ('+sheetName.trim()+')', (await p.$eval('#wsName',e=>e.textContent)).trim()===sheetName.trim());
-ok('and the same view (Trend)', await p.$eval('#viewTrend',e=>e.getAttribute('aria-pressed'))==='true');
+ok('and the same view (comparing to the previous round)', await p.$eval('#cmpSel',e=>e.value)==='' && await p.$eval('#legend',e=>/thinner/.test(e.textContent)));
 
 // the page you chose is the page you come back to
 await p.click('#iceTabs [data-page=trends]'); await p.waitForTimeout(700);

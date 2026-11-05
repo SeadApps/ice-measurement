@@ -25,6 +25,7 @@
  "reg": 15,
  "restoretest": 12,
  "resume": 8,
+ "rinktest": 19,
  "routetest": 40,
  "scheduletest": 31,
  "scopetest": 53,

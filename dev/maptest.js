@@ -32,7 +32,7 @@ ok('there is no 3D button, canvas or hint', !(await p.$('#view3d')) && !(await p
 ok('and no 3D code is left to call', await R(() => typeof drawSurf === 'undefined' && typeof sizeSurf === 'undefined' && typeof zScale === 'undefined'));
 await R(() => { state.lastView = '3d'; enterWork(state.lastView); });            // how a saved view really arrives
 await sleep(500);
-ok('a saved 3D view opens on the map', await R(() => viewMode) === 'map' && await p.getAttribute('#viewMap', 'aria-pressed') === 'true');
+ok('a saved 3D view opens on the map', await R(() => viewMode) === 'map' && await p.inputValue('#cmpSel') === 'off');
 
 /* ---- the pure colours, in the page --------------------------------------------------------------------- */
 const bands = await R(() => BAND_RGB.map(c => c.slice()));
@@ -124,10 +124,10 @@ ok('and it is saved as one, in the preferences, not in any record', JSON.parse(a
 await sleep(300);
 ok('the thickness keys keep the band colours in both modes: the builder\'s keys, the dots and the map agree while entering',
    await R(() => { const chips = [...document.querySelectorAll('#chips .chip[data-opt] .dot')]; return chips.length === 21 && chips.every((c, i) => c.style.backgroundColor.replace(/\s/g, '') === rgbCss(BAND_RGB[BANDS.indexOf(bandOf(decOf.get(KEYS[i])))])); }));
-await R(() => { document.getElementById('viewTrend').click(); });
+await R(() => { const c = document.getElementById('cmpSel'); c.value = ''; c.dispatchEvent(new Event('change')); });
 await sleep(400);
 ok('the Compare (Trend) view is untouched, and the toggle is not offered there', await R(() => document.getElementById('mapModeRow').style.display) === 'none' && /thinner/.test(await text(p, '#legend')));
-await R(() => { document.getElementById('viewMap').click(); });
+await R(() => { const c = document.getElementById('cmpSel'); c.value = 'off'; c.dispatchEvent(new Event('change')); });
 await sleep(300);
 ok('and is back on the map', await R(() => document.getElementById('mapModeRow').style.display) === 'flex');
 await p.click('#mmColor'); await sleep(300);
