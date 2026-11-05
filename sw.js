@@ -1,6 +1,6 @@
 // Bump CACHE_VERSION whenever you change any file listed below — there's no build
 // step, so this string is the only thing that retires the previous cache.
-const CACHE_VERSION = "arena-v24";  // v20: Ice is three pages (Rink view, Trends, Measurement builder) named by the address; ice.html, shell.js
+const CACHE_VERSION = "arena-v25";  // v25: ice.css (the Ice styling moved out of ice.html); Trends by third and spot; in-page confirmations; band colours per theme;  // v20: Ice is three pages (Rink view, Trends, Measurement builder) named by the address; ice.html, shell.js
 // v19: no 3D; Color map blend and Lowest point on the Rink view
 // v18: ice-core.js (the model, moved out of ice.html unchanged)
 // v17: the shared bar inside Ice and Glass (shellbar.css); shell.js, ice.html, glass.html
@@ -14,7 +14,7 @@ const CACHE_VERSION = "arena-v24";  // v20: Ice is three pages (Rink view, Trend
 // v9: D1 — two-step sign-in, editing lock, facility tags, sheet shape; sync.js, records.js, ice.html, glass.html
 const PRECACHE_URLS = [
   "./", "index.html", "ice.html", "glass.html", "sync.js", "records.js",
-  "shell.js", "shell.css", "shellbar.css", "home.js", "launcher.html", "ice-core.js",
+  "shell.js", "shell.css", "shellbar.css", "home.js", "launcher.html", "ice-core.js", "ice.css",
   "manifest.json", "icon-192.png", "icon-512.png"
 ];
 

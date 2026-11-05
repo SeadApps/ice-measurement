@@ -83,10 +83,16 @@ let state=null,compareId=null;
 const css=getComputedStyle(document.documentElement);
 const BAND_META=[{key:"thin",c:"#d6453f",label:"Too thin"},{key:"low",c:"#e8b54a",label:"Thin"},{key:"ideal",c:"#eef4f6",label:"Ideal"},{key:"high",c:"#6aa9d6",label:"Thick"},{key:"thick",c:"#2c6aa3",label:"Too thick"}];
 let BANDS=[],BAND_RGB=[];
+/* The colours above are the dark theme's and the fallback. The page's stylesheet gives each theme its own as
+   --b-thin ... --b-thick, and the canvas (which cannot read a variable by itself) asks for them whenever the
+   bands are built and whenever the theme changes. */
+const bandHex=m=>{const v=css.getPropertyValue("--b-"+m.key).trim();return /^#[0-9a-f]{6}$/i.test(v)?v:m.c;};
+const themeInk=(name,fb)=>css.getPropertyValue(name).trim()||fb;
+function recolorBands(){if(!BANDS.length)return;BANDS.forEach((b,i)=>{b.color=bandHex(BAND_META[i]);});BAND_RGB=BANDS.map(b=>rgbOf(b.color));}
 const rgbOf=h=>{h=h.replace("#","");return[parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];};
 function buildBands(){const e=EF().edges,lts=[e[0],e[1],e[2],e[3],Infinity];
   const rngs=["< "+fmtSet(e[0]),fmtSet(e[0])+"–"+fmtSet(e[1]),"≈ "+fmtSet(EF().target),fmtSet(e[2])+"–"+fmtSet(e[3]),fmtSet(e[3])+" +"];
-  BANDS=BAND_META.map((m,i)=>({...m,lt:lts[i],color:m.c,rng:rngs[i]}));BAND_RGB=BANDS.map(b=>rgbOf(b.color));}
+  BANDS=BAND_META.map((m,i)=>({...m,lt:lts[i],color:bandHex(m),rng:rngs[i]}));BAND_RGB=BANDS.map(b=>rgbOf(b.color));}
 const bandOf=v=>{for(const b of BANDS)if(v<b.lt)return b;return BANDS[BANDS.length-1];};
 
 /* Shapes come from the store, so a rink added on the launcher is
