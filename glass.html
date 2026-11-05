@@ -107,12 +107,6 @@ header{display:flex;flex-wrap:wrap;align-items:center;gap:14px;padding-bottom:16
 .lg-feat{background:var(--rink-red)}
 .lg-asm{background:var(--warn)}
 .lg-open{background:repeating-linear-gradient(45deg,var(--surface-2) 0 2px,var(--ink-3) 2px 3px);border:1px solid var(--line-2)}
-.whoami{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--ink-2);margin:-8px 0 -4px}
-.whoami label{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
-.whoami input{font:inherit;font-size:13px;padding:4px 9px;border:1px solid var(--line);border-radius:10px;
-  background:var(--surface);color:var(--ink);width:190px}
-.whoami input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
-.whoami span{font-family:var(--mono);font-size:11px;color:var(--ink-3)}
 .plan{padding:8px 6px 4px;overflow-x:auto}
 .tick{stroke-width:.45;stroke-linecap:round;pointer-events:none}
 .tick.door{stroke:var(--accent)} .tick.feature{stroke:var(--rink-red)}
@@ -293,7 +287,13 @@ footer{font-size:12.5px;color:var(--ink-3);text-align:center;font-family:var(--m
    the tiles to four, and between them they pushed the plan off the screen.
    Nothing is dropped that is not said elsewhere on the page. 560px is the
    breakpoint ice.html already uses, so the two pages turn together. */
+.sheet-x{display:none}
 @media (max-width:560px){
+  /* the picked panel opens as a sheet at the bottom of the screen */
+  #detail.has-sel{position:fixed;left:0;right:0;bottom:0;z-index:30;max-height:64vh;overflow:auto;border-radius:16px 16px 0 0;
+    box-shadow:0 -10px 40px -12px #000a;padding-bottom:max(16px,env(safe-area-inset-bottom))}
+  #detail:not(.has-sel){display:none}
+  #detail .sheet-x{display:block;position:absolute;top:8px;right:8px;width:44px;height:44px;border:0;border-radius:10px;background:var(--surface-2);color:var(--ink);font-size:16px}
   .wrap{padding:14px 14px 40px;gap:14px}
   header{gap:9px;padding-bottom:12px}
   .brand{width:100%;margin-right:0}
@@ -309,7 +309,7 @@ footer{font-size:12.5px;color:var(--ink-3);text-align:center;font-family:var(--m
   @page{size:landscape;margin:12mm}
   body{background:#fff}
   .wrap{max-width:none;padding:0;gap:14px}
-  .rail,.whoami,.tools,.aside,.theme,.scopebar,.card-hd .lgd span:last-child{display:none!important}
+  .rail,.tools,.aside,.theme,.scopebar,.card-hd .lgd span:last-child{display:none!important}
   /* The printed sheet is the reference document: every piece, whatever the
      screen is scoped to - the status scope and the search box both. That is
      what max-height:none below has always been for, and it is why rows out of
@@ -440,10 +440,6 @@ document.documentElement.setAttribute("data-theme",_t==="light"?"light":"dark");
 </div>
 
 <div class="rail" id="rail"></div>
-<div class="whoami" id="whoami" style="display:none">
-  <label>Marked by</label>
-  <b id="whoname"></b>
-</div>
 
 <section class="card">
   <div class="card-hd">
@@ -648,6 +644,21 @@ function buildPlan(target){
     + `aria-label="Plan view of the rink glass at ${esc(facilityName(activeBucket))}">${parts.join('')}</svg>`;
   document.querySelectorAll('#' + (target || 'plan') + ' .pnl').forEach(el =>
     el.addEventListener('click', () => select(el.dataset.id)));
+  /* A panel is about 8px wide on a phone, so a tap that misses it picks the nearest one within 44px. The schedule
+     under the plan is still the exact way in. */
+  const host = document.getElementById(target || 'plan');
+  if(!target && !host.__nearest){
+    host.__nearest = true;
+    host.addEventListener('click', e => {
+      if(e.target.closest('.pnl')) return;
+      let best = null, bd = 44;
+      host.querySelectorAll('.pnl').forEach(el => {
+        const r = el.getBoundingClientRect(), d = Math.hypot(e.clientX - (r.x + r.width / 2), e.clientY - (r.y + r.height / 2));
+        if(d < bd){ bd = d; best = el.dataset.id; }
+      });
+      if(best) select(best);
+    });
+  }
 }
 
 /* ---------------- render ---------------- */
@@ -900,9 +911,11 @@ function table(){
 }
 function detail(){
   const el = document.getElementById('detail');
+  el.classList.toggle('has-sel', !!sel);
   if(!sel){ el.innerHTML = `<p class="empty">Select a panel on the plan or in the schedule to record its condition.</p>`; return; }
   const p = GLASS.find(x=>x.id===sel), s = st(sel);
   el.innerHTML = `
+    <button class="sheet-x" type="button" aria-label="Close">✕</button>
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
       <div><span class="pid">${p.id.replace(/^0+/,'')}</span>
       <div style="font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin-top:2px">Panel</div></div>
@@ -930,6 +943,7 @@ function detail(){
     </div>`;
   /* The panel this card is about, fixed now rather than read back later. */
   const pid = sel;
+  el.querySelector('.sheet-x').addEventListener('click', () => select(pid));
   el.querySelectorAll('.sbtn').forEach(b=>b.addEventListener('click',()=>{
     flushEdits();                       // the note you just typed belongs to this panel too
     set(pid,{status:b.dataset.s});
@@ -1022,6 +1036,7 @@ function select(id){
    Only on select, too. Deselecting must not drag the page anywhere. */
 function reveal(){
   if(!sel) return;
+  if(matchMedia('(max-width:560px)').matches) return;   // a phone opens it as a sheet over the page
   const grid = document.querySelector('.grid'), el = document.getElementById('detail');
   if(!grid || !el) return;
   const stacked = getComputedStyle(grid).gridTemplateColumns.split(' ').length === 1;
@@ -1048,7 +1063,7 @@ document.getElementById('csv').addEventListener('click', ()=>{
      block underneath is the per-size arithmetic somebody can put on an order
      without doing it again by hand. */
   const cov = coverage();
-  const rows = [['Panel','Section','Width (in)','Height (in)','Thickness','Status','Source','Note','Marked by','Date']];
+  const rows = [['Panel','Section','Width (in)','Height (in)','Thickness','Status','Source','Note','Changed by','Date']];
   cov.rows.forEach(({p, covered, patch})=>{
     const s = state[p.id] || {};
     rows.push([p.id.replace(/^0+/,''), p.section, p.width_in, glassHeightOf(p), p.thickness,
@@ -1709,7 +1724,6 @@ async function bldSave(){
   });
   /* What changes a record. Selectors, so the panel card and the stock rows, which are rebuilt on
      every selection, are covered too. Search, filters, printing and the plan itself stay open. */
-  SYNC.onStatus(paintWho);
   SYNC.lockControls(['#addRink','[aria-label^="Remove this rink"]','.sbtn','#plabel','#ptag','#note','#noteClear',
     '#noteSave','#load','#spSize','#spW','#spH','#spT','#spQty','#spNote','#spAdd','.sp-undo']);
   SYNC.start({title:'Arena Management System'}).then(() => {

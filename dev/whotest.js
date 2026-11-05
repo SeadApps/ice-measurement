@@ -42,7 +42,7 @@ const b=await chromium.launch();
 let L=await device(b,'L'); await L.p.goto(B+'/glass.html'); await sleep(1200);
 await signIn(L.p,null);
 ok('there is no box to type a name into', (await L.p.$('#who'))===null);
-ok('and nothing is claimed while nobody is signed in', !(await L.p.isVisible('.whoami')));
+ok('and no "Marked by" control exists at all', await L.p.evaluate(()=>!document.getElementById('whoami') && !/Marked by/i.test(document.body.innerText)));
 await mark(L.p,'045','replace'); await L.p.evaluate(()=>window.Sync.sync('t')); await sleep(2000);
 const gp0=(await rows()).filter(r=>r.kind==='glass_panel');
 ok('a mark is written with no name on it', gp0.length>0 && gp0.every(r=>!('by' in r.body) && !('changedBy' in r.body)), JSON.stringify(gp0.map(r=>r.body)));
@@ -53,8 +53,8 @@ await addStaff({id:'dana',name:'Dana',role:'staff',code:'dana-code-1',facilities
 await addStaff({id:'pete',name:'Pete',role:'management',code:'pete-code-1'});
 const D=await device(b,'D'); await D.p.goto(B+'/glass.html'); await sleep(1200);
 await signIn(D.p,'dana','dana-code-1');
-ok('the page names who is signed in', (await D.p.textContent('#whoname'))==='Dana', await D.p.textContent('#whoname'));
-ok('read-only: there is still nothing to type into', (await D.p.$('#who'))===null && await D.p.isVisible('.whoami'));
+ok('the bar names who is signed in', (await D.p.textContent('#shellbar #whoName'))==='Dana', await D.p.textContent('#shellbar #whoName'));
+ok('and there is still nothing to type into', (await D.p.$('#who'))===null && (await D.p.$('#whoname'))===null);
 ok('Sync no longer keeps a typed name', await D.p.evaluate(()=>typeof window.Sync.who==='undefined'));
 
 await D.p.evaluate(c=>window.Sync.unlockEditing(c),EDIT); await sleep(1200);
@@ -65,15 +65,15 @@ let row=(await rows()).find(r=>r.kind==='glass_panel');
 ok('nothing sent says who: the server does', row && !('by' in row.body) && !('changedBy' in row.body), JSON.stringify(row&&row.body));
 ok('and it says Dana', row.changed_by_name==='Dana');
 let csv=await csvOf(D.p);
-ok('the order list shows her under "Marked by"', cell(csv,'45','Marked by')==='Dana', String(cell(csv,'45','Marked by')));
+ok('the order list shows her under "Changed by"', cell(csv,'45','Changed by')==='Dana', String(cell(csv,'45','Changed by')));
 
 /* ---- another person, another device ------------------------------------------ */
 const P=await device(b,'P'); await P.p.goto(B+'/glass.html'); await sleep(1200);
 await signIn(P.p,'pete','pete-code-1');
-ok('Pete\'s page names Pete', (await P.p.textContent('#whoname'))==='Pete');
+ok('Pete\'s bar names Pete', (await P.p.textContent('#shellbar #whoName'))==='Pete');
 ok('he sees who marked the panel Dana did', (await stateOf(P.p,'045')).changedBy==='Dana', JSON.stringify(await stateOf(P.p,'045')));
 csv=await csvOf(P.p);
-ok('and the order list says so', cell(csv,'45','Marked by')==='Dana');
+ok('and the order list says so', cell(csv,'45','Changed by')==='Dana');
 
 await P.p.evaluate(c=>window.Sync.unlockEditing(c),EDIT); await sleep(1200);
 await mark(P.p,'045','plexi');
@@ -90,7 +90,7 @@ await fetch(B+'/rest/v1/records?on_conflict=kind,id',{method:'POST',headers:{Aut
   body:JSON.stringify([{kind:'glass_panel',id:'100',deleted:false,body:{status:'replace',note:'cracked',by:'Old Name',at:'2026-09-01'}}])});
 await D.p.evaluate(()=>window.Sync.sync('t')); await sleep(2500);
 csv=await csvOf(D.p);
-ok('an old mark still shows the name that was typed on it', cell(csv,'100','Marked by')==='Old Name', String(cell(csv,'100','Marked by')));
+ok('an old mark still shows the name that was typed on it', cell(csv,'100','Changed by')==='Old Name', String(cell(csv,'100','Changed by')));
 ok('and was not claimed by whoever pulled it', !(await stateOf(D.p,'100')).changedBy, JSON.stringify(await stateOf(D.p,'100')));
 
 /* The saved record file names the signed-in person too. */

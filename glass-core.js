@@ -131,11 +131,6 @@ function stamp(){ return new Date().toISOString().slice(0,10); }
 /* Nobody types their name any more. The server stamps whoever is signed in on every change, and
    this is only that name, for showing. Marks from before keep the name that was typed on them. */
 const whoName = () => { const p = window.Sync && window.Sync.person && window.Sync.person(); return p ? p.name : ''; };
-function paintWho(){
-  const n = whoName(), box = document.getElementById('whoami');
-  document.getElementById('whoname').textContent = n;
-  if(box) box.style.display = n ? '' : 'none';
-}
 let records = {};             // bucket -> panelId -> {status,note,by,at,updatedAt}
 let facilities = {};          // facilityId -> {id,name,ord} - the Ice app owns these
 let sheets = {};              // sheetId -> {id,facilityId,name,ord} - the Ice app owns these too
@@ -621,7 +616,6 @@ async function restore(){
   const legacy = bucketOf(LEGACY);
   for(const id in legacy){ if(legacy[id] && !legacy[id].updatedAt) legacy[id].updatedAt = legacy[id].at || '1970-01-01'; }
   setBucket(activeBucket);
-  paintWho();
 }
 const nowISO = () => new Date().toISOString();
 const stampOf = r => (r && (r.updatedAt || r.at)) || '';   // full timestamp, else the older date-only field
