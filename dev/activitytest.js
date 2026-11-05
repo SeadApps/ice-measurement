@@ -25,7 +25,7 @@ const unlock=async t=>{ await rpc(t,'unlock_editing',{code:EDIT}); };
 const rec=(kind,id,fac,extra,deleted)=>({kind,id,deleted:!!deleted,body:Object.assign(fac?{fac}:{},extra||{})});
 
 async function device(browser,name){
-  const ctx=await browser.newContext({viewport:{width:1280,height:900},serviceWorkers:'block'});
+  const ctx=await browser.newContext({viewport:{width:1000,height:900},serviceWorkers:'block'});
   await ctx.addInitScript(c=>{window.__SYNC_CONFIG__=c;}, {url:B, anon:'test'});
   const p=await ctx.newPage();
   p.on('pageerror',e=>console.log('  !! '+name+' pageerror: '+String(e).split('\n')[0]));

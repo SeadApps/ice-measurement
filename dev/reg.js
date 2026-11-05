@@ -21,7 +21,7 @@ async function seedSignedIn(ctx){
    that printed FAIL and still exited 0 is one nobody notices. */
 let pass=0, fail=0;
 const ok=(n,c)=>{c?pass++:fail++;console.log((c?'  PASS  ':'  FAIL  ')+n);};
-(async()=>{const b=await chromium.launch();const ctx = await b.newContext({viewport:{width:1280,height:900}}); await seedSignedIn(ctx);
+(async()=>{const b=await chromium.launch();const ctx = await b.newContext({viewport:{width:1000,height:900}}); await seedSignedIn(ctx);
 const p=await ctx.newPage();const errs=[];
 p.on('pageerror',e=>errs.push(String(e).split('\n')[0]));
 p.on('console',m=>{if(m.type()==='error'&&!/sw\.js|service worker|404/i.test(m.text()))errs.push('console: '+m.text())});
@@ -77,7 +77,7 @@ await p.click('#iceTabs [data-page=trends]'); await p.waitForTimeout(500);
 ok('the Trends tab leaves the workspace',
    await p.evaluate(()=>state.screen==='home'));
 ok('without leaving the app', /ice\.html/.test(p.url()), p.url());
-await p.setViewportSize({width:1280, height:900});
+await p.setViewportSize({width:1000, height:900});
 
 console.log('\nerrors:', errs.length?errs.slice(0,5):'none');
 console.log('\n  '+pass+' passed, '+fail+' failed');

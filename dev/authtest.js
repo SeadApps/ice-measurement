@@ -21,7 +21,7 @@ const bypass=p=>p.evaluate(()=>document.body.classList.remove('sync-locked'));
 
 
 async function device(browser,name){
-  const ctx=await browser.newContext({viewport:{width:1280,height:900}});
+  const ctx=await browser.newContext({viewport:{width:1000,height:900}});
   await ctx.addInitScript(c=>{window.__SYNC_CONFIG__=c;}, {url:B, anon:'test'});
   const p=await ctx.newPage();
   p.on('pageerror',e=>console.log('  !! '+name+' pageerror: '+String(e).split('\n')[0]));

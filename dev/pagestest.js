@@ -14,7 +14,7 @@ const { ok, sleep, B } = k;
 await fetch(B + '/__reset');
 await k.seed();
 const b = await k.chromium.launch();
-const D = await k.device(b, 1280);
+const D = await k.device(b, 1000);
 const p = D.p;
 const errs = []; p.on('console', m => { if (m.type() === 'error' && !/sw\.js|404/i.test(m.text())) errs.push(m.text()); });
 const R = (fn, a) => p.evaluate(fn, a);

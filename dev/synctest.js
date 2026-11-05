@@ -11,7 +11,7 @@ async function device(browser, name){
      cache-first rule answers a repeated identical pull from its cache. Supabase is
      cross-origin in production, which the worker leaves alone. A device that has sent
      nothing pulls with the same cursor every time, which is how this showed up. */
-  const ctx=await browser.newContext({viewport:{width:1280,height:900},serviceWorkers:'block'});
+  const ctx=await browser.newContext({viewport:{width:1000,height:900},serviceWorkers:'block'});
   await ctx.addInitScript(c=>{window.__SYNC_CONFIG__=c;}, CFG);
   const p=await ctx.newPage();
   p.on('pageerror',e=>console.log('  !! '+name+' pageerror: '+String(e).split('\n')[0]));

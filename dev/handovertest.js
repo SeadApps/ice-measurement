@@ -26,7 +26,7 @@ const sessions=async()=>(await rows()).filter(r=>r.kind==='session');
 const by=async()=>(await sessions()).map(r=>r.changed_by);
 
 async function device(browser,name,cfg){
-  const ctx=await browser.newContext({viewport:{width:1280,height:900},serviceWorkers:'block'});
+  const ctx=await browser.newContext({viewport:{width:1000,height:900},serviceWorkers:'block'});
   await ctx.addInitScript(c=>{window.__SYNC_CONFIG__=c;}, Object.assign({url:B, anon:'test'},cfg||{}));
   const p=await ctx.newPage();
   p.on('pageerror',e=>console.log('  !! '+name+' pageerror: '+String(e).split('\n')[0]));

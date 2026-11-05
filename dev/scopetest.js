@@ -33,7 +33,7 @@ async function device(browser,name){
   /* No service worker: here the fake server shares the page's origin, so the worker's
      cache-first rule would answer a repeated pull from its cache. Supabase is cross-origin
      in production, which the worker leaves alone. */
-  const ctx=await browser.newContext({viewport:{width:1280,height:900},serviceWorkers:'block'});
+  const ctx=await browser.newContext({viewport:{width:1000,height:900},serviceWorkers:'block'});
   await ctx.addInitScript(c=>{window.__SYNC_CONFIG__=c;}, {url:B, anon:'test'});
   const p=await ctx.newPage();
   p.on('pageerror',e=>console.log('  !! '+name+' pageerror: '+String(e).split('\n')[0]));

@@ -26,7 +26,7 @@ const open = async (w, url) => {
 };
 const EXPECT = ['1/2"', '5/8"', '3/4"', '7/8"', '1"', '1 1/8"', '1 1/4"', '1 3/8"', '1 1/2"', '1 5/8"', '1 3/4"', '1 7/8"', '2"', '2 1/8"', '2 1/4"', '2 3/8"', '2 1/2"', '2 5/8"', '2 3/4"', '2 7/8"', '3"'];
 
-let D = await open(1280, '/ice.html#/f/f1/s/s1/build'), p = D.p;
+let D = await open(1000, '/ice.html#/f/f1/s/s1/build'), p = D.p;
 const R = fn => p.evaluate(fn);
 const keys = () => R(() => [...document.querySelectorAll('#chips .chip[data-opt]')].map(c => c.dataset.opt));
 const cols = () => R(() => getComputedStyle(document.getElementById('chips')).gridTemplateColumns.split(' ').length);

@@ -20,7 +20,7 @@ const rgbEq = (a, b, e) => a.every((v, i) => near(v, b[i], e == null ? 1e-6 : e)
 await fetch(B + '/__reset');
 await k.seed();
 const b = await k.chromium.launch();
-const D = await k.device(b, 1280);
+const D = await k.device(b, 1000);
 const p = D.p;
 await p.goto(B + '/ice.html#/f/f1/s/s1');
 await p.waitForSelector('.sync-gate #sg-code'); await p.fill('.sync-gate #sg-code', k.ACCESS); await p.click('.sync-gate button');

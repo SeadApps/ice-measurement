@@ -29,7 +29,7 @@ const post=(tok,list)=>fetch(B+'/rest/v1/records?on_conflict=kind,id',{method:'P
 const find=async(kind,id)=>(await rows()).find(r=>r.kind===kind&&r.id===id);
 
 async function device(browser,name){
-  const ctx=await browser.newContext({viewport:{width:1280,height:900}});
+  const ctx=await browser.newContext({viewport:{width:1000,height:900}});
   await ctx.addInitScript(c=>{window.__SYNC_CONFIG__=c;}, {url:B, anon:'test'});
   const p=await ctx.newPage();
   p.on('pageerror',e=>console.log('  !! '+name+' pageerror: '+String(e).split('\n')[0]));

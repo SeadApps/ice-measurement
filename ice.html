@@ -160,6 +160,12 @@
   #app[data-page="build"] #cmpWrap, #app[data-page="build"] #expCsv, #app[data-page="build"] #expPng, #app[data-page="build"] #expPdf,
   #app[data-page="build"] .bar .seg{display:none!important}
 
+  .laptopmsg{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;max-width:1500px;margin:14px auto 0;padding:14px 18px;background:var(--panel-2);border:1px solid var(--line);border-left:3px solid var(--frost);border-radius:9px}
+  .laptopmsg[hidden]{display:none}
+  .laptopmsg b{flex:1 1 100%;font-size:15px}
+  .laptopmsg span{flex:1 1 320px;color:var(--ink-dim)}
+  #app[data-page="build"] main, #app[data-page="build"] .subbar, #app[data-page="build"] footer.actions{transition:opacity .15s}
+  main[inert], .subbar[inert], footer.actions[inert]{opacity:.35;pointer-events:none;user-select:none}
   @media(min-width:880px){.work-top{grid-template-columns:minmax(0,1fr) 256px;align-items:start}}
   .stage{display:flex;flex-direction:column;gap:12px;min-width:0}
   .readout .ro-grid{display:flex;flex-wrap:wrap;gap:12px}
@@ -351,6 +357,12 @@
     <button class="mini" id="newRound">+ New round</button>
     <span class="sub-spacer"></span>
     <span class="field" id="cmpWrap">Compare to <select id="cmpSel"></select></span>
+  </div>
+
+  <div class="laptopmsg" id="laptopMsg" role="status" hidden>
+    <b>The Measurement builder is for a phone or tablet</b>
+    <span>Readings are taken at the rink, so entry is switched off on a laptop. Rink view and Trends work here as they do anywhere.</span>
+    <button class="mini" id="laptopToRink">Go to Rink view</button>
   </div>
 
   <main>
@@ -827,7 +839,7 @@ $("backupWarnBtn").addEventListener("click",doBackupExport);
 /* ---------- screens ---------- */
 const appEl=$("app");
 function enterWork(view){state.screen="work";if(page==="trends")page="rink";appEl.dataset.page=page;markTabs();compareId=null;clearUndo();hideSel=false;applyGeometry(Records.sizeOf(sheet()),session().mode);buildBands();buildChips();computeField();computeDelta();
-  $("home").style.display="none";appEl.classList.add("live");buildSessSel();sizeLive();setView(view||"map");refresh();persist();}
+  $("home").style.display="none";appEl.classList.add("live");buildSessSel();sizeLive();setView(view||"map");refresh();persist();applyLaptop();}
 function goHome(){state.screen="home";page="trends";appEl.dataset.page=page;markTabs();appEl.classList.remove("live");$("home").style.display="block";buildHome();persist();}
 /* ---------- the three pages ----------
    The address names the page (#/f/FID/s/SID/rink|trends|build). Trends is the old home screen
@@ -835,9 +847,15 @@ function goHome(){state.screen="home";page="trends";appEl.dataset.page=page;mark
    with the other page's controls put away (see the [data-page] rules in the stylesheet). */
 const PAGES=["rink","trends","build"];let page="rink";
 function markTabs(){document.querySelectorAll("#iceTabs [data-page]").forEach(b=>b.setAttribute("aria-current",b.dataset.page===page?"page":"false"));}
+/* Entry is for a phone or tablet. When the shell says the layout is a laptop, the builder shows why and
+   nothing on it can be used (inert: no clicks, no keys, no focus), so import and clear are out too. */
+function applyLaptop(){const on=typeof Shell!=="undefined"&&Shell.layout()==="laptop"&&page==="build";
+  document.querySelectorAll("#app main,#app .subbar,#app footer.actions").forEach(e=>{e.inert=on;});$("laptopMsg").hidden=!on;}
 function showPage(p){if(!PAGES.includes(p))p="rink";page=p;state.lastPage=p;
   if(p==="trends")goHome();else{$("home").style.display="none";enterWork(p==="build"?"map":state.lastView);}
-  if(typeof Shell!=="undefined")Shell.setAddress(facility().id,sheet().id,p);}
+  applyLaptop();if(typeof Shell!=="undefined")Shell.setAddress(facility().id,sheet().id,p);}
+if(typeof Shell!=="undefined")Shell.onLayout(applyLaptop);
+$("laptopToRink").addEventListener("click",()=>showPage("rink"));
 document.querySelectorAll("#iceTabs [data-page]").forEach(b=>b.addEventListener("click",()=>showPage(b.dataset.page)));
 /* The ≡ is gone; the switcher carries both jobs now. Crossing to Glass is a
    link, and Ice's own entry - which was a link to the page you are already on,
