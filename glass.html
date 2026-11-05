@@ -288,6 +288,18 @@ footer{font-size:12.5px;color:var(--ink-3);text-align:center;font-family:var(--m
    Nothing is dropped that is not said elsewhere on the page. 560px is the
    breakpoint ice.html already uses, so the two pages turn together. */
 .sheet-x{display:none}
+/* the three pages of Glass: the address names one, and the others' cards are put away */
+.gtabs{display:flex;gap:6px;flex-wrap:wrap}
+.gtabs button{appearance:none;font:inherit;font-size:13px;min-height:44px;padding:0 16px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink-2);cursor:pointer}
+.gtabs button[aria-current="page"]{background:var(--accent);color:var(--ground);border-color:var(--accent);font-weight:600}
+#glassWrap[data-page="rink"] #spares{display:none}
+#glassWrap[data-page="inventory"] .specstrip,#glassWrap[data-page="inventory"] .rail,#glassWrap[data-page="inventory"] #planCard,
+#glassWrap[data-page="inventory"] .grid>section.card,#glassWrap[data-page="inventory"] .aside>:not(#spares){display:none}
+#glassWrap[data-page="inventory"] .grid{grid-template-columns:minmax(0,1fr)}
+#glassWrap[data-page="inventory"] .aside{position:static}
+.sp-qty-in{width:78px;min-height:44px;font:inherit;font-family:var(--mono);font-size:15px;font-weight:600;text-align:right;padding:4px 8px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--ink)}
+.sp-qty-in.short{color:var(--replace)}
+.sp-qty-in:focus-visible{outline:2px solid var(--accent);outline-offset:-1px}
 @media (max-width:560px){
   /* the picked panel opens as a sheet at the bottom of the screen */
   #detail.has-sel{position:fixed;left:0;right:0;bottom:0;z-index:30;max-height:64vh;overflow:auto;border-radius:16px 16px 0 0;
@@ -415,7 +427,7 @@ try{var _t=localStorage.getItem("rink_theme");}catch(e){}
 document.documentElement.setAttribute("data-theme",_t==="light"?"light":"dark");</script>
 
 <div id="shellbar"></div>
-<div class="wrap">
+<div class="wrap" id="glassWrap" data-page="rink">
 <header>
   <div class="brand">
     <h1><span class="mark">[ &#9633; ]</span> Glass Manager</h1>
@@ -429,6 +441,12 @@ document.documentElement.setAttribute("data-theme",_t==="light"?"light":"dark");
   <button type="button" class="bld-x" id="addRink">+ Add a rink</button>
 </header>
 
+<nav class="gtabs" id="glassTabs" aria-label="Glass pages">
+  <button type="button" data-page="rink" aria-current="page">Rink view</button>
+  <button type="button" data-page="build" aria-current="false">Builder</button>
+  <button type="button" data-page="inventory" aria-current="false">Inventory</button>
+</nav>
+
 <div class="specstrip">
   <p class="lede"><span id="facName">Conway Arena</span><span id="ledeRest"></span></p>
   <div class="specs">
@@ -441,7 +459,7 @@ document.documentElement.setAttribute("data-theme",_t==="light"?"light":"dark");
 
 <div class="rail" id="rail"></div>
 
-<section class="card">
+<section class="card" id="planCard">
   <div class="card-hd">
     <h2>Plan view</h2>
     <div class="hint lgd">
@@ -775,7 +793,7 @@ function spares(){
     const s = have[k], n = want[k] || 0, short = n > s.qty;
     return `<div class="sp-line">
       <span class="sp-sz">${sizeLabel(s)}</span>
-      <span class="sp-n${short?' short':''}">${s.qty}</span>
+      <input class="sp-qty-in${short?' short':''}" type="number" min="0" step="1" inputmode="numeric" data-k="${esc(k)}" value="${s.qty}" aria-label="Count of ${esc(sizeLabel(s))}">
       ${n ? `<span class="sp-need"><b>${n}</b> flagged on this rink · ${
         short ? `${n - s.qty} to order` : 'covered from stock'}</span>` : ''}
     </div>`;
@@ -791,11 +809,21 @@ function spares(){
          the game can go on tonight. */
       const pq = (have[sizeKey(s.w, s.h, s.thk, 'plexi')] || {}).qty || 0;
       return `<div class="sp-line">
-        <span class="sp-sz">${sizeLabel(s)}</span><span class="sp-n short">0</span>
+        <span class="sp-sz">${sizeLabel(s)}</span><input class="sp-qty-in short" type="number" min="0" step="1" inputmode="numeric" data-k="${esc(k)}" value="0" aria-label="Count of ${esc(sizeLabel(s))}">
         <span class="sp-need"><b>${want[k]}</b> flagged on this rink · ${want[k]} to order${
           pq ? ` · ${pq} plexi to patch with` : ''}</span></div>`;
     }).join('');
   }
+
+  /* A count is edited by writing the difference as one more movement - never a new total, which two devices
+     correcting the same shelf would overwrite each other with. */
+  box.querySelectorAll('.sp-qty-in').forEach(i => i.addEventListener('change', () => {
+    const key = i.dataset.k, cur = ((coverage().have[key] || {}).qty) || 0, v = Math.round(Number(i.value));
+    if(i.value === '' || !isFinite(v) || v < 0 || v === cur){ i.value = cur; return; }
+    const q = key.split('|');
+    addMovement(q[0], q[1], q[2], q[3], v - cur, `Count corrected from ${cur} to ${v}`);
+    store(); spares(); table(); rail();
+  }));
 
   /* The size picker carries shapes; the toggle beside it carries material. */
   const sizes = knownSizes();
@@ -1725,7 +1753,30 @@ async function bldSave(){
   /* What changes a record. Selectors, so the panel card and the stock rows, which are rebuilt on
      every selection, are covered too. Search, filters, printing and the plan itself stay open. */
   SYNC.lockControls(['#addRink','[aria-label^="Remove this rink"]','.sbtn','#plabel','#ptag','#note','#noteClear',
-    '#noteSave','#load','#spSize','#spW','#spH','#spT','#spQty','#spNote','#spAdd','.sp-undo']);
+    '#noteSave','#load','#spSize','#spW','#spH','#spT','#spQty','#spNote','#spAdd','.sp-undo','.sp-qty-in']);
+  /* The pages of Glass. The address names one (#/f/FID/s/SID/rink|build|inventory); the page's cards are shown or put
+     away by the wrapper's data-page. The Builder is still the dialog it was; it becomes a page of its own next. */
+  const GPAGES = ['rink', 'build', 'inventory'];
+  let gpage = 'rink';
+  function glassAddress(){
+    const sid = (activeBucket === LEGACY) ? boundSheetId : activeBucket, sh = sid && sheets[sid];
+    return sh && sh.facilityId ? {fid: sh.facilityId, sid} : null;
+  }
+  function showGlassPage(p, fromAddress){
+    if(!GPAGES.includes(p)) p = 'rink';
+    gpage = p;
+    document.getElementById('glassWrap').dataset.page = p;
+    document.querySelectorAll('#glassTabs [data-page]').forEach(b => b.setAttribute('aria-current', b.dataset.page === p ? 'page' : 'false'));
+    if(p === 'inventory') spares();
+    if(p === 'build'){ if(document.getElementById('builder').hidden) bldOpen(); }
+    else if(!document.getElementById('builder').hidden) bldClose();
+    const a = glassAddress();
+    if(!fromAddress && a && typeof Shell !== 'undefined') Shell.setAddress(a.fid, a.sid, p);
+  }
+  /* The page is read from the address itself too: a Glass-only device may not yet hold the sheet the bar would look it up in. */
+  const viewFromHash = () => { const m = /\/s\/[^/]+\/([a-z]+)$/.exec(location.hash); return m ? m[1] : null; };
+  document.querySelectorAll('#glassTabs [data-page]').forEach(b => b.addEventListener('click', () => showGlassPage(b.dataset.page)));
+  document.getElementById('bldClose').addEventListener('click', () => { if(gpage === 'build') showGlassPage('rink'); });
   SYNC.start({title:'Arena Management System'}).then(() => {
     if(typeof Shell === 'undefined') return;
     const sid0 = (activeBucket === LEGACY) ? boundSheetId : activeBucket, sh0 = sid0 && sheets[sid0];
@@ -1735,6 +1786,7 @@ async function bldSave(){
       if(w && w.sid !== sid0 && !LAYOUTS[w.sid] && !(boundSheetId && w.sid === boundSheetId)){
         sayTool('No glass has been built for ' + ((sheets[w.sid] && sheets[w.sid].name) || 'that sheet') + ' yet. Use + Add a rink to walk it.');
       } else if(sh0 && sh0.facilityId) Shell.setAddress(sh0.facilityId, sid0);
+      showGlassPage((w && w.view) || viewFromHash(), true);
     });
   });
   /* A sheet chosen in the bar's menus is an address change. Glass follows it to that sheet's glass
@@ -1753,6 +1805,7 @@ async function bldSave(){
     fillRinks();
     sayTool('No glass has been built for ' + ((sheets[w.sid] && sheets[w.sid].name) || 'that sheet') + ' yet. Use + Add a rink to walk it.');
   });
+  window.addEventListener('hashchange', () => { const m = /\/s\/[^/]+\/([a-z]+)$/.exec(location.hash); const v = m && m[1]; if(v && GPAGES.includes(v) && v !== gpage) showGlassPage(v, true); });
 })();
 </script>
 

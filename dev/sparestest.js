@@ -87,6 +87,7 @@ await sleep(4000);
 const A = await device(b);
 await A.p.goto(B + '/glass.html'); await signIn(A.p);
 await sleep(2000);
+await A.p.click('#glassTabs [data-page=inventory]'); await sleep(300);
 
 {
   const s = await A.p.evaluate(() => ({
@@ -107,6 +108,7 @@ await sleep(2000);
    at first, because .sp-other carries display:grid and that beats the
    browser's [hidden]{display:none} - the third time this file has met that. */
 {
+  await A.p.click('#glassTabs [data-page=inventory]'); await sleep(200);
   await A.p.evaluate(() => { document.getElementById('spAddBox').open = true; });
   await sleep(200);
   const shut = await A.p.evaluate(() => document.getElementById('spOther').offsetParent !== null);
