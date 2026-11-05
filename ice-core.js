@@ -166,3 +166,16 @@ function lowestScale(vals,target){
   const color=v=>{if(v<=stops[0][0])return stops[0][1];if(v>=last[0])return last[1];
     for(let i=1;i<stops.length;i++){const a=stops[i-1],b=stops[i];if(v<=b[0])return mixRGB(a[1],b[1],(v-a[0])/(b[0]-a[0]));}return last[1];};
   return {min,max,nMin,nMax,target,stops,color};}
+
+/* ---------- Trends series ---------- */
+/* The average thickness, round by round, for the whole sheet, one third of it (left end,
+   neutral, right end) or one spot. Pure: it reads the rounds it is given and nothing else.
+   sel is {kind:"sheet"}, {kind:"zone",third:0|1|2} or {kind:"spot",key:"x,y"}. A round with no
+   reading in the selection is left out, and rounds come back oldest first. */
+const ZONE_NAMES=["Left end","Neutral","Right end"];
+function seriesOf(sessions,sel){
+  sel=sel||{kind:"sheet"};
+  const take=k=>{if(sel.kind==="spot")return k===sel.key;if(sel.kind==="zone")return thirdOf(+k.split(",")[0])===sel.third;return true;};
+  return (sessions||[]).map(s=>{const v=[];for(const k in s.data){if(take(k)){const d=decOf.get(s.data[k]);if(d!==undefined)v.push(d);}}
+      return v.length?{s,st:{avg:v.reduce((a,b)=>a+b,0)/v.length,n:v.length}}:null;})
+    .filter(Boolean).sort((a,b)=>new Date(a.s.date)-new Date(b.s.date));}
