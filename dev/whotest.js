@@ -93,11 +93,6 @@ csv=await csvOf(D.p);
 ok('an old mark still shows the name that was typed on it', cell(csv,'100','Changed by')==='Old Name', String(cell(csv,'100','Changed by')));
 ok('and was not claimed by whoever pulled it', !(await stateOf(D.p,'100')).changedBy, JSON.stringify(await stateOf(D.p,'100')));
 
-/* The saved record file names the signed-in person too. */
-const d2=D.p.waitForEvent('download'); await D.p.click('#save'); const dl2=await d2;
-const saved=JSON.parse(fs.readFileSync(await dl2.path(),'utf8'));
-ok('the record file is saved under the signed-in name', saved.by==='Dana', saved.by);
-
 console.log('\n  '+pass+' passed, '+fail+' failed');
 await b.close();
 process.exit(fail?1:0);})();

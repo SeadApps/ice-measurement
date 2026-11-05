@@ -502,11 +502,8 @@ document.documentElement.setAttribute("data-theme",_t==="light"?"light":"dark");
       </div>
       <div class="tools">
         <input type="search" id="q" placeholder="Panel # or size" aria-label="Search panels">
-        <button class="btn" id="save">Save record</button>
-        <button class="btn" id="load">Load record</button>
         <button class="btn" id="print">Print</button>
         <span class="savenote" id="toolNote" role="status" style="margin:0"></span>
-        <input type="file" id="file" accept=".json,application/json" hidden>
       </div>
     </div>
     <div class="scopebar">
@@ -1143,40 +1140,6 @@ document.getElementById('csv').addEventListener('click', ()=>{
   grab('conway-arena-glass-order.csv',
        rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\r\n'),
        'text/csv');
-});
-document.getElementById('save').addEventListener('click', ()=>{
-  grab(`conway-glass-record-${stamp()}.json`,
-       JSON.stringify({rink:facilityName(activeBucket), saved:stamp(), by:whoName(), panels:state}, null, 2),
-       'application/json');
-  say('Record file saved — send it on to whoever keeps the master.');
-});
-document.getElementById('load').addEventListener('click', ()=>{
-  if(SYNC && !SYNC.canRestore()){ sayTool(SYNC.restoreMessage); return; }
-  document.getElementById('toolNote').textContent = '';
-  document.getElementById('file').click();
-});
-document.getElementById('file').addEventListener('change', e=>{
-  const f = e.target.files[0]; if(!f) return;
-  if(SYNC && !SYNC.canRestore()){ e.target.value = ''; sayTool(SYNC.restoreMessage); return; }
-  const r = new FileReader();
-  r.onload = () => {
-    let inc = null;
-    try{ inc = JSON.parse(r.result); }catch(err){}
-    if(!inc || !inc.panels){ say('That file is not a saved record.'); return; }
-    let added = 0, changed = 0;
-    for(const [id, v] of Object.entries(inc.panels)){
-      if(!GLASS.some(p=>p.id===id)) continue;
-      const cur = state[id];
-      if(!cur){ state[id] = v; added++; }
-      else if(cur.status !== v.status || (cur.note||'') !== (v.note||'')){
-        if(stampOf(v) > stampOf(cur)){ state[id] = v; changed++; }   // newer edit wins; a tie keeps ours
-      }
-    }
-    store(); rail(); table(); detail(); paint();
-    say(`Merged ${added} new and ${changed} updated ${added+changed===1?'panel':'panels'}.`);
-    e.target.value = '';
-  };
-  r.readAsText(f);
 });
 document.getElementById('print').addEventListener('click', ()=>window.print());
 
@@ -1888,7 +1851,7 @@ async function bldSave(){
   /* What changes a record. Selectors, so the panel card and the stock rows, which are rebuilt on
      every selection, are covered too. Search, filters, printing and the plan itself stay open. */
   SYNC.lockControls(['#addRink','[aria-label^="Remove this rink"]','.sbtn','#plabel','#ptag','#note','#noteClear',
-    '#noteSave','#load','#spSize','#spW','#spH','#spT','#spQty','#spNote','#spAdd','.sp-undo','.sp-qty-in','#bldRemove']);
+    '#noteSave','#spSize','#spW','#spH','#spT','#spQty','#spNote','#spAdd','.sp-undo','.sp-qty-in','#bldRemove']);
   /* The pages of Glass. The address names one (#/f/FID/s/SID/rink|build|inventory); the page's cards are shown or put
      away by the wrapper's data-page. The Builder is still the dialog it was; it becomes a page of its own next. */
   const GPAGES = ['rink', 'build', 'inventory'];

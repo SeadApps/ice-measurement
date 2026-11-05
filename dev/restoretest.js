@@ -45,7 +45,7 @@ const iceBackup = file('backup.json', { format: 'rink-ice-v4',
   facilities: { bk: { id: 'bk', name: 'Backup Rink', ord: 9, settings: { target: 1.5, edges: [0.6875, 1.4375, 1.5625, 1.9375] }, updatedAt: T } },
   sheets: { bks: { id: 'bks', facilityId: 'bk', name: 'Backup sheet', ord: 0, size: { L: 200, W: 85, corner: 28 }, updatedAt: T } },
   sessions: { bkz: { id: 'bkz', sheetId: 'bks', ord: 0, date: T, mode: 'moderate', data: { '1': '1 1/2"' }, notes: {}, updatedAt: T } } });
-const glassRecord = file('rec.json', { rink: 'Conway', panels: { '045': { status: 'replace', note: 'from the file', updatedAt: '2030-01-01T00:00:00.000Z' } } });
+const glassRecord = file('rec.json', { rink: 'Conway', saved: '2030-01-01', panels: { '045': { status: 'replace', note: 'from the file', updatedAt: '2030-01-01T00:00:00.000Z' } } });
 const names = p => p.evaluate(() => state.facilities.map(f => f.name));
 const note = p => p.evaluate(() => document.getElementById('savedNote').textContent);
 const panel = p => p.evaluate(() => (state['045'] || {}).status || '');
@@ -85,18 +85,22 @@ ok('Management can', await M.p.evaluate(() => Sync.canRestore()) === true);
 await M.p.setInputFiles('#backupFile', iceBackup); await sleep(1800); await M.p.click('#sureScrim.on #sureYes'); await sleep(800);
 ok('and the backup merges for them', (await names(M.p)).includes('Backup Rink'), JSON.stringify(await names(M.p)));
 
-/* ---- Glass's own record file ------------------------------------------------------ */
+/* ---- a Glass file, from before Glass joined the backup: through the account menu, like any other ---- */
+const menuRestore = async p => { await p.click('#acctMenu'); await p.click('.dropdown .it:has-text("Restore from backup")'); await sleep(400); };
 const GS = await device(b, 'GS');
-await GS.p.goto(B + '/glass.html'); await signInAs(GS.p, 'flo', 'flo-code-1'); await unlock(GS.p); await sleep(1500);
-await GS.p.evaluate(() => document.getElementById('load').click());
-ok('Glass tells Staff the same', (await GS.p.evaluate(() => document.getElementById('toolNote').textContent)) === MSG);
-await GS.p.setInputFiles('#file', glassRecord); await sleep(1200);
-ok('and merges nothing from a file chosen anyway', (await panel(GS.p)) !== 'replace', await panel(GS.p));
+await GS.p.goto(B + '/index.html'); await signInAs(GS.p, 'flo', 'flo-code-1'); await unlock(GS.p); await sleep(1500);
+await menuRestore(GS.p);
+ok('the account menu tells Staff the same', (await GS.p.evaluate(() => document.body.innerText)).includes(MSG));
+await GS.p.goto(B + '/glass.html'); await sleep(2500);
+ok('and nothing came from it', (await panel(GS.p)) !== 'replace', await panel(GS.p));
 
 const GM = await device(b, 'GM');
-await GM.p.goto(B + '/glass.html'); await signInAs(GM.p, 'pete', 'pete-code-1'); await unlock(GM.p); await sleep(1500);
-await GM.p.setInputFiles('#file', glassRecord); await sleep(1200);
-ok('Management can load a Glass record file', (await panel(GM.p)) === 'replace', await panel(GM.p));
+await GM.p.goto(B + '/index.html'); await signInAs(GM.p, 'pete', 'pete-code-1'); await unlock(GM.p); await sleep(1500);
+await menuRestore(GM.p);
+await GM.p.setInputFiles('#restoreFile', glassRecord); await sleep(800);
+await GM.p.click('#restoreYes'); await sleep(1200);
+await GM.p.goto(B + '/glass.html'); await sleep(2500);
+ok('Management can load a Glass record file from it', (await panel(GM.p)) === 'replace', await panel(GM.p));
 
 await b.close();
 console.log('\n' + pass + ' passed, ' + fail + ' failed');

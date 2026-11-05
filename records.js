@@ -352,6 +352,50 @@
     return {known:true, layout, replace, plexi, verified};
   }
 
+  /* ---- Glass in the backup ------------------------------------------------------------------
+     What Glass keeps on a device (panel conditions, the binding, the layouts walked, the spare-glass
+     movements and the one-tap widths) lives under one key of its own. It travels in the same backup file as
+     Ice's records, and comes back by the same rule: newest wins per record, movements are added, nothing is
+     deleted. A Glass file saved before this ({rink, saved, panels}) is read as panels of Conway's glass. */
+  const GLASS_KEY = "glass_record_v2";
+  const glassStamp = r => (r && (r.updatedAt || r.at)) || "";
+  function glassCounts(g){
+    let panels = 0;
+    for(const b in (g.records||{})) for(const id in g.records[b]){ const v = g.records[b][id]; if(v && !v.seed && !v.deleted) panels++; }
+    return {panels, spares:Object.keys(g.spares||{}).length, widths:Object.keys(g.widths||{}).length, layouts:Object.keys(g.specs||{}).length};
+  }
+  function glassFromLegacy(obj){
+    const recs = {};
+    for(const id in obj.panels){ const v = obj.panels[id]; if(v) recs[id] = Object.assign({}, v, {updatedAt: v.updatedAt || v.at || obj.saved}); }
+    return {records:{legacy:recs}};
+  }
+  function mergeGlass(cur, inc){
+    const snap = cur && typeof cur === "object" ? JSON.parse(JSON.stringify(cur)) : {};
+    ["records","spares","widths","specs","at","gone","names"].forEach(k => { snap[k] = snap[k] || {}; });
+    let taken = 0;
+    for(const b in (inc.records||{})){
+      for(const pid in inc.records[b]){
+        const v = inc.records[b][pid]; if(!v || v.seed) continue;
+        const c = snap.records[b] && snap.records[b][pid];
+        if(!c || c.seed || glassStamp(v) > glassStamp(c)){ (snap.records[b] = snap.records[b] || {})[pid] = v; taken++; }
+      }
+    }
+    ["spares","widths"].forEach(k => { for(const id in (inc[k]||{})){
+      const v = inc[k][id]; if(!v) continue;
+      if(!snap[k][id] || glassStamp(v) > glassStamp(snap[k][id])){ snap[k][id] = v; taken++; } } });
+    for(const b in (inc.specs||{})){
+      const at = (inc.at||{})[b] || "";
+      if(at > (snap.gone[b]||"") && (!snap.specs[b] || at > (snap.at[b]||""))){
+        snap.specs[b] = inc.specs[b]; snap.at[b] = at; if(inc.names && inc.names[b]) snap.names[b] = inc.names[b]; taken++;
+      }
+    }
+    for(const b in (inc.gone||{})){
+      if(inc.gone[b] > (snap.gone[b]||"") && inc.gone[b] > (snap.at[b]||"")){ snap.gone[b] = inc.gone[b]; delete snap.specs[b]; snap.at[b] = inc.gone[b]; taken++; }
+    }
+    if(inc.boundSheetId && (inc.bindingAt||"") > (snap.bindingAt||"")){ snap.boundSheetId = inc.boundSheetId; snap.bindingAt = inc.bindingAt; taken++; }
+    return {snap, taken};
+  }
+
   const Repo = {
     async save(st,opts){
       const d=decompose(st);
@@ -590,20 +634,28 @@
       const keep = (kind, r) => !only || (t.facOfRec(kind, r) != null && only(t.facOfRec(kind, r)));
       const out = {fac:{}, sh:{}, se:{}};
       [["fac", m.fac], ["sh", m.sh], ["se", m.se]].forEach(([k, o]) => { for(const id in o) if(o[id] && keep(k, o[id])) out[k][id] = o[id]; });
-      return {format:"rink-ice-v4", exportedAt:nowISO(), facilities:out.fac, sheets:out.sh, sessions:out.se};
+      const file = {format:"rink-ice-v4", exportedAt:nowISO(), facilities:out.fac, sheets:out.sh, sessions:out.se};
+      /* Glass's own records are not tagged the way these are, so a person who may only see some facilities gets none of them. */
+      const g = only ? null : await rd(GLASS_KEY);
+      if(g) file.glass = g;
+      return file;
     },
     /* What a backup file would bring in, without bringing it. Understands the record format
        and the older whole-state one. {ok:false} for anything else. */
     previewImport(obj){
-      let inc = null;
+      let inc = null, glass = null;
       if(obj && obj.format === "rink-ice-v4" && obj.sessions){
         inc = {facilities:obj.facilities||{}, sheets:obj.sheets||{}, sessions:obj.sessions||{}};
+        if(obj.glass && typeof obj.glass === "object") glass = obj.glass;
+      } else if(obj && !Array.isArray(obj.facilities) && obj.panels && typeof obj.panels === "object" && obj.saved){
+        inc = {facilities:{}, sheets:{}, sessions:{}};                    // a Glass file from before Glass joined the backup
+        glass = glassFromLegacy(obj);
       } else if(obj && Array.isArray(obj.facilities) && obj.facilities.length){          // an older whole-state backup
         const d = decompose(obj), t = obj.exportedAt || nowISO(), stamp = o => { const r = {}; for(const k in o) r[k] = Object.assign({}, o[k], {updatedAt:t}); return r; };
         inc = {facilities:stamp(d.fac), sheets:stamp(d.sh), sessions:stamp(d.se)};
       } else return {ok:false, error:"not a backup file"};
       const live = o => Object.values(o).filter(r => r && !r.deleted).length;
-      return {ok:true, inc, rounds:Object.keys(inc.sessions).length, facilities:live(inc.facilities), sheets:live(inc.sheets)};
+      return {ok:true, inc, glassSnap:glass, glass:glass ? glassCounts(glass) : null, rounds:Object.keys(inc.sessions).length, facilities:live(inc.facilities), sheets:live(inc.sheets)};
     },
     /* Merge a backup in, newest wins per record and readings inside a round kept from both. */
     async importAll(obj){
@@ -611,7 +663,12 @@
       await this.load();
       const res = this.merge(pv.inc);
       if(res.taken) await this.persistMaps();
-      return {ok:true, taken:res.taken, facilities:res.facilities, rounds:pv.rounds};
+      let gt = 0;
+      if(pv.glassSnap){
+        const m = mergeGlass(await rd(GLASS_KEY), pv.glassSnap);
+        if(m.taken){ await Store.set(GLASS_KEY, JSON.stringify(m.snap)); gt = m.taken; }
+      }
+      return {ok:true, taken:res.taken + gt, facilities:res.facilities, rounds:pv.rounds};
     },
 
     /* The sheets that have been removed, for a page that offers to bring them back. Reads

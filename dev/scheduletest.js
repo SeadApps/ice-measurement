@@ -61,14 +61,14 @@ const b = await chromium.launch();
     sub: (document.querySelector('.sched-sub') || {}).textContent || null,
     csvInScope: !!document.querySelector('.scopebar #csv'),
     csvInTools: !!document.querySelector('.tools #csv'),
-    recordBtns: ['save', 'load', 'print'].every(id => !!document.querySelector('.tools #' + id))
+    recordBtns: ['print'].every(id => !!document.querySelector('.tools #' + id))
   }));
   ok('the card says what the table is for', !!hd.sub && /order/i.test(hd.sub), hd.sub);
   /* The order list is the reason the table exists, so it sits with the line
      describing what you are looking at rather than as a fourth way to get a
      file out of the page. */
   ok('the order list sits with the scope, not the file buttons', hd.csvInScope && !hd.csvInTools);
-  ok('save / load / print stay together', hd.recordBtns);
+  ok('print stays with the file buttons; save and load moved into the backup', hd.recordBtns);
 
   /* ---------------- it opens on what needs attention ---------------- */
   const load = await p.evaluate(VIS);

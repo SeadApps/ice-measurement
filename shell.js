@@ -259,7 +259,7 @@
     var dlg = h("div", { cls: "dlg sb", id: "restoreDlg", role: "dialog", "aria-modal": "true", "aria-label": "Restore from backup" }, [
       h("div", { cls: "dlgbox" }, [
         h("h3", { text: "Merge this backup into your data?" }),
-        h("p", { id: "restoreCount", text: pv.rounds + " round" + (pv.rounds === 1 ? "" : "s") + " in the file. Nothing is deleted: where both copies changed the same round, the newer edit wins and readings from each are kept." }),
+        h("p", { id: "restoreCount", text: pv.rounds + " round" + (pv.rounds === 1 ? "" : "s") + (pv.glass ? ", " + pv.glass.panels + " Glass panel" + (pv.glass.panels === 1 ? "" : "s") + " and " + pv.glass.spares + " spare-glass movement" + (pv.glass.spares === 1 ? "" : "s") : "") + " in the file. Nothing is deleted: where both copies changed the same round, the newer edit wins and readings from each are kept." }),
         h("div", { cls: "sbfoot" }, [
           h("button", { cls: "sbx", type: "button", id: "restoreYes", text: "Merge", onclick: async function () {
             dlg.remove();

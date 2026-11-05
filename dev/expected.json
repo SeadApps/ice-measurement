@@ -18,6 +18,7 @@
  "glassinvtest": 23,
  "glassbuildtest": 30,
  "glasslaptoptest": 10,
+ "glassbackuptest": 20,
  "handovertest": 40,
  "homecheck": 78,
  "icebuildtest": 25,
@@ -47,6 +48,6 @@
  "stafftest": 65,
  "stamptest": 25,
  "synctest": 26,
- "whotest": 19,
+ "whotest": 18,
  "widthstest": 25
 }
