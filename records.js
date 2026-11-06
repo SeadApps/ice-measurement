@@ -352,6 +352,20 @@
     return {known:true, layout, replace, plexi, verified};
   }
 
+  /* What a drawing of a sheet's glass needs, read from this device and nothing else: which layout it has (Conway's
+     compiled-in one for the sheet Glass is bound to, otherwise the walk or the drawing it keeps) and each panel's
+     condition. Returns {known:false} when Glass has not been opened here and {layout:false} when this sheet has no
+     glass built. It reads and writes nothing. */
+  async function glassFor(sheetId){
+    const v2 = await rd("glass_record_v2");
+    if(!v2) return {known:false};
+    const bound = v2.boundSheetId === sheetId;
+    const spec = (v2.specs && v2.specs[sheetId]) || null, drawn = (v2.built && v2.built[sheetId]) || null;
+    if(!bound && !spec && !drawn) return {known:true, layout:false};
+    const recs = v2.records || {};
+    return {known:true, layout:true, bound, spec, drawn, panels:Object.assign({}, bound ? recs.legacy : null, recs[sheetId])};
+  }
+
   /* ---- Glass in the backup ------------------------------------------------------------------
      What Glass keeps on a device (panel conditions, the binding, the layouts walked, the spare-glass
      movements and the one-tap widths) lives under one key of its own. It travels in the same backup file as
@@ -756,7 +770,7 @@
   global.Records = { KEYS:K, PREF_KEYS, Store, Repo,
                      decompose, reassemble, nowISO, hasReadings, lastRound, isOverdue,
                      RINK_SIZES, NHL_SIZE, DEFAULT_EDGES, SETTINGS_VERSION, eighthUp, eighthNear,
-                     readingValue, trendOf, glassSummary, perimeterOf, shapePerimeter,
+                     readingValue, trendOf, glassSummary, glassFor, perimeterOf, shapePerimeter,
                      settingsOf, upgradeSettings, settingsNeedUpgrade, overdueDaysOf,
                      STD_CORNER, shapeFromSize, shapeOf, sizeOf, compareShape, shapeProblem, SHAPE_TOLERANCE,
                      uid, newSession, newSheet, defaultSettings, newFacility };

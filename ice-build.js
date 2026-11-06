@@ -58,10 +58,10 @@ function setEntry(m){entryMode=m;$("modeFree").setAttribute("aria-pressed",Strin
 $("noteInput").addEventListener("input",e=>setNote(e.target.value));
 
 /* In-page replacement for confirm()/alert(). ask({title,text,ok,cancel}, onYes, onNo): with cancel:null it is a notice with one button. */
-function ask(o,yes,no){const sc=$("sureScrim");$("sureTitle").textContent=o.title||"Are you sure?";$("sureText").textContent=o.text||"";
+function ask(o,yes,no,dismiss){const sc=$("sureScrim");$("sureTitle").textContent=o.title||"Are you sure?";$("sureText").textContent=o.text||"";
   $("sureYes").textContent=o.ok||"OK";$("sureNo").textContent=o.cancel||"Cancel";$("sureNo").style.display=o.cancel===null?"none":"";
   const done=fn=>{sc.classList.remove("on");$("sureYes").onclick=$("sureNo").onclick=sc.onclick=null;if(fn)fn();};
-  $("sureYes").onclick=()=>done(yes);$("sureNo").onclick=()=>done(no);sc.onclick=e=>{if(e.target===sc)done(no);};
+  $("sureYes").onclick=()=>done(yes);$("sureNo").onclick=()=>done(no);sc.onclick=e=>{if(e.target===sc)done(dismiss||no);};
   sc.classList.add("on");$("sureNo").style.display==="none"?$("sureYes").focus():$("sureNo").focus();}
 function askDeleteRound(sh,s,after){   /* the sheet is looked up again on OK: a pull can replace the objects while the question is open */
   const sid=s.id,shId=sh.id;

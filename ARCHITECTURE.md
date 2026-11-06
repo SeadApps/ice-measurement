@@ -10,6 +10,8 @@ shell.css      the Ice Board look for the shell's own pages (rail, tab bar, rows
 shellbar.css   the shared bar's look, scoped under .sb so it sits inside Ice and Glass without restyling them
 home.js        the shell's pages: Facilities, Sheets, Sheet settings, Staff
 review.js      Quality review (laptop): Changes, Current state, Flags, Reports
+report-maps.js the two drawings a report carries, standalone: iceMap (canvas) and glassPlan (SVG), light theme, no page needed
+glass-data.js  Conway's survey of its own glass (DATA), split out of glass-core.js so the Reports can draw the plan
 flags.js       the flag record: raise, resolve, reopen, merge; shared by the shell, Ice and Glass
 ice.html       Ice Manager: the page, its markup and its boot; the script is split into
   ice-core.js    the model with no page in it: geometry and spots, the sixteen labels and units, state, bands, saving, the interpolation
@@ -33,7 +35,7 @@ dev/           the test suites and the fake Supabase they run against (developme
 
 Each app is one page that routes by its address. Its script is split into classic scripts that
 share the page's globals, in a fixed order (`ice-core.js`, `ice-rink.js`, `ice-trends.js`,
-`ice-build.js`, `ice-prefs.js`, then the page's own glue; `glass-gen.js`, `glass-core.js`, then the
+`ice-build.js`, `ice-prefs.js`, then the page's own glue; `glass-data.js`, `glass-gen.js`, `glass-core.js`, then the
 glue). There are no modules and no build step: a top-level statement may only call what is in a
 file loaded before it, and everything else is reached at call time. `sync.js` and `records.js` are the
 shared code - the network, and the store.
@@ -619,6 +621,8 @@ node dev/scheduletest.js   # 31 checks: the schedule opens on what needs attenti
 node dev/scopetest.js      # 53 checks: a Staff person sees and writes only their facilities; the tag; the per-person cursor
 node dev/seedtest.js       # 23 checks: a fresh device's invented facility is a seed: never sent while untouched, sent whole when edited, dropped when real ones arrive
 node dev/settingstest.js   # 68 checks: Sheet settings writes name and shape and nothing else; draft, validation, glass check, Staff read-only, remove and undo; Ice draws the new outline
+node dev/reportmapstest.js # 21 checks: the report's ice map and glass plan: band colours, the facility's own edges, panels by condition, both in either theme, absent when there is nothing to draw, in the print copy, nothing written
+node dev/exporttest.js     # 14 checks: a laptop downloads an exported file at once; a touch device is asked to share or save (Ice exports and the account-menu backup), and backing out does neither
 node dev/facremovetest.js # 14 checks: Remove facility asks in the page, hides the facility and its sheets and keeps every round, undo and Removed facilities, an earlier hidden sheet stays hidden, the last facility cannot go, another device sees it
 node dev/shapetest.js      # 69 checks: one shape per sheet, the migration, the builder's compare and update, updateSheet
 node dev/shelltest.js      # 91 checks: the chrome at 390/820/1024/1280, breakpoints, menus, theme, tab bar, rail
@@ -630,7 +634,7 @@ node dev/whotest.js        # 18 checks: nobody types their name; the bar names t
 node dev/widthstest.js     # 25 checks: a facility's one-tap widths (default 43/48, no record until changed); only Management resolves or reopens a flag
 ```
 
-1906 checks in all, over 59 suites. Tests point `window.__SYNC_CONFIG__` at the fake via
+1941 checks in all, over 61 suites. Tests point `window.__SYNC_CONFIG__` at the fake via
 `addInitScript`; the real pages never read it.
 
 **Lessons from the access work, each of which cost a debugging session:**
@@ -1003,9 +1007,13 @@ panel or a setting. `dev/navdata.js` is the flow chart's access table as data an
   `Records.trendOf`, `Records.glassSummary`), so the three cannot disagree (`reviewtest` compares them).
 - **Reports** build a paper preview from the ticked sections (summary, Ice latest round, thickness trend, glass condition, flagged
   items, changes in the period) and print it through a hidden `#printRoot` with print-only rules, Letter portrait, black on white
-  in either theme. Save as PDF is the print dialog's PDF destination; there is no library. **Not done as specified:** the
-  report has tables where the spec has a map image and a plan drawing, because those drawing functions live in Ice and Glass and
-  are not loaded in the shell; and `review.js` is loaded at every width rather than only on a laptop.
+  in either theme. Save as PDF is the print dialog's PDF destination; there is no library. The latest round carries its colour map and the
+  glass section the plan, both drawn by `report-maps.js` (the same geometry, interpolation, band edges from the facility's
+  settings and panel colours as Ice and Glass, always in the light theme's colours; they cannot call those pages' own
+  drawing, which hangs off page globals, so the two are kept in step by hand and `reportmapstest` checks the colours). The
+  plan reads Glass's layout and panel conditions from the device (`Records.glassFor`); Conway's survey is `glass-data.js` and a
+  built sheet's walk is run through `glass-gen.js`. **Not done as specified:** `review.js` is loaded at every width rather
+  than only on a laptop.
 
 ## Maps
 
@@ -1072,8 +1080,11 @@ way, so it can still be loaded once from the account menu (`glassbackuptest`).
 - **One browser `confirm()` is left**, in `sync.js` for signing out; everything else asks in the page.
 - **No realtime.** Sync happens on open and on focus. Supabase realtime would make the desktop update while you
   watch; not needed so far.
-- **Reports have no map image or glass plan** (see *Quality review and flags*), and the order list is not in the report; it is
-  in Glass, Rink view.
+- **The order list is not in the report**; it is in Glass, Rink view. Reports now carry the ice map and the glass plan.
+- **A display for the Zamboni-room monitor** (the latest round's map, in place of the paper copy on the bulletin board) is
+  wanted and not built. `ReportMaps.iceMap` already draws a map from a sheet's size, a round and the facility's settings with
+  no page, so a display page can use it; what is open is the page itself (which sheets, how often it refreshes, no sign-in prompt
+  on a wall screen).
 - **Removing a facility** is Management's, from the facility's page (*Remove facility*, asked in the page): the
   facility and its live sheets are tombstoned and each sheet is marked `removedWith`, every round is kept.
   *Removed facilities* on the Facilities page, and the undo banner, bring it back with exactly those sheets (one
