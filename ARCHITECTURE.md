@@ -10,7 +10,7 @@ shell.css      the Ice Board look for the shell's own pages (rail, tab bar, rows
 shellbar.css   the shared bar's look, scoped under .sb so it sits inside Ice and Glass without restyling them
 home.js        the shell's pages: Facilities, Sheets, Sheet settings, Staff
 review.js      Quality review (laptop): Changes, Current state, Flags, Reports
-report-maps.js the two drawings a report carries, standalone: iceMap (canvas) and glassPlan (SVG), light theme, no page needed
+report-maps.js the drawings a report (and the TV picture) carry, standalone: iceMap (canvas, light or dark), tvImage, glassPlan (SVG), no page needed
 glass-data.js  Conway's survey of its own glass (DATA), split out of glass-core.js so the Reports can draw the plan
 flags.js       the flag record: raise, resolve, reopen, merge; shared by the shell, Ice and Glass
 ice.html       Ice Manager: the page, its markup and its boot; the script is split into
@@ -622,6 +622,7 @@ node dev/scopetest.js      # 53 checks: a Staff person sees and writes only thei
 node dev/seedtest.js       # 23 checks: a fresh device's invented facility is a seed: never sent while untouched, sent whole when edited, dropped when real ones arrive
 node dev/settingstest.js   # 68 checks: Sheet settings writes name and shape and nothing else; draft, validation, glass check, Staff read-only, remove and undo; Ice draws the new outline
 node dev/reportmapstest.js # 21 checks: the report's ice map and glass plan: band colours, the facility's own edges, panels by condition, both in either theme, absent when there is nothing to draw, in the print copy, nothing written
+node dev/tvtest.js         # 12 checks: Export for TV: 1920x1080, dark in either theme, the newest round with readings, a laptop downloads, an iPad asks share or save, a sheet with no round says so
 node dev/exporttest.js     # 14 checks: a laptop downloads an exported file at once; a touch device is asked to share or save (Ice exports and the account-menu backup), and backing out does neither
 node dev/facremovetest.js # 14 checks: Remove facility asks in the page, hides the facility and its sheets and keeps every round, undo and Removed facilities, an earlier hidden sheet stays hidden, the last facility cannot go, another device sees it
 node dev/shapetest.js      # 69 checks: one shape per sheet, the migration, the builder's compare and update, updateSheet
@@ -634,7 +635,7 @@ node dev/whotest.js        # 18 checks: nobody types their name; the bar names t
 node dev/widthstest.js     # 25 checks: a facility's one-tap widths (default 43/48, no record until changed); only Management resolves or reopens a flag
 ```
 
-1941 checks in all, over 61 suites. Tests point `window.__SYNC_CONFIG__` at the fake via
+1953 checks in all, over 62 suites. Tests point `window.__SYNC_CONFIG__` at the fake via
 `addInitScript`; the real pages never read it.
 
 **Lessons from the access work, each of which cost a debugging session:**
@@ -1081,10 +1082,12 @@ way, so it can still be loaded once from the account menu (`glassbackuptest`).
 - **No realtime.** Sync happens on open and on focus. Supabase realtime would make the desktop update while you
   watch; not needed so far.
 - **The order list is not in the report**; it is in Glass, Rink view. Reports now carry the ice map and the glass plan.
-- **A display for the Zamboni-room monitor** (the latest round's map, in place of the paper copy on the bulletin board) is
-  wanted and not built. `ReportMaps.iceMap` already draws a map from a sheet's size, a round and the facility's settings with
-  no page, so a display page can use it; what is open is the page itself (which sheets, how often it refreshes, no sign-in prompt
-  on a wall screen).
+- **The Zamboni-room monitor.** The paper map on the bulletin board is being replaced by a TV. *Export for TV* (Ice, Rink view)
+  makes a 1920x1080 dark picture of a sheet's newest round with readings (`ReportMaps.tvImage`: sheet, round date, thinnest,
+  average, thickest, the map, the colour key) to put on the TV by hand. Not built, and decided against for now: a page on the TV
+  that signs in (a rotated access code would put the sign-in prompt on the wall screen), and an automatic 5am job that publishes the
+  picture at a fixed address (needs a read-only Staff person for Conway, a GitHub secret, and Pete's agreement that the address is
+  public). `ReportMaps.tvImage` is the piece either would reuse.
 - **Removing a facility** is Management's, from the facility's page (*Remove facility*, asked in the page): the
   facility and its live sheets are tombstoned and each sheet is marked `removedWith`, every round is kept.
   *Removed facilities* on the Facilities page, and the undo banner, bring it back with exactly those sheets (one

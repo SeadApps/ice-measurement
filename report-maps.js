@@ -1,5 +1,6 @@
 /* report-maps.js: the two drawings a Quality report carries, made without Ice or Glass being open.
 
+   tvImage   the same map as a 1920 x 1080 dark picture for a screen, with the date and the three figures.
    iceMap    one round of readings as the colour map Ice draws, with the spots and their readings, and the legend.
    glassPlan one sheet's glass as the plan Glass draws, with each panel coloured by its condition.
 
@@ -18,7 +19,12 @@
   var BANDS = [{ key: "thin", c: "#c4332d", label: "Too thin" }, { key: "low", c: "#d4900f", label: "Thin" }, { key: "ideal", c: "#cfe3ec", label: "Ideal" },
     { key: "high", c: "#5b9ccc", label: "Thick" }, { key: "thick", c: "#2c6aa3", label: "Too thick" }];
   var NX = 150, NY = 64, POW = 2.4, BLEND = 1 / 16;   // Ice's default smoothing ("balanced") and its band blend
-  var RED = "rgba(200,32,47,.8)", BLUE = "rgba(23,71,209,.85)";
+  /* The dark theme's band colours (--b-* in ice.css) and the two looks the map can have. The report is always light; a TV is dark. */
+  var BANDS_DARK = ["#d6453f", "#e8b54a", "#eef4f6", "#6aa9d6", "#2c6aa3"];
+  var LOOK = {
+    light: { bg: "#ffffff", rink: "#eaf0f8", edge: "#52627a", ink: "#0b1a33", ink2: "#52627a", orient: "rgba(11,26,51,.45)", red: "rgba(200,32,47,.8)", blue: "rgba(23,71,209,.85)", dot: "#0b1a33", lblBg: "rgba(255,255,255,.85)", swatchEdge: "#52627a" },
+    dark: { bg: "#0b0d0f", rink: "#1c2226", edge: "#93a09a", ink: "#eef2ef", ink2: "#93a09a", orient: "rgba(13,22,32,.4)", red: "rgba(255,90,71,.85)", blue: "rgba(55,182,255,.9)", dot: "#0b0d0f", lblBg: "rgba(11,13,15,.85)", swatchEdge: "#3c4a51" }
+  };
 
   function rgb(hex) { hex = hex.replace("#", ""); return [parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16)]; }
   /* A thickness in inches as Ice writes a set-point: whole inches and eighths (1 1/2″). */
@@ -35,10 +41,10 @@
     return { L: L, W: W, corner: size.corner, GOAL1: 11 * sx, GOAL2: L - 11 * sx, BLUE1: 75 * sx, BLUE2: L - 75 * sx, CX: L / 2, CY: W / 2,
       FO_L: 40 * sx, FO_R: L - 40 * sx, FO_B: 22 * sy, FO_T: W - 22 * sy };
   }
-  function bandsFor(settings) {
+  function bandsFor(settings, theme) {
     var e = settings.edges, lts = [e[0], e[1], e[2], e[3], Infinity];
     var rng = ["< " + eighths(e[0]), eighths(e[0]) + " – " + eighths(e[1]), "≈ " + eighths(settings.target), eighths(e[2]) + " – " + eighths(e[3]), eighths(e[3]) + " +"];
-    return BANDS.map(function (b, i) { return { label: b.label, color: b.c, rgb: rgb(b.c), lt: lts[i], rng: rng[i] }; });
+    return BANDS.map(function (b, i) { var c = theme === "dark" ? BANDS_DARK[i] : b.c; return { label: b.label, color: c, rgb: rgb(c), lt: lts[i], rng: rng[i] }; });
   }
   function colorFor(bands, v) {
     var bi = bands.length - 1;
@@ -75,19 +81,20 @@
   /* opts: size {L,W,corner}, data {"x,y": reading label}, settings (Records.settingsOf), width (px, default 1600),
      legend (default true), labels (default true). Returns a canvas. A 1/4" or "2+" reading is drawn like any other. */
   function iceMap(opts) {
-    var R = global.Records, g = geometry(opts.size), settings = opts.settings, bands = bandsFor(settings);
+    var R = global.Records, g = geometry(opts.size), settings = opts.settings, T = LOOK[opts.theme === "dark" ? "dark" : "light"], bands = bandsFor(settings, opts.theme);
+    var RED = T.red, BLUE = T.blue, big = opts.scale || 1;
     var width = opts.width || 1600, pad = 24, s = (width - pad * 2) / g.L, mapH = g.W * s;
-    var legendH = opts.legend === false ? 0 : 70, H = Math.round(mapH + pad * 2 + legendH);
+    var legendH = opts.legend === false ? 0 : Math.round(70 * big), H = Math.round(mapH + pad * 2 + legendH);
     var cv = document.createElement("canvas"); cv.width = width; cv.height = H;
     var c = cv.getContext("2d"), ox = pad, oy = pad;
     var FX = function (x) { return ox + x * s; }, FY = function (y) { return oy + (g.W - y) * s; };
-    c.fillStyle = "#ffffff"; c.fillRect(0, 0, width, H);
+    c.fillStyle = T.bg; c.fillRect(0, 0, width, H);
 
     var samples = [], keys = Object.keys(opts.data || {});
     keys.forEach(function (k) { var p = k.split(",").map(Number), v = R.readingValue(opts.data[k]); if (isFinite(p[0]) && isFinite(p[1]) && isFinite(v)) samples.push({ x: p[0], y: p[1], v: v, k: k }); });
     var fld = field(g, samples, settings.target);
 
-    c.save(); roundRink(c, ox, oy, s, g); c.clip(); c.fillStyle = "#eaf0f8"; c.fillRect(ox, oy, g.L * s, mapH);
+    c.save(); roundRink(c, ox, oy, s, g); c.clip(); c.fillStyle = T.rink; c.fillRect(ox, oy, g.L * s, mapH);
     var heat = document.createElement("canvas"); heat.width = NX; heat.height = NY;
     var hc = heat.getContext("2d"), img = hc.createImageData(NX, NY);
     for (var j = 0; j < NY; j++) for (var i = 0; i < NX; i++) {
@@ -104,36 +111,65 @@
     [[g.FO_L, g.FO_B], [g.FO_L, g.FO_T], [g.FO_R, g.FO_B], [g.FO_R, g.FO_T]].forEach(function (p) { circ(p[0], p[1], 15, RED, lw); circ(p[0], p[1], 2, RED, 0, true); });
     circ(g.CX, g.CY, 1.6, RED, 0, true);
     c.restore();
-    roundRink(c, ox, oy, s, g); c.lineWidth = 3; c.strokeStyle = "#52627a"; c.stroke();
+    roundRink(c, ox, oy, s, g); c.lineWidth = 3; c.strokeStyle = T.edge; c.stroke();
 
     /* orientation words, as on the Ice map */
-    c.save(); c.fillStyle = "rgba(11,26,51,.45)"; c.textAlign = "center"; c.textBaseline = "middle"; c.font = "700 " + Math.max(11, 3.2 * s) + "px Arial, sans-serif";
+    c.save(); c.fillStyle = T.orient; c.textAlign = "center"; c.textBaseline = "middle"; c.font = "700 " + Math.max(11, 3.2 * s) + "px Arial, sans-serif";
     c.fillText("HOME BENCH", FX(g.L * .3), FY(g.W - 3.4)); c.fillText("AWAY BENCH", FX(g.L * .7), FY(g.W - 3.4)); c.fillText("BLEACHERS", FX(g.L / 2), FY(3.4));
     c.save(); c.translate(FX(3.4), FY(g.W / 2)); c.rotate(-Math.PI / 2); c.fillText("ZAMBONI ROOM", 0, 0); c.restore();
     c.save(); c.translate(FX(g.L - 3.4), FY(g.W / 2)); c.rotate(Math.PI / 2); c.fillText("LOBBY", 0, 0); c.restore(); c.restore();
 
     /* the spots: a dot in the reading's band, the reading above it */
-    var fs = Math.max(11, Math.min(18, s * 2.1));
+    var fs = Math.max(11, Math.min(opts.labelMax || 18, s * 2.1));
     samples.forEach(function (p) {
       var px = FX(p.x), py = FY(p.y), col = colorFor(bands, p.v);
       c.beginPath(); c.arc(px, py, Math.max(5, s * .75), 0, 7); c.fillStyle = "rgb(" + Math.round(col[0]) + "," + Math.round(col[1]) + "," + Math.round(col[2]) + ")"; c.fill();
-      c.lineWidth = 1.6; c.strokeStyle = "#0b1a33"; c.stroke();
+      c.lineWidth = 1.6; c.strokeStyle = T.dot; c.stroke();
       if (opts.labels !== false) {
         var t = String(opts.data[p.k]).replace(/"/g, ""); c.font = "700 " + fs + "px Consolas, monospace"; c.textAlign = "center"; c.textBaseline = "bottom";
-        var tw = c.measureText(t).width; c.fillStyle = "rgba(255,255,255,.85)"; c.fillRect(px - tw / 2 - 3, py - Math.max(5, s * .75) - fs - 3, tw + 6, fs + 3);
-        c.fillStyle = "#0b1a33"; c.fillText(t, px, py - Math.max(5, s * .75) - 2);
+        var tw = c.measureText(t).width; c.fillStyle = T.lblBg; c.fillRect(px - tw / 2 - 3, py - Math.max(5, s * .75) - fs - 3, tw + 6, fs + 3);
+        c.fillStyle = T.ink; c.fillText(t, px, py - Math.max(5, s * .75) - 2);
       }
     });
 
     if (opts.legend !== false) {
-      var lx = pad, ly = oy + mapH + 38; c.textBaseline = "middle"; c.textAlign = "left"; c.font = "600 15px Arial, sans-serif";
+      var lx = pad, ly = oy + mapH + Math.round(38 * big), f1 = Math.round(15 * big), f2 = Math.round(13 * big), sw = Math.round(18 * big);
+      c.textBaseline = "middle"; c.textAlign = "left"; c.font = "600 " + f1 + "px Arial, sans-serif";
       bands.forEach(function (b) {
-        c.fillStyle = b.color; c.fillRect(lx, ly - 9, 18, 18); c.strokeStyle = "#52627a"; c.lineWidth = 1; c.strokeRect(lx, ly - 9, 18, 18);
-        c.fillStyle = "#0b1a33"; c.fillText(b.label, lx + 26, ly); var w1 = c.measureText(b.label).width;
-        c.fillStyle = "#52627a"; c.font = "13px Arial, sans-serif"; c.fillText(b.rng, lx + 26 + w1 + 8, ly); var w2 = c.measureText(b.rng).width; c.font = "600 15px Arial, sans-serif";
-        lx += 26 + w1 + 8 + w2 + 28;
+        c.fillStyle = b.color; c.fillRect(lx, ly - sw / 2, sw, sw); c.strokeStyle = T.swatchEdge; c.lineWidth = 1; c.strokeRect(lx, ly - sw / 2, sw, sw);
+        c.fillStyle = T.ink; c.font = "600 " + f1 + "px Arial, sans-serif"; c.fillText(b.label, lx + sw + 8, ly); var w1 = c.measureText(b.label).width;
+        c.fillStyle = T.ink2; c.font = f2 + "px Arial, sans-serif"; c.fillText(b.rng, lx + sw + 8 + w1 + 8, ly); var w2 = c.measureText(b.rng).width;
+        lx += sw + 8 + w1 + 8 + w2 + Math.round(28 * big);
       });
     }
+    return cv;
+  }
+
+  /* The picture for the screen in the Zamboni room: 1920 x 1080, dark, one sheet's latest round, written to be read from across
+     the room. opts: facility, sheet (names), round {date, data}, size, settings (Records.settingsOf). Returns a canvas. */
+  function tvImage(opts) {
+    var R = global.Records, W = 1920, H = 1080, pad = 48, T = LOOK.dark, MONO = "Consolas, 'Courier New', monospace";
+    var cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+    var c = cv.getContext("2d"); c.fillStyle = T.bg; c.fillRect(0, 0, W, H);
+    var vals = Object.keys(opts.round.data || {}).map(function (k) { return R.readingValue(opts.round.data[k]); }).filter(isFinite);
+    var avg = vals.length ? vals.reduce(function (a, b) { return a + b; }, 0) / vals.length : 0;
+    c.textBaseline = "alphabetic"; c.textAlign = "left";
+    c.fillStyle = T.ink; c.font = "800 52px Arial, sans-serif"; c.fillText((opts.facility + " \u00b7 " + opts.sheet).toUpperCase(), pad, pad + 48);
+    var d = new Date(opts.round.date);
+    var when = d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }) + " \u00b7 " + d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+    c.fillStyle = "#ffb000"; c.font = "600 30px " + MONO; c.fillText("LATEST ROUND  " + when.toUpperCase() + "  \u00b7  " + vals.length + " READINGS", pad, pad + 92);
+    /* the three figures, scoreboard style, at the right */
+    var stats = vals.length ? [["THINNEST", eighths(Math.min.apply(null, vals))], ["AVERAGE", avg.toFixed(2) + "\u2033"], ["THICKEST", eighths(Math.max.apply(null, vals))]] : [];
+    var x = W - pad;
+    stats.slice().reverse().forEach(function (q) {
+      c.textAlign = "right"; c.fillStyle = "#ffb000"; c.font = "700 64px " + MONO; c.fillText(q[1], x, pad + 62);
+      var w = c.measureText(q[1]).width;
+      c.fillStyle = T.ink2; c.font = "600 22px Arial, sans-serif"; c.fillText(q[0], x, pad + 96);
+      x -= w + 56;
+    });
+    var map = iceMap({ size: opts.size, data: opts.round.data, settings: opts.settings, width: 1790, theme: "dark", scale: 1.5, labelMax: 26 });
+    var top = pad + 126, hh = Math.min(map.height, H - top - 12);
+    c.drawImage(map, 0, 0, map.width, hh, Math.round((W - map.width) / 2), top, map.width, hh);
     return cv;
   }
 
@@ -220,5 +256,5 @@
     return out;
   }
 
-  global.ReportMaps = { iceMap: iceMap, glassPlan: glassPlan, glassCounts: glassCounts, layoutOf: layoutOf, bandsFor: bandsFor, colorFor: colorFor, eighths: eighths, geometry: geometry };
+  global.ReportMaps = { iceMap: iceMap, tvImage: tvImage, glassPlan: glassPlan, glassCounts: glassCounts, layoutOf: layoutOf, bandsFor: bandsFor, colorFor: colorFor, eighths: eighths, geometry: geometry };
 })(this);
