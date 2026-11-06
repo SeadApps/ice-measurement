@@ -124,7 +124,7 @@
     /* Open flags, so the cards and the Fleet table can count them (flags.js; only what this person may see). */
     var flags = [];
     if (global.Flags) { await global.Flags.load(); flags = global.Flags.all().filter(function (r) { return r.status === "open" && (!r.fac || live[r.fac]); }); }
-    return { prefs: (st && st.prefs) || {}, facilities: facs, sessions: (st && st.sessions) || [], glass: glass, removed: removed, flags: flags };
+    return { prefs: (st && st.prefs) || {}, facilities: facs, sessions: (st && st.sessions) || [], glass: glass, removed: removed, removedFacs: canManage() ? (await Repo.readRemovedFacilities()).filter(function (r) { return canSee(r.id); }) : [], flags: flags };
   }
 
   /* How a sheet is doing. The overdue rule is the store's, read from the
@@ -491,7 +491,7 @@
   async function barData() {
     var st = await Repo.read();
     return { prefs: (st && st.prefs) || {}, facilities: ((st && st.facilities) || []).filter(function (f) { return canSee(f.id); }),
-             sessions: (st && st.sessions) || [], glass: {}, removed: [] };
+             sessions: (st && st.sessions) || [], glass: {}, removed: [], removedFacs: [] };
   }
   /* The facility and sheet the address names, if this person may have them: {fid, sid}, else null.
      A facility with no sheet named means the sheet you were last on there, or its first. */
