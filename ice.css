@@ -204,8 +204,6 @@
   .card{background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:12px}
   .card>.head{display:flex;align-items:center;gap:8px;margin-bottom:9px}
   .card>.head .eyebrow{margin-right:auto}
-  .undo{appearance:none;background:var(--panel-2);border:1px solid var(--line);color:var(--ink-dim);font:inherit;font-size:11px;font-weight:600;padding:5px 9px;border-radius:3px;cursor:pointer}
-  .undo:disabled{opacity:.4;cursor:default}.undo:not(:disabled):hover{color:var(--ink);border-color:var(--line-2)}
   .gprog{display:none;margin-bottom:10px}.gprog.on{display:block}
   .gprog .lab{font-size:11px;color:var(--ink-dim);font-family:var(--mono);margin-bottom:5px;display:flex;justify-content:space-between}
   .gprog .track{height:6px;border-radius:3px;background:var(--panel-2);overflow:hidden}
@@ -225,6 +223,8 @@
   .chip:focus-visible{outline:2px solid var(--frost);outline-offset:1px}
   .chip.clear{grid-column:1/-1;justify-content:center;color:var(--ink-dim);background:transparent}
   .chip.clear:hover{color:var(--ink);border-color:var(--line-2)}
+  .chip.clear{min-height:48px;height:48px;font-size:14px}
+  .chip.clear:disabled{opacity:.4;cursor:default}.chip.clear:disabled:hover{color:var(--ink-dim);border-color:var(--line)}
   .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:11px}
   .stat{background:var(--panel-2);border:1px solid var(--line);border-radius:3px;padding:9px 10px}
   .stat .k{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);font-weight:700}

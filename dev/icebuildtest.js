@@ -76,6 +76,26 @@ D = await open(390, '/ice.html#/f/f1/s/s1/build'); p = D.p;
 ok('phone: three across (seven down)', await cols() === 3, String(await cols()));
 ok('each key at least 44px square', await R(() => { const r = document.querySelector('#chips .chip[data-opt]').getBoundingClientRect(); return r.height >= 44 && r.width >= 44; }));
 ok('and no horizontal scroll', await R(() => document.documentElement.scrollWidth <= window.innerWidth));
+/* Undo sits with the keys, directly under Clear this point and the same size. In the card's header it was pushed off the edge of a narrower screen. */
+for (const w of [1000, 390]) {
+  const E = w === 1000 ? D : await open(w, '/ice.html#/f/f1/s/s1/build'), q = E.p;
+  const geo = await q.evaluate(() => { const c = document.getElementById('chips'), kids = [...c.children], u = document.getElementById('undoBtn'), r = u.getBoundingClientRect(), cl = [...c.querySelectorAll('.chip.clear')][0].getBoundingClientRect();
+    return { last: kids[kids.length - 1] === u, afterClear: kids[kids.length - 2].textContent === 'Clear this point', sameBox: Math.abs(r.width - cl.width) < 1 && Math.abs(r.height - cl.height) < 1 && Math.abs(r.left - cl.left) < 1,
+      under: r.top >= cl.bottom - 1 && r.top - cl.bottom < 30, inView: r.left >= 0 && r.right <= innerWidth, tall: r.height >= 44, inHeader: !!document.querySelector('.card .head #undoBtn'), disabled: u.disabled }; });
+  ok(w + 'px: Undo is the last box of the keys, right after Clear this point', geo.last && geo.afterClear);
+  ok(w + 'px: the same size and left edge as Clear this point, directly under it', geo.sameBox && geo.under, JSON.stringify(geo) + JSON.stringify(await q.evaluate(() => [...document.querySelectorAll('#chips .chip.clear')].map(e => { const r = e.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)]; }))));
+  ok(w + 'px: fully on screen, and at least 44px tall', geo.inView && geo.tall);
+  ok(w + 'px: no longer in the card header', !geo.inHeader);
+  ok(w + 'px: off until there is something to undo', geo.disabled);
+  await q.evaluate(() => { const c = document.querySelector('#chips .chip[data-opt]'); c.click(); });
+  await sleep(300);
+  const after = await q.evaluate(() => ({ on: !document.getElementById('undoBtn').disabled, set: Object.keys(data()).length }));
+  ok(w + 'px: a reading turns it on', after.on && after.set >= 1, JSON.stringify(after));
+  await q.click('#undoBtn'); await sleep(300);
+  ok(w + 'px: Undo takes the reading back, and turns itself off', await q.evaluate(() => Object.keys(data()).length) === after.set - 1 && await q.evaluate(() => document.getElementById('undoBtn').disabled));
+  if (w !== 1000) await E.ctx.close();
+}
+
 await D.ctx.close();
 
 ok('no errors', errs.length === 0, errs.slice(0, 3).join(' | '));
