@@ -622,7 +622,7 @@ node dev/scopetest.js      # 53 checks: a Staff person sees and writes only thei
 node dev/seedtest.js       # 23 checks: a fresh device's invented facility is a seed: never sent while untouched, sent whole when edited, dropped when real ones arrive
 node dev/settingstest.js   # 68 checks: Sheet settings writes name and shape and nothing else; draft, validation, glass check, Staff read-only, remove and undo; Ice draws the new outline
 node dev/reportmapstest.js # 21 checks: the report's ice map and glass plan: band colours, the facility's own edges, panels by condition, both in either theme, absent when there is nothing to draw, in the print copy, nothing written
-node dev/exporttest.js     # 6 checks: a laptop downloads an exported file and opens no share window; a touch device offers the share sheet
+node dev/exporttest.js     # 14 checks: a laptop downloads an exported file at once; a touch device is asked to share or save (Ice exports and the account-menu backup), and backing out does neither
 node dev/facremovetest.js # 14 checks: Remove facility asks in the page, hides the facility and its sheets and keeps every round, undo and Removed facilities, an earlier hidden sheet stays hidden, the last facility cannot go, another device sees it
 node dev/shapetest.js      # 69 checks: one shape per sheet, the migration, the builder's compare and update, updateSheet
 node dev/shelltest.js      # 91 checks: the chrome at 390/820/1024/1280, breakpoints, menus, theme, tab bar, rail
@@ -634,7 +634,7 @@ node dev/whotest.js        # 18 checks: nobody types their name; the bar names t
 node dev/widthstest.js     # 25 checks: a facility's one-tap widths (default 43/48, no record until changed); only Management resolves or reopens a flag
 ```
 
-1933 checks in all, over 61 suites. Tests point `window.__SYNC_CONFIG__` at the fake via
+1941 checks in all, over 61 suites. Tests point `window.__SYNC_CONFIG__` at the fake via
 `addInitScript`; the real pages never read it.
 
 **Lessons from the access work, each of which cost a debugging session:**

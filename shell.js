@@ -210,12 +210,27 @@
     var days = Math.floor((Date.now() - new Date(iso)) / 86400000);
     return "Last backup: " + (days <= 0 ? "today" : days === 1 ? "yesterday" : days + " days ago");
   }
-  /* Offer the file to the share sheet where there is one (iPad: email, AirDrop), else download it. */
+  /* On a touch device (iPad: email, AirDrop) ask whether to share the file or save it; a laptop just downloads it. */
+  function chooseShareOrSave(name) {
+    return new Promise(function (res) {
+      var done = function (v) { return function () { dlg.remove(); res(v); }; };
+      var dlg = h("div", { cls: "dlg sb", id: "shareDlg", role: "dialog", "aria-modal": "true", "aria-label": "Share or save?" }, [
+        h("div", { cls: "dlgbox" }, [h("h3", { text: "Share or save?" }), h("p", { text: name + ": share it (email, AirDrop, Slack...) or save it to this device." }),
+          h("div", { cls: "sbfoot" }, [
+            h("button", { cls: "sbx", type: "button", id: "shareYes", text: "Share", onclick: done("share") }),
+            h("button", { cls: "sbx", type: "button", id: "saveYes", text: "Save to device", onclick: done("save") }),
+            h("button", { cls: "sbx ghost", type: "button", id: "shareNo", text: "Cancel", onclick: done("cancel") })])])]);
+      document.body.appendChild(dlg);
+      var y = document.getElementById("shareYes"); if (y) y.focus();
+    });
+  }
   async function saveFile(content, mime, name) {
     var blob = new Blob([content], { type: mime });
-    if (global.matchMedia && global.matchMedia("(pointer: coarse)").matches && navigator.share && navigator.canShare) {   // a laptop saves the file; only a touch device offers the share sheet
-      var file = new File([blob], name, { type: mime });
-      if (navigator.canShare({ files: [file] })) {
+    var file = new File([blob], name, { type: mime });
+    if (global.matchMedia && global.matchMedia("(pointer: coarse)").matches && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      var pick = await chooseShareOrSave(name);
+      if (pick === "cancel") return "cancelled";
+      if (pick === "share") {
         try { await navigator.share({ files: [file], title: name }); return "shared"; }
         catch (err) { if (err && err.name === "AbortError") return "cancelled"; }
       }

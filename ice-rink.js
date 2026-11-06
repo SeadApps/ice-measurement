@@ -145,15 +145,17 @@ $("cmpSel").addEventListener("change",e=>{const v=e.target.value;if(v==="off"){c
 $("expCsv").addEventListener("click",async()=>{const d=data(),nt=notes(),unitCol=isMM()?"thickness_mm":"thickness_in";let csv=`x_ft,y_ft,${unitCol},zone,note\n`;
   for(const k in d){const[x,y]=k.split(",");const dec=decOf.get(d[k]),val=isMM()?mmOf(dec).toFixed(2):dec;csv+=`${x},${y},${val},"${zoneOf({x:+x,y:+y})}","${(nt[k]||"").replace(/"/g,'""')}"\n`;}
   await exportFile(csv,"text/csv",fileStem()+".csv");});
-/* content: string or Blob. Tries the native share sheet (so the file can go straight to
-   email/AirDrop/Slack/etc) and falls back to a normal download if sharing isn't available,
-   isn't supported for this file type, or the user backs out of a real share attempt. */
+/* content: string or Blob. On a touch device it asks whether to share the file (the native share sheet: email, AirDrop,
+   Slack...) or save it; it downloads at once everywhere else, and when a share attempt fails. */
 async function exportFile(content,mime,name){
   const blob=content instanceof Blob?content:new Blob([content],{type:mime});
-  /* The share sheet is for a touch device (iPad, phone). On a laptop it would open the operating system's share window instead of saving the file. */
-  if(window.matchMedia&&matchMedia('(pointer: coarse)').matches&&navigator.share&&navigator.canShare){
-    const file=new File([blob],name,{type:mime});
-    if(navigator.canShare({files:[file]})){
+  /* A touch device (iPad, phone) can share the file or save it; a laptop only saves it (its share window would open the operating system's sheet instead of downloading). */
+  const file=new File([blob],name,{type:mime});
+  const touch=window.matchMedia&&matchMedia('(pointer: coarse)').matches&&navigator.share&&navigator.canShare&&navigator.canShare({files:[file]});
+  if(touch){
+    const pick=await new Promise(res=>ask({title:"Share or save?",text:name+": share it (email, AirDrop, Slack...) or save it to this device.",ok:"Share",cancel:"Save to device"},()=>res("share"),()=>res("save"),()=>res("cancel")));
+    if(pick==="cancel")return"cancelled";
+    if(pick==="share"){
       try{await navigator.share({files:[file],title:name});flashNote("shared");return"shared";}
       catch(err){if(err&&err.name==="AbortError"){flashNote("share canceled");return"cancelled";}}
     }
