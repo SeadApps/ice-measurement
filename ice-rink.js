@@ -54,7 +54,7 @@ function drawDots(ctx,ox,oy,s,opt){const d=data(),nt=notes(),base=opt.trend?base
   const fs=flaggedSpots();for(let k=0;k<POINTS.length;k++){const p=POINTS[k];if(!fs[keyOf(p)])continue;const px=FX(ox,s,p.x),py=FY(oy,s,p.y);
     ctx.save();ctx.beginPath();ctx.arc(px,py,8,0,7);ctx.lineWidth=2.2;ctx.strokeStyle="#e8b54a";ctx.setLineDash([3,2.5]);ctx.stroke();ctx.setLineDash([]);
     ctx.beginPath();ctx.moveTo(px+6,py-14);ctx.lineTo(px+6,py-5);ctx.lineTo(px+14,py-9.5);ctx.closePath();ctx.fillStyle="#e8b54a";ctx.fill();ctx.restore();}
-  if(opt.sel){const p=POINTS[selIdx],px=FX(ox,s,p.x),py=FY(oy,s,p.y);ctx.beginPath();ctx.arc(px,py,9,0,7);ctx.lineWidth=2.4;ctx.strokeStyle=themeInk("--frost","#6fd6ec");ctx.stroke();ctx.beginPath();ctx.arc(px,py,12.5,0,7);ctx.lineWidth=1;ctx.globalAlpha=.4;ctx.stroke();ctx.globalAlpha=1;}}
+  if(opt.sel){const p=POINTS[selIdx],px=FX(ox,s,p.x),py=FY(oy,s,p.y);ctx.beginPath();ctx.arc(px,py,9,0,7);ctx.lineWidth=2.4;ctx.strokeStyle=themeInk("--ink","#eef2ef");ctx.stroke();ctx.beginPath();ctx.arc(px,py,12.5,0,7);ctx.lineWidth=1;ctx.globalAlpha=.4;ctx.stroke();ctx.globalAlpha=1;}}
 /* Which map colours are in use, and the scale behind them. The mode is a device preference. */
 const mapMode=()=>state&&state.mapMode==="lowest"?"lowest":"color";
 const mapScale=()=>lowestScale(Object.values(data()).map(l=>decOf.get(l)),EF().target);
