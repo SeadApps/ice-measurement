@@ -2,8 +2,7 @@
    Scoreboard. System fonts only, so the app opens offline and makes no outside
    request; the named faces come first so they apply if they are ever bundled.
 
-   Ice and Glass keep their own look until D3 and D4, and the bar is the only thing
-   shared with them, so for now the two will not match. */
+   Ice and Glass wear the same tokens (ice.css and glass.css), so the three read as one product. */
 :root{
   --bg:#f4f7fb; --panel:#ffffff; --panel-2:#eaf0f8; --line:#d3dcea; --line-2:#b4c2d8;
   --ink:#0b1a33; --ink-dim:#52627a; --ink-faint:#64748c;
