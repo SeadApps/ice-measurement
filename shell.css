@@ -174,9 +174,9 @@ label.field,.field{display:grid;gap:4px;font-size:13px;color:var(--ink-dim)}
 .tile[disabled]{opacity:.55;cursor:not-allowed}
 .steppers{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin-top:14px}
 .stp{display:flex;align-items:stretch;gap:8px}
-.sb{width:60px;min-height:60px;font:700 26px var(--mono);border:2px solid var(--frost);background:transparent;color:var(--frost);
+.stpb{width:60px;min-height:60px;font:700 26px var(--mono);border:2px solid var(--frost);background:transparent;color:var(--frost);
   border-radius:3px;cursor:pointer}
-.sb[disabled]{opacity:.35;cursor:not-allowed}
+.stpb[disabled]{opacity:.35;cursor:not-allowed}
 .sv{flex:1;min-width:84px;display:flex;align-items:center;justify-content:center;font:700 22px var(--mono);color:var(--fig);
   text-shadow:var(--glow);background:var(--panel-2);border-radius:3px;font-variant-numeric:tabular-nums;white-space:nowrap;padding:0 8px}
 .read{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:12px}
@@ -195,7 +195,7 @@ label.field,.field{display:grid;gap:4px;font-size:13px;color:var(--ink-dim)}
 .abtn{flex:1;min-width:160px;min-height:56px;font:800 15px var(--sans);text-transform:uppercase;letter-spacing:.04em;border-radius:3px;
   border:2px solid var(--frost);background:var(--frost);color:var(--on-frost);cursor:pointer;max-width:320px}
 .abtn[disabled]{opacity:.35;cursor:not-allowed}
-@media (max-width:760px){.two{grid-template-columns:minmax(0,1fr)}.sb{width:56px}}
+@media (max-width:760px){.two{grid-template-columns:minmax(0,1fr)}.stpb{width:56px}}
 
 /* Quality review */
 .subbar.filters{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px}

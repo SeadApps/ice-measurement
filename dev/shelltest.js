@@ -110,6 +110,7 @@ ok('the context button lists facilities', /Conway Arena/.test(await text(p, '.dr
 /* ---- the rail --------------------------------------------------------------------------------------- */
 await p.setViewportSize({ width: 1280, height: 900 }); await p.goto(B + '/index.html#/f/f2/s/s3'); await p.waitForSelector('#page .screen'); await sleep(600);
 ok('the rail lists each facility with its sheets, then Quality review', (await p.$$eval('#rail h3', e => e.map(x => x.textContent))).join() === 'Conway Arena,Flynn Rink,Quality review');
+ok('the bar runs the width of the page, one row tall (no page style may shrink it: the settings steppers once did)', await p.evaluate(() => { const r = document.querySelector('.nav').getBoundingClientRect(); return r.width >= innerWidth - 20 && r.height < 100 && r.top < 5; }));
 ok('with a dot on the overdue one only', (await p.$$eval('#rail a .dot', d => d.map(x => x.parentElement.textContent))).join() === 'Standard');
 ok('and the sheet you are on marked', (await p.$$eval('#rail a[aria-current="true"]', a => a.map(x => x.textContent))).join() === 'Mini');
 await p.click('#rail a:has-text("Main")'); await sleep(600);

@@ -199,7 +199,7 @@ await k.seed(k.PETE);
 const M = await k.device(b, 1280);
 await M.p.goto(B + '/index.html' + SET); await k.signInAs(M.p, 'pete', 'pete-code-1'); await M.p.waitForSelector('#pageSettings'); await sleep(600);
 ok('Management with the editing window shut sees it read-only, and is told how to change that', /Unlock to edit/.test(await text(M.p, '#viewOnly')) && await M.p.$eval('#ssave', e => e.disabled) && await M.p.$eval('#sname', e => e.disabled));
-ok('every stepper and tile is off', await M.p.$$eval('#pageSettings .sb, #pageSettings .tile, #pageSettings [data-opt]', b => b.every(x => x.disabled)));
+ok('every stepper and tile is off', await M.p.$$eval('#pageSettings .stpb, #pageSettings .tile, #pageSettings [data-opt]', b => b.every(x => x.disabled)));
 await M.p.evaluate(c => Sync.unlockEditing(c), k.EDIT); await sleep(800);
 ok('unlocking turns the page live without a reload', !(await M.p.$('#viewOnly')) && !(await M.p.$eval('#sname', e => e.disabled)) && !(await M.p.$eval('#ssave', e => e.disabled)));
 await M.p.fill('#sname', 'Pete\'s Standard'); await click(M.p, '#ssave'); await sleep(2500);

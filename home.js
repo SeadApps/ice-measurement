@@ -274,9 +274,9 @@
       draft[key] = Math.min(c.max, Math.max(c.min, nv)); draft.preset = "custom"; savedMsg = ""; Shell.repaint();
     }
     return h("div", { cls: "field" }, [c.label + " (" + c.unit + ")", h("div", { cls: "stp" }, [
-      h("button", { cls: "sb", type: "button", "data-s": key, "data-d": "-1", disabled: dis, "aria-label": "Decrease " + c.label, text: "−", onclick: function () { nudge(-1); } }),
+      h("button", { cls: "stpb", type: "button", "data-s": key, "data-d": "-1", disabled: dis, "aria-label": "Decrease " + c.label, text: "−", onclick: function () { nudge(-1); } }),
       h("span", { cls: "sv", "data-v": key, "aria-live": "polite", text: c.text(draft[key]) }),
-      h("button", { cls: "sb", type: "button", "data-s": key, "data-d": "1", disabled: dis, "aria-label": "Increase " + c.label, text: "+", onclick: function () { nudge(1); } })])]);
+      h("button", { cls: "stpb", type: "button", "data-s": key, "data-d": "1", disabled: dis, "aria-label": "Increase " + c.label, text: "+", onclick: function () { nudge(1); } })])]);
   }
   function glassCheck(g, per) {
     var el = h("div", { cls: "card" }, [h("div", { cls: "eyebrow", text: "Glass check" })]);
