@@ -20,7 +20,7 @@ const ok = (n, c, x) => { c ? pass++ : fail++; console.log((c ? '  PASS  ' : '  
 
 (async () => {
 const b = await chromium.launch();
-const ctx = await b.newContext({ viewport: { width: 1280, height: 1000 } });
+const ctx = await b.newContext({ viewport: { width: 1000, height: 1000 } });
 await ctx.addInitScript(() => { window.__SYNC_CONFIG__ = { url: 'http://localhost:8200', anon: 'test', email: 'x@y.z' }; });
 const p = await ctx.newPage();
 const errs = [];
@@ -28,13 +28,31 @@ p.on('pageerror', e => errs.push(String(e).split('\n')[0]));
 await p.goto(B + '/glass.html'); await sleep(1500);
 await p.evaluate(() => document.querySelectorAll('.sync-gate').forEach(e => e.remove()));
 
-/* One rink is not a choice, so there is nothing to pick from yet. */
-ok('a device with only Conway has no picker',
-   await p.evaluate(() => document.getElementById('rinkPick').hidden));
+/* The surfaces that have no glass yet, written the way Ice and the Facilities page write them. The Builder is
+   for a sheet that exists: a rink is always a sheet now, so there is no "new surface" to walk. */
+await p.evaluate(t => {
+  const sz = { L: 200, W: 85, corner: 28 };
+  localStorage.setItem('ice_v4_facilities', JSON.stringify({ fa: { id: 'fa', name: 'Laconia Ice', ord: 0, updatedAt: t } }));
+  const sh = {};
+  [['sd', 'Rink 0', 0], ['sa', 'Rink 1', 1], ['sb', 'Rink 2', 2], ['se', 'Rink 5', 3], ['sf', 'Rink 6', 4]]
+    .forEach(([id, name, ord]) => { sh[id] = { id, facilityId: 'fa', name, ord, size: sz, updatedAt: t }; });
+  localStorage.setItem('ice_v4_sheets', JSON.stringify(sh));
+  localStorage.setItem('ice_v4_sessions', JSON.stringify({}));
+  localStorage.setItem('ice_v4_prefs', JSON.stringify({ activeFacility: 'fa', activeSheet: 'sd' }));
+}, '2026-09-01T00:00:00.000Z');
+/* The Builder page for a sheet: the address names it, as the bar's sheet menu would. */
+const openBuilder = async (fid, sid) => {
+  await p.evaluate(([f, s2]) => { localStorage.removeItem('glass_build_draft_v1'); location.hash = '#/f/' + f + '/s/' + s2 + '/build'; window.__glassShow('build', true); }, [fid, sid]);
+  await sleep(600);
+};
+ok('the old header is gone: no rink picker, no "Add a rink"',
+   await p.evaluate(() => !document.getElementById('rinkPick') && !document.getElementById('addRink') && !document.querySelector('header')));
 
 /* ---------------- step 1: the sheet ---------------- */
-await p.click('#addRink');
+await openBuilder('fa', 'sd');
 ok('the builder opens', await p.isVisible('#builder'));
+ok('with no way to walk a surface that is not in the system',
+   await p.evaluate(() => !document.querySelector('#bSheet option[value="__new"]') && !document.getElementById('bName')));
 
 await p.fill('#bL', '185'); await p.fill('#bW', '85');
 await p.fill('#bRf', '28'); await p.fill('#bRi', '0');
@@ -49,9 +67,6 @@ ok('an impossible corner radius is refused', /too big/i.test(await p.textContent
    await p.textContent('#bldMsg'));
 await p.fill('#bRf', '28'); await sleep(150);
 
-await p.click('#bldNext');
-ok('a rink with no name is refused', /name/i.test(await p.textContent('#bldMsg')));
-await p.fill('#bName', 'Nashua Arena — Rink 2');
 await p.click('#bldNext'); await sleep(200);
 
 /* ---------------- step 2: the glass ---------------- */
@@ -156,7 +171,7 @@ const after = await p.evaluate(() => ({
   viewBox: document.querySelector('#plan svg').getAttribute('viewBox')
 }));
 ok('the new rink becomes the one on screen', after.bucket !== 'legacy', after.bucket);
-ok('it carries the name it was given', /Rink 2/.test(after.name), after.name);
+ok('it carries the name it was given', /Rink 0/.test(after.name), after.name);
 ok('the plan is the new rink, not Conway', after.panels !== 127 && after.panels > 10, String(after.panels));
 ok('its schedule is listed', after.rows === after.panels, after.rows + ' vs ' + after.panels);
 ok('its glass height came through', after.height.indexOf('72') >= 0, after.height);
@@ -182,18 +197,13 @@ const back = await p.evaluate(() => ({
 }));
 ok('the rink is still there after a reload', back.bucket === after.bucket, back.bucket);
 ok('with its layout', back.panels === after.panels, back.panels + ' vs ' + after.panels);
-ok('its name', /Rink 2/.test(back.name), back.name);
+ok('its name', /Rink 0/.test(back.name), back.name);
 ok('and the condition recorded against it', back.mark === 'replace', String(back.mark));
 
 /* ---------------- the way back off it ---------------- */
 
 /* bldSave() moves you to the rink it just made. Until now nothing could move
    you off it again short of clearing site data. */
-ok('the picker appears once there are two rinks',
-   !(await p.evaluate(() => document.getElementById('rinkPick').hidden)));
-const rinkOpts = await p.evaluate(() =>
-  [...document.getElementById('rinkPick').options].map(o => o.textContent));
-ok('it lists both, Conway first', rinkOpts.length === 2 && /Conway/.test(rinkOpts[0]), JSON.stringify(rinkOpts));
 
 const built = await p.evaluate(() => ({
   size: document.getElementById('specSize').textContent,
@@ -201,7 +211,7 @@ const built = await p.evaluate(() => ({
 }));
 ok('the spec strip shows the built rink, not Conway', built.size.indexOf('185') === 0, built.size);
 
-await p.selectOption('#rinkPick', 'legacy'); await sleep(700);
+await p.evaluate(async () => { await switchRink('legacy'); }); await sleep(700);
 const home = await p.evaluate(() => ({
   bucket: activeBucket,
   panels: document.querySelectorAll('#plan .pnl').length,
@@ -227,8 +237,8 @@ ok('and the rink you chose survives a reload',
 
 /* Changing where the walk starts changes the shape of the stretches, so what
    was entered against the old ones cannot be carried across. */
-await p.click('#addRink'); await sleep(200);
-await p.fill('#bName', 'Third rink'); await p.click('#bldNext'); await sleep(200);
+await openBuilder('fa', 'sa');
+await p.click('#bldNext'); await sleep(200);
 await p.selectOption('#bStart', 'end'); await sleep(200);
 await p.click('#bldNext'); await sleep(250);
 ok('a corner start gives four stretches', /Stretch 1 of 4/.test(await p.textContent('#bldBody')),
@@ -237,21 +247,13 @@ await p.click('#bldClose'); await sleep(150);
 
 /* ---------------- the join: glass hangs off an ice surface ---------------- */
 
-/* Seeded the way the launcher writes them, so the builder is looking at real
-   surfaces rather than anything invented here. */
-await p.evaluate(t => {
-  localStorage.setItem('ice_v4_facilities', JSON.stringify({
-    fa:{id:'fa',name:'Laconia Ice',ord:0,updatedAt:t} }));
-  localStorage.setItem('ice_v4_sheets', JSON.stringify({
-    sa:{id:'sa',facilityId:'fa',name:'Rink 1',ord:0,updatedAt:t},
-    sb:{id:'sb',facilityId:'fa',name:'Rink 2',ord:1,updatedAt:t} }));
-  localStorage.setItem('ice_v4_sessions', JSON.stringify({}));
+/* Which surface the program says you are at: Rink 2. */
+await p.evaluate(() => {
   const pr = JSON.parse(localStorage.getItem('ice_v4_prefs') || '{}');
   pr.activeFacility = 'fa'; pr.activeSheet = 'sb';
   localStorage.setItem('ice_v4_prefs', JSON.stringify(pr));
-}, '2026-09-01T00:00:00.000Z');
-
-await p.click('#addRink'); await sleep(500);
+});
+await openBuilder('fa', 'sb');
 const surfaces = await p.evaluate(() =>
   [...document.getElementById('bSheet').options].map(o => ({ v: o.value, t: o.textContent })));
 ok('the builder offers the surfaces that have no glass yet',
@@ -260,10 +262,8 @@ ok('naming them by facility and sheet',
    (surfaces.find(o => o.v === 'sa') || {}).t === 'Laconia Ice \u2014 Rink 1',
    JSON.stringify(surfaces));
 /* The reason you opened this is the rink you are standing in. */
-ok('and it starts on the one the launcher says you are at',
+ok('and it starts on the one the address names',
    (await p.evaluate(() => BLD.sheet)) === 'sb');
-ok('the rink-name field stays out of the way for a surface that exists',
-   !(await p.isVisible('#bNewWrap')));
 
 /* Fills every stretch to roughly its board length and saves, the way the
    walk does, without driving the form a fourth time. */
@@ -288,32 +288,16 @@ ok('walking it keys the glass by the surface itself', onSb === 'sb', String(onSb
 ok('so the plan is named after that surface',
    /Laconia Ice/.test(await p.textContent('#facName')), await p.textContent('#facName'));
 
-await p.click('#addRink'); await sleep(500);
+await openBuilder('fa', 'sa');
 const left = await p.evaluate(() =>
   [...document.getElementById('bSheet').options].map(o => o.value));
 ok('a surface that already has glass is not offered again', left.indexOf('sb') < 0,
    JSON.stringify(left));
 
-/* And a rink that is not in the system at all: the builder writes the facility
-   and the sheet, through the same method the launcher uses. */
-await p.selectOption('#bSheet', '__new'); await sleep(250);
-ok('choosing a new surface asks what it is called', await p.isVisible('#bNewWrap'));
-const made = await p.evaluate(walkIn, 'Rink 3'); await sleep(400);
-const recs = await p.evaluate(() => ({
-  sh: JSON.parse(localStorage.getItem('ice_v4_sheets') || '{}'),
-  fac: JSON.parse(localStorage.getItem('ice_v4_facilities') || '{}') }));
-ok('a rink walked from scratch gets a sheet record', !!recs.sh[made], String(made));
-ok('under the facility you are already at', !!recs.sh[made] && recs.sh[made].facilityId === 'fa',
-   JSON.stringify(recs.sh[made]));
-ok('named what you called it', !!recs.sh[made] && recs.sh[made].name === 'Rink 3',
-   JSON.stringify(recs.sh[made]));
-ok('and its glass is keyed by that same surface',
-   await p.evaluate(k => !!LAYOUTS[k], made));
-
 /* Which rink you are at is one fact, not one per app. */
 await p.evaluate(async () => { await switchRink('sb'); }); await sleep(500);
 const prefs = await p.evaluate(() => JSON.parse(localStorage.getItem('ice_v4_prefs') || '{}'));
-ok('switching rink in Glass moves where the launcher says you are',
+ok('switching rink in Glass moves where the program says you are',
    prefs.activeSheet === 'sb' && prefs.activeFacility === 'fa', JSON.stringify(prefs));
 
 await p.reload(); await sleep(1800);
@@ -324,7 +308,7 @@ ok('and Glass opens on that surface next time',
 /* ---------------- and which way round it is drawn ---------------- */
 
 /* Step 4 is where you are already holding the drawing up against the room. */
-await p.click('#addRink'); await sleep(500);
+await openBuilder('fa', 'se');
 await p.evaluate(() => {
   BLD.L = 185; BLD.W = 85; BLD.Rft = 28; BLD.Rin = 0; BLD.height = 72;
   BLD.start = 'end'; BLD.walls = []; BLD.wi = 0; BLD.step = 4;
@@ -353,12 +337,12 @@ ok('and the button says it is on',
 
 /* It has to be in the spec, or the rink arrives on the next device facing the
    way the builder was not holding it. */
-const facedBucket = await p.evaluate(async () => { BLD.name = 'Faced rink'; await bldSave(); return activeBucket; });
+const facedBucket = await p.evaluate(async () => { await bldSave(); return activeBucket; });
 await sleep(400);
 ok('the walk records which way round it is',
    await p.evaluate(k => LAYOUTS[k].spec.flip === true, facedBucket));
 
-/* ---------------- the picker follows the launcher, and lets go ---------------- */
+/* ---------------- walked glass can be taken off again ---------------- */
 
 p.on('dialog', d => d.accept());
 
@@ -375,7 +359,7 @@ await p.evaluate(t => {
   localStorage.setItem('ice_v4_prefs', JSON.stringify(pr));
 }, '2026-09-01T00:00:00.000Z');
 
-await p.click('#addRink'); await sleep(500);
+await openBuilder('fb', 'sc');
 ok('the builder starts on the new site\'s surface',
    (await p.evaluate(() => BLD.sheet)) === 'sc', await p.evaluate(() => BLD.sheet));
 const onSc = await p.evaluate(walkIn, null); await sleep(400);
@@ -386,34 +370,19 @@ await p.evaluate(async () => {
   const pr = JSON.parse(localStorage.getItem('ice_v4_prefs'));
   pr.activeFacility = 'fa'; pr.activeSheet = 'sb';
   localStorage.setItem('ice_v4_prefs', JSON.stringify(pr));
-  await switchRink('sb'); await loadSurfaces(); fillRinks();
+  await switchRink('sb'); await loadSurfaces();
 });
 await sleep(400);
-const offered = await p.evaluate(() =>
-  [...document.getElementById('rinkPick').options].map(o => o.value));
-ok('the picker offers this facility\'s rinks', offered.indexOf('sb') >= 0, JSON.stringify(offered));
-ok('and not another site\'s', offered.indexOf('sc') < 0, JSON.stringify(offered));
-/* Conway's glass is bound to a surface at neither site in this fixture, so it
-   cannot be classified - and something you cannot classify is better shown. */
-ok('Conway is not hidden by a facility it cannot be placed at',
-   offered.indexOf('legacy') >= 0, JSON.stringify(offered));
-
 /* Glass walked by mistake had no way off the device. */
-ok('a walked rink offers a way to remove it',
-   !(await p.evaluate(() => document.getElementById('rinkDel').hidden)));
 await p.evaluate(async () => { await switchRink('legacy'); });
 await sleep(300);
-ok('Conway does not, being compiled in rather than walked',
-   await p.evaluate(() => document.getElementById('rinkDel').hidden));
 
 await p.evaluate(async () => { await switchRink('sb'); }); await sleep(300);
-await p.evaluate(async () => { await deleteRink('sb'); }); await sleep(500);
+await p.evaluate(async () => { deleteRink('sb'); await new Promise(r => setTimeout(r, 200)); document.getElementById('sureYes').click(); }); await sleep(500);
 const gone = await p.evaluate(() => ({
-  layout: !!LAYOUTS['sb'], bucket: activeBucket, tombstoned: !!LAYOUT_GONE['sb'],
-  options: [...document.getElementById('rinkPick').options].map(o => o.value) }));
+  layout: !!LAYOUTS['sb'], bucket: activeBucket, tombstoned: !!LAYOUT_GONE['sb'] }));
 ok('removing it takes the layout with it', !gone.layout, JSON.stringify(gone));
 ok('and drops you back on Conway', gone.bucket === 'legacy', gone.bucket);
-ok('the picker stops offering it', gone.options.indexOf('sb') < 0, JSON.stringify(gone.options));
 /* Dropped quietly, the next pull would simply hand it back. */
 ok('and it is tombstoned, not just forgotten', gone.tombstoned, JSON.stringify(gone));
 

@@ -1,0 +1,416 @@
+/* glass.css: the Ice Board styling of Glass's pages (Rink view, Builder, Inventory).
+   Moved out of glass.html unchanged; the theme tokens are at the top. */
+/* Palette and type taken from the Ice app so the two read as one product. */
+:root{
+  --glow:#16283a;
+  --ground:#0d1620; --surface:#152433; --surface-2:#1c3142; --surface-3:#22394b;
+  --line:#273d4f; --line-2:#3a5b72;
+  --ink:#eaf3f8; --ink-2:#90a8b8; --ink-3:#5d7384;
+  --accent:#6fd6ec; --accent-soft:#13323f;
+  --rink-blue:#4f8fd0; --rink-red:#d6453f; --ice:#feffff;
+  --ok:#6f8ea0; --ok-soft:#d0d0d0;
+  /* Text sitting on a glass panel, not on the page. Panels are light in
+     both themes, so this stays dark in both and is deliberately not
+     redefined under [data-theme="light"]. */
+  --panel-ink:#13222e;
+  --replace:#e5645d; --replace-soft:#3a1f1e;
+  --plexi:#e8b54a; --plexi-soft:#33280f;
+  --warn:#e8b54a;
+  --shadow:0 1px 2px rgba(0,0,0,.35),0 10px 26px -14px rgba(0,0,0,.7);
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --display:var(--sans); --body:var(--sans);
+}
+[data-theme="light"]{
+  --glow:#d6e6f0;
+  --ground:#eaeff3; --surface:#ffffff; --surface-2:#eef3f7; --surface-3:#e2eaf1;
+  --line:#d2dde5; --line-2:#b6c7d3;
+  --ink:#13222e; --ink-2:#51707f; --ink-3:#8499a6;
+  --accent:#1391b4; --accent-soft:#d8eef4;
+  --rink-blue:#2f86c5; --rink-red:#d6453f; --ice:#fbfdfe;
+  --ok:#7492a3; --ok-soft:#e4ecf1;
+  --replace:#b02f2a; --replace-soft:#f7dedc;
+  --plexi:#96650c; --plexi-soft:#faedd3;
+  --warn:#96650c;
+  --shadow:0 1px 2px rgba(19,34,46,.06),0 8px 24px -12px rgba(19,34,46,.16);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:radial-gradient(1200px 600px at 50% -10%, var(--glow) 0%, transparent 60%), var(--ground);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1440px;margin:0 auto;padding:28px 24px 64px;display:flex;flex-direction:column;gap:22px}
+
+/* ---- header ---- */
+header{display:flex;flex-wrap:wrap;align-items:center;gap:14px;padding-bottom:16px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:baseline;gap:10px;margin-right:auto}
+.brand h1{margin:0;font-size:21px;font-weight:800;letter-spacing:.02em;display:flex;align-items:baseline;gap:9px}
+.brand h1 .mark{font-family:var(--mono);color:var(--accent);font-weight:700;font-size:16px}
+.brand .sub{font-size:11px;color:var(--ink-2)}
+.eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-3);font-weight:700}
+.lede{color:var(--ink-2);font-size:13.5px;margin:0;max-width:74ch}
+.themeseg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.themeseg button{appearance:none;border:0;background:var(--surface-2);color:var(--ink-2);font:inherit;font-size:12.5px;
+  font-weight:600;padding:8px 16px;cursor:pointer}
+.themeseg button[aria-pressed="true"]{background:var(--accent);color:#06222b}
+.themeseg button+button{border-left:1px solid var(--line)}
+.themeseg button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+/* ---------- the shared bar (shell.js) is drawn into #shellbar, styled by shellbar.css ---------- */
+#shellbar{position:relative;z-index:50}
+@media print{#shellbar{display:none!important}}
+.specstrip{display:flex;gap:26px;flex-wrap:wrap;align-items:flex-end;justify-content:space-between}
+.specs{display:flex;gap:26px;flex-wrap:wrap}
+.spec{display:flex;flex-direction:column;gap:1px}
+.spec b{font-family:var(--mono);font-size:19px;font-weight:500;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.spec span{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+
+  padding:5px 11px;border:0;border-left:1px solid var(--line);background:transparent;color:var(--ink-3);cursor:pointer}
+.theme button:first-child{border-left:0}
+.theme button:hover{color:var(--ink-2);background:var(--surface-2)}
+.theme button[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
+.theme button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+
+/* ---- status rail ---- */
+.rail{display:flex;flex-wrap:wrap;gap:10px;align-items:stretch}
+.tile{flex:1 1 190px;background:var(--surface);border:1px solid var(--line);border-radius:10px;
+  padding:11px 14px;display:flex;flex-direction:column;gap:2px;cursor:pointer;text-align:left;
+  font:inherit;color:inherit;position:relative;transition:border-color .12s,background .12s}
+.tile:hover{border-color:var(--line-2)}
+.tile[aria-pressed="true"]{background:var(--surface-2);border-color:var(--ink-3)}
+.tile:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tile .k{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);
+  display:flex;align-items:center;gap:7px}
+.tile .k i{width:9px;height:9px;border-radius:6px;display:inline-block;flex:none}
+.tile .v{font-family:var(--mono);font-size:23px;font-weight:500;line-height:1.15;font-variant-numeric:tabular-nums}
+.tile .m{font-size:12px;color:var(--ink-2)}
+.sw-ok{background:var(--ok)} .sw-replace{background:var(--replace)} .sw-plexi{background:var(--plexi)}
+
+/* ---- diagram ---- */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow)}
+.card-hd{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap;
+  padding:12px 16px;border-bottom:1px solid var(--line)}
+.card-hd h2{font-family:var(--display);font-weight:600;font-size:17px;letter-spacing:.02em;margin:0;text-transform:uppercase}
+.hint{font-size:12.5px;color:var(--ink-3)}
+.lgd{display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+.lgd span{display:inline-flex;align-items:center;gap:6px}
+.lgd i{width:11px;height:11px;flex:none;border-radius:6px}
+.lg-door{background:var(--accent)}
+.lg-feat{background:var(--rink-red)}
+.lg-asm{background:var(--warn)}
+.lg-open{background:repeating-linear-gradient(45deg,var(--surface-2) 0 2px,var(--ink-3) 2px 3px);border:1px solid var(--line-2)}
+.plan{padding:8px 6px 4px;overflow-x:auto}
+.tick{stroke-width:.45;stroke-linecap:round;pointer-events:none}
+.tick.door{stroke:var(--accent)} .tick.feature{stroke:var(--rink-red)}
+.tick.damage{stroke:var(--replace)} .tick.assumed{stroke:var(--warn)}
+.pnl.assumed{stroke:var(--warn);stroke-width:.38;stroke-dasharray:.7 .5}
+svg.rink{display:block;width:100%;min-width:760px;height:auto}
+.pnl{cursor:pointer;stroke:var(--surface);stroke-width:.16;transition:opacity .12s}
+.pnl:hover{stroke:var(--ink);stroke-width:.4}
+.pnl.sel{stroke:var(--ink);stroke-width:.55}
+.pnl.dim{opacity:.22}
+.pnum{font-family:var(--mono);font-size:1.62px;fill:var(--ink-3);text-anchor:middle;dominant-baseline:middle;pointer-events:none;user-select:none}
+.pnum.on{fill:var(--panel-ink);font-weight:600}
+.seclbl{font-family:var(--display);font-size:3.4px;font-weight:600;letter-spacing:.24em;fill:var(--ink-3);text-anchor:middle;text-transform:uppercase}
+.opnlbl{font-family:var(--display);font-size:1.95px;font-weight:600;letter-spacing:.04em;fill:var(--ink-2);text-anchor:middle;dominant-baseline:middle;text-transform:uppercase}
+.opnlbl.warn{fill:var(--warn)}
+.doorlbl{font-family:var(--display);font-size:2.5px;font-weight:600;letter-spacing:.1em;fill:var(--accent);text-anchor:middle;dominant-baseline:middle;text-transform:uppercase}
+.dim-t{font-family:var(--mono);font-size:2.6px;fill:var(--ink-3);text-anchor:middle}
+
+/* ---- lower grid ---- */
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:22px;align-items:start}
+/* minmax(0,...) as above, not a bare 1fr: 1fr means minmax(auto,1fr), and that
+   auto floors the column at its min-content width. The column then refuses to
+   shrink, and takes the whole page sideways with it - 121px of it at 390px. */
+@media (max-width:1040px){.grid{grid-template-columns:minmax(0,1fr)}}
+.aside{position:sticky;top:18px;display:flex;flex-direction:column;gap:18px}
+.pad{padding:14px 16px}
+.detail dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:5px 14px;font-size:13.5px}
+.detail dt{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);align-self:center}
+.detail dd{margin:0;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.pid{font-family:var(--display);font-size:38px;font-weight:700;line-height:.9;letter-spacing:-.01em}
+.stat-btns{display:flex;flex-direction:column;gap:6px;margin-top:14px}
+.sbtn{display:flex;align-items:center;gap:9px;padding:8px 11px;border:1px solid var(--line);background:var(--surface);
+  border-radius:10px;font:inherit;font-size:13.5px;color:var(--ink);cursor:pointer;text-align:left;transition:.12s}
+.sbtn i{width:10px;height:10px;border-radius:6px;flex:none}
+.sbtn:hover{border-color:var(--line-2);background:var(--surface-2)}
+.sbtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sbtn[aria-pressed="true"]{border-color:currentColor;font-weight:600}
+.sbtn[data-s="ok"][aria-pressed="true"]{color:var(--ok);background:var(--ok-soft)}
+.sbtn[data-s="replace"][aria-pressed="true"]{color:var(--replace);background:var(--replace-soft)}
+.sbtn[data-s="plexi"][aria-pressed="true"]{color:var(--plexi);background:var(--plexi-soft)}
+textarea{width:100%;margin-top:10px;min-height:62px;resize:vertical;font:inherit;font-size:13px;color:var(--ink);
+  background:var(--ground);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.empty{color:var(--ink-3);font-size:13.5px}
+.savenote{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--ink-3);margin-top:9px;min-height:14px}
+/* Clear and Save sit under the note. The note still saves itself 600ms after
+   you stop typing and again when you leave the box - these are for certainty,
+   and because a note you want gone should not need a select-all first. */
+.note-act{display:flex;align-items:center;gap:8px;margin-top:9px;flex-wrap:wrap}
+.note-act .savenote{margin-top:0;margin-left:auto;text-align:right}
+.note-x{padding:6px 10px;line-height:1;font-size:12px}
+.note-x:hover{border-color:var(--replace);color:var(--replace)}
+
+/* ---- spare glass ---- */
+.sp-where{margin:0 0 10px;font-size:11.5px;color:var(--ink-3)}
+.sp-line{display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:baseline;
+  padding:7px 0;border-top:1px solid var(--line)}
+.sp-line:first-child{border-top:0}
+.sp-sz{font-family:var(--mono);font-size:12.5px;color:var(--ink)}
+.sp-n{font-family:var(--mono);font-size:14px;font-weight:600;font-variant-numeric:tabular-nums}
+.sp-n.short{color:var(--replace)}
+.sp-need{grid-column:1/-1;font-size:11.5px;color:var(--ink-3)}
+.sp-need b{color:var(--ink-2);font-weight:600}
+.sp-none{margin:0;font-size:12.5px;color:var(--ink-3)}
+.sp-add{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
+.sp-add summary{font-size:12px;color:var(--accent);cursor:pointer;list-style:none}
+.sp-add summary::-webkit-details-marker{display:none}
+.sp-add summary::before{content:"+ ";font-family:var(--mono)}
+.sp-add[open] summary::before{content:"− ";font-family:var(--mono)}
+.sp-form{display:flex;flex-direction:column;gap:7px;margin-top:9px}
+.sp-form select,.sp-form input{font:inherit;font-size:12.5px;padding:6px 8px;border:1px solid var(--line);
+  border-radius:8px;background:var(--surface-2);color:var(--ink);min-width:0}
+.sp-form select:focus-visible,.sp-form input:focus-visible{outline:2px solid var(--accent);outline-offset:-1px}
+.sp-row{display:grid;grid-template-columns:64px 1fr auto;gap:6px}
+/* Same segmented shape as the theme switch at the top of the page, so the two
+   read as the same kind of control. */
+.sp-mat{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;align-self:flex-start}
+.sp-mat button{font:inherit;font-size:12.5px;padding:6px 12px;border:0;background:var(--surface-2);
+  color:var(--ink-2);cursor:pointer}
+.sp-mat button+button{border-left:1px solid var(--line)}
+.sp-mat button[aria-pressed="true"]{background:var(--accent);color:var(--ground);font-weight:600}
+.sp-mat button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.sp-other{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+/* Same trap as .bld-f above: display:grid on a class outranks the browser's
+   own [hidden]{display:none}, so the custom-size boxes sat open permanently. */
+.sp-other[hidden]{display:none}
+.sp-hint{margin:8px 0 0;font-size:11px;line-height:1.45;color:var(--ink-3)}
+.sp-mv{margin-top:11px;border-top:1px solid var(--line);padding-top:9px;
+  display:flex;flex-direction:column;gap:5px}
+.sp-mv-h{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+.sp-mv-r{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:baseline;font-size:12px}
+.sp-mv-q{font-family:var(--mono);font-weight:600;font-variant-numeric:tabular-nums}
+.sp-mv-q.up{color:var(--ok)}
+.sp-mv-q.down{color:var(--ink-2)}
+.sp-mv-t{color:var(--ink-2);overflow-wrap:anywhere}
+.sp-undo{font:inherit;font-size:11px;background:none;border:0;color:var(--ink-3);cursor:pointer;padding:0}
+.sp-undo:hover{color:var(--replace)}
+/* A deduction the app made rather than somebody typing it. Marked because it
+   is the one movement nobody chose, so it is the one worth being able to spot
+   and take back. */
+.sp-auto{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;
+  border:1px solid var(--line-2);border-radius:4px;padding:0 4px;color:var(--ink-3)}
+.sp-cov{font-size:12px;color:var(--ink-2)}
+.sp-cov b{color:var(--ink);font-weight:600}
+
+/* ---- schedule ---- */
+.hd-t{display:flex;flex-direction:column;gap:2px;min-width:0}
+.sched-sub{margin:0;font-size:12px;line-height:1.45;color:var(--ink-3);font-weight:400;
+  text-transform:none;letter-spacing:0}
+/* The line that says what you are looking at, and the way back to all of it.
+   The order list sits here rather than among Save/Load/Print because it is
+   what this table is for, not a fourth way to get a file out of it. */
+.scopebar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+  padding:9px 16px;border-bottom:1px solid var(--line);background:var(--surface-2)}
+.scope-t{margin:0;font-size:12.5px;color:var(--ink-2)}
+.scope-t b{color:var(--ink);font-weight:600}
+.scope-a{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.btn-go{border-color:var(--accent);color:var(--accent)}
+.btn-go:hover{background:var(--accent);color:var(--ground)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn:disabled:hover{background:var(--surface)}
+tr.off{display:none}
+.tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+input[type=search]{font:inherit;font-size:13px;padding:6px 10px;border:1px solid var(--line);border-radius:10px;
+  background:var(--ground);color:var(--ink);width:150px}
+input[type=search]:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.btn{font:inherit;font-size:12.5px;padding:6px 11px;border:1px solid var(--line);background:var(--surface);
+  color:var(--ink);border-radius:10px;cursor:pointer}
+.btn:hover{background:var(--surface-2)}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tblwrap{max-height:560px;overflow:auto}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th{position:sticky;top:0;z-index:2;background:var(--surface-2);font-family:var(--mono);font-size:9.5px;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2);font-weight:500;text-align:left;
+  padding:7px 12px;border-bottom:1px solid var(--line)}
+td{padding:5px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+tbody tr{cursor:pointer}
+tbody tr:hover td{background:var(--surface-2)}
+tbody tr.sel td{background:var(--accent-soft)}
+tr.grp td{background:var(--surface-3);font-family:var(--display);font-weight:600;letter-spacing:.16em;
+  text-transform:uppercase;font-size:11.5px;color:var(--ink-2);padding:7px 12px;position:sticky;top:27px;z-index:1}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:500}
+.pill{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;
+  text-transform:uppercase;padding:2px 7px;border-radius:6px;white-space:nowrap}
+.pill i{width:7px;height:7px;border-radius:1px;flex:none}
+.p-ok{color:var(--ink-3)} .p-ok i{background:var(--ok)}
+.p-replace{color:var(--replace);background:var(--replace-soft)} .p-replace i{background:var(--replace)}
+.p-plexi{color:var(--plexi);background:var(--plexi-soft)} .p-plexi i{background:var(--plexi)}
+.tagchip{display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.04em;padding:1px 6px;
+  border-radius:6px;border:1px solid currentColor;white-space:nowrap}
+.t-door{color:var(--accent)} .t-zamdoor{color:var(--accent)}
+.t-feature{color:var(--rink-red)} .t-damage{color:var(--replace)}
+.t-assumed{color:var(--warn)}
+
+/* ---- notes ---- */
+.pnl-note{display:flex;gap:8px;margin-top:10px}
+.pnl-note input{flex:1;min-width:0}
+.pnl-note input,.pnl-note select{font:inherit;font-size:13px;background:var(--surface-2);color:var(--ink);
+  border:1px solid var(--line);border-radius:8px;padding:7px 9px;height:34px}
+.pnl-note input:focus-visible,.pnl-note select:focus-visible{outline:2px solid var(--accent);outline-offset:-1px}
+.notes{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:0;border:1px solid var(--line);
+  border-radius:10px;overflow:hidden;background:var(--surface)}
+.note{padding:15px 18px;border-right:1px solid var(--line)}
+.note:last-child{border-right:0}
+.note h3{font-family:var(--display);font-size:14px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;
+  margin:0 0 6px;display:flex;align-items:center;gap:8px}
+.note h3::before{content:"";width:3px;height:14px;background:var(--warn);flex:none}
+.note.info h3::before{background:var(--accent)}
+.note p{margin:0;font-size:13.5px;color:var(--ink-2)}
+.note p+p{margin-top:7px}
+kbd{font-family:var(--mono);font-size:12px;background:var(--surface-2);border:1px solid var(--line);
+  border-radius:6px;padding:0 4px}
+footer{font-size:12.5px;color:var(--ink-3);text-align:center;font-family:var(--mono);letter-spacing:.04em}
+/* ---- phone ----
+   Glass was built on a desktop and never looked at on a phone. At 390px the
+   rink started 1116px down - past two screenfuls - because everything that
+   sits in a row on a desktop stacks here: the header wrapped to four rows and
+   the tiles to four, and between them they pushed the plan off the screen.
+   Nothing is dropped that is not said elsewhere on the page. 560px is the
+   breakpoint ice.html already uses, so the two pages turn together. */
+.sheet-x{display:none}
+.gscrim{position:fixed;inset:0;z-index:1000;background:#06090dcc;display:none;align-items:center;justify-content:center;padding:16px}
+.gscrim.on{display:flex}
+.gsure{background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:16px;padding:20px;max-width:440px;width:100%}
+.gsure h2{margin:0 0 8px;font-size:17px}.gsure p{margin:0 0 16px;color:var(--ink-2);font-size:14px;line-height:1.5}
+.gsure-foot{display:flex;gap:8px;justify-content:flex-end}
+.gsure-foot .btn{min-height:44px}
+.bld-page[hidden]{display:none}
+#glassWrap:not([data-page="build"]) .bld-page{display:none}
+#glassWrap[data-page="build"] .specstrip,#glassWrap[data-page="build"] .rail,#glassWrap[data-page="build"] #planCard,#glassWrap[data-page="build"] .grid{display:none}
+/* the three pages of Glass: the address names one, and the others' cards are put away */
+.gtabs{display:flex;gap:6px;flex-wrap:wrap}
+.gtabs button{appearance:none;font:inherit;font-size:13px;min-height:44px;padding:0 16px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink-2);cursor:pointer}
+.gtabs button[aria-current="page"]{background:var(--accent);color:var(--ground);border-color:var(--accent);font-weight:600}
+#glassWrap[data-page="rink"] #spares{display:none}
+#glassWrap[data-page="inventory"] .specstrip,#glassWrap[data-page="inventory"] .rail,#glassWrap[data-page="inventory"] #planCard,
+#glassWrap[data-page="inventory"] .grid>section.card,#glassWrap[data-page="inventory"] .aside>:not(#spares){display:none}
+#glassWrap[data-page="inventory"] .grid{grid-template-columns:minmax(0,1fr)}
+#glassWrap[data-page="inventory"] .aside{position:static}
+.sp-qty-in{width:78px;min-height:44px;font:inherit;font-family:var(--mono);font-size:15px;font-weight:600;text-align:right;padding:4px 8px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--ink)}
+.sp-qty-in.short{color:var(--replace)}
+.sp-qty-in:focus-visible{outline:2px solid var(--accent);outline-offset:-1px}
+@media (max-width:560px){
+  /* the picked panel opens as a sheet at the bottom of the screen */
+  #detail.has-sel{position:fixed;left:0;right:0;bottom:0;z-index:30;max-height:64vh;overflow:auto;border-radius:16px 16px 0 0;
+    box-shadow:0 -10px 40px -12px #000a;padding-bottom:max(16px,env(safe-area-inset-bottom))}
+  #detail:not(.has-sel){display:none}
+  #detail .sheet-x{display:block;position:absolute;top:8px;right:8px;width:44px;height:44px;border:0;border-radius:10px;background:var(--surface-2);color:var(--ink);font-size:16px}
+  .wrap{padding:14px 14px 40px;gap:14px}
+  header{gap:9px;padding-bottom:12px}
+  .brand{width:100%;margin-right:0}
+  .brand h1{font-size:18px}
+  .brand .sub{display:none}      /* restates the title, and costs two lines here */
+  .specstrip{gap:12px}
+  .specs{gap:12px 18px}
+  .spec b{font-size:17px}
+  .tile{flex-basis:140px}        /* two tiles to a row rather than one */
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+@media print{
+  @page{size:landscape;margin:12mm}
+  body{background:#fff}
+  .wrap{max-width:none;padding:0;gap:14px}
+  .rail,.tools,.aside,.theme,.scopebar,.card-hd .lgd span:last-child{display:none!important}
+  /* The printed sheet is the reference document: every piece, whatever the
+     screen is scoped to - the status scope and the search box both. That is
+     what max-height:none below has always been for, and it is why rows out of
+     view are hidden rather than left out: the table now opens on the two
+     flagged panels, and a printout that followed the screen would silently
+     have become two rows. Searching and then printing gives all 127 too, which
+     is the one case where this surprises; the order list is the way to get a
+     subset onto paper. */
+  tr.off{display:table-row!important}
+  tr.none{display:none!important}
+  .card{box-shadow:none;border-color:#bbb;break-inside:avoid}
+  .grid{grid-template-columns:1fr}
+  .tblwrap{max-height:none;overflow:visible}
+  th{position:static}
+  tr.grp td{position:static}
+  svg.rink{min-width:0}
+  .notes{break-inside:avoid}
+  header{border-bottom-width:1.5px}
+}
+
+  /* ---- the rink builder ---- */
+  .bld{position:fixed;inset:0;z-index:900;background:var(--ground);overflow:auto;padding:0}
+  .bld[hidden]{display:none!important}
+  .bld-box{max-width:820px;margin:0 auto;padding:20px 16px 40px;display:flex;flex-direction:column;gap:16px}
+  .bld-head{display:flex;align-items:baseline;gap:12px}
+  .bld-head h2{margin:0;font-size:20px;font-weight:800;letter-spacing:-.01em}
+  .bld-head .sub{font-size:12.5px;color:var(--ink-2)}
+  .bld-x{margin-left:auto;appearance:none;font:inherit;font-size:13px;background:var(--surface);
+    color:var(--ink-2);border:1px solid var(--line);border-radius:8px;padding:8px 14px;cursor:pointer}
+  .bld-steps{display:flex;gap:6px;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;
+    text-transform:uppercase}
+  .bld-steps span{flex:1;padding:7px 8px;text-align:center;border-radius:7px;background:var(--surface);
+    color:var(--ink-3);border:1px solid var(--line)}
+  .bld-steps span.on{background:var(--accent);color:var(--ground);border-color:var(--accent);font-weight:700}
+  .bld-steps span.done{color:var(--ok)}
+  .bld-body{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px}
+  .bld-body h3{margin:0 0 4px;font-size:16px;font-weight:700}
+  .bld-body p.note{margin:0 0 16px;font-size:13px;color:var(--ink-2);line-height:1.55;max-width:62ch}
+  .bld-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+  .bld-f{display:flex;flex-direction:column;gap:5px}
+  /* display:flex on a class outranks the browser's own [hidden]{display:none}. */
+  .bld-f[hidden]{display:none}
+  .bld-f label{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+  .bld-f input,.bld-f select{font:inherit;font-size:16px;height:46px;padding:0 12px;border-radius:9px;
+    border:1px solid var(--line);background:var(--surface-2);color:var(--ink);width:100%}
+  .bld-f input:focus,.bld-f select:focus{outline:2px solid var(--accent);outline-offset:-1px}
+  .bld-f .hint{font-size:11.5px;color:var(--ink-3)}
+  .bld-check{display:flex;align-items:flex-start;gap:10px;margin-top:14px;font-size:14px;line-height:1.5}
+  .bld-check input{width:22px;height:22px;margin-top:1px;flex:none;accent-color:var(--accent)}
+  .bld-readout{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin:16px 0}
+  .bld-readout div{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:10px 12px}
+  .bld-readout b{display:block;font-family:var(--mono);font-size:17px;font-variant-numeric:tabular-nums}
+  .bld-readout span{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
+  .bld-readout div.warn{border-color:var(--plexi)} .bld-readout div.warn b{color:var(--plexi)}
+  .bld-readout div.bad{border-color:var(--replace)} .bld-readout div.bad b{color:var(--replace)}
+  .bld-list{display:flex;flex-wrap:wrap;gap:6px;margin:14px 0;min-height:30px}
+  .bld-chip{display:inline-flex;align-items:center;gap:7px;background:var(--surface-2);
+    border:1px solid var(--line);border-radius:999px;padding:6px 6px 6px 12px;font-family:var(--mono);font-size:12px}
+  .bld-chip.door{border-color:var(--accent)} .bld-chip.gate{border-color:var(--accent)}
+  .bld-chip.open{border-color:var(--ink-3);border-style:dashed}
+  .bld-chip button{appearance:none;border:0;background:transparent;color:var(--ink-3);cursor:pointer;
+    font-size:15px;line-height:1;padding:2px 5px;border-radius:50%}
+  .bld-chip button:hover{color:var(--replace)}
+  .bld-add{display:grid;grid-template-columns:1.1fr .9fr 1.4fr auto;gap:8px;align-items:end}
+  @media (max-width:640px){ .bld-add{grid-template-columns:1fr 1fr} .bld-add .wide{grid-column:1/-1} }
+  .bld-foot{display:flex;align-items:center;gap:12px}
+  .bld-foot button{appearance:none;font:inherit;font-size:15px;font-weight:600;height:46px;padding:0 22px;
+    border-radius:9px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+  .bld-foot button.primary{background:var(--accent);color:var(--ground);border-color:var(--accent);font-weight:700}
+  .bld-foot button:disabled{opacity:.45;cursor:default}
+  .bld-foot .bld-msg{flex:1;font-size:13px;color:var(--ink-2)}
+  .bld-foot .bld-msg.bad{color:var(--replace)}
+  .bld-secs{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+  .bld-secs th{text-align:left;font-family:var(--mono);font-size:9.5px;letter-spacing:.11em;
+    text-transform:uppercase;color:var(--ink-3);padding:0 10px 7px 0;border-bottom:1px solid var(--line-2)}
+  .bld-secs td{padding:9px 10px 9px 0;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+  .bld-secs td.n{font-family:var(--mono)}
+  .bld-secs tr.warn td.n{color:var(--plexi)} .bld-secs tr.bad td.n{color:var(--replace)}
+  #bldPlan{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:10px;overflow-x:auto}
+  .bld-seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+  .bld-seg button{appearance:none;font:inherit;font-size:15px;font-weight:600;padding:12px 22px;
+    background:var(--surface-2);color:var(--ink-2);border:0;cursor:pointer;min-width:82px}
+  .bld-seg button[aria-pressed="true"]{background:var(--accent);color:var(--ground);font-weight:700}
+  .bld-seg button+button{border-left:1px solid var(--line)}
+  .bld-addbtn{height:46px;padding:0 22px;border-radius:9px;border:1px solid var(--accent);
+    background:var(--accent);color:var(--ground);font:inherit;font-size:15px;font-weight:700;cursor:pointer}
+  #bldPlan svg{width:100%;height:auto;display:block}
+
+/* flags: a panel somebody has flagged and nobody has resolved */
+.pnl.flagged{stroke:var(--plexi);stroke-width:1.1;stroke-dasharray:1.6 1}
+.flag-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:12px 0 4px}
+.flag-open{font-size:12.5px;color:var(--plexi)}
+.fl-f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--ink-2);margin:0 0 10px}
+.fl-f select,.fl-f input{font:inherit;font-size:14px;padding:9px 10px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--ink);min-height:44px}

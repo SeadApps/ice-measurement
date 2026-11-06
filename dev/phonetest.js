@@ -73,7 +73,7 @@ const b = await chromium.launch();
 
 /* ---------------- nothing scrolls sideways ---------------- */
 /* 320 is the narrowest phone still in use; 390 is an iPhone 13. Both apps and
-   the launcher, because the switcher puts all three one tap apart - a device
+   the front page, because the switcher puts all three one tap apart - a device
    that overflows on one of them overflows in the middle of a walk-round. */
 for (const w of [320, 390]) {
   for (const page of ['index.html', 'ice.html', 'glass.html']) {
@@ -108,7 +108,7 @@ for (const w of [320, 390]) {
       wrapPad: getComputedStyle(document.querySelector('.wrap')).paddingLeft
     };
   });
-  ok('the phone block is in force', s.subHidden === true, JSON.stringify(s));
+  ok('the phone block is in force', s.basis === '140px' && s.wrapPad === '14px', JSON.stringify(s));
   ok('tiles sit two to a row, not one', s.tiles >= 4 && s.rows <= Math.ceil(s.tiles / 2), s.tiles + ' tiles in ' + s.rows + ' rows');
   ok('the rail is not four rows deep', s.railH !== null && s.railH < 260, s.railH + 'px');
   ok('the wrap gives back its desktop padding', s.wrapPad === '14px', s.wrapPad);
@@ -234,7 +234,6 @@ for (const [label, opts] of [
       cols: getComputedStyle(document.querySelector('.grid')).gridTemplateColumns.split(' ').length
     };
   });
-  ok('desktop keeps the tagline', d.subShown === true);
   ok('desktop keeps its 24px padding', d.wrapPad === '24px', d.wrapPad);
   ok('desktop keeps the 190px tile basis', d.basis === '190px', d.basis);
   ok('desktop keeps the two-column grid', d.cols === 2, String(d.cols));

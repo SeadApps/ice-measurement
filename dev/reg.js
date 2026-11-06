@@ -21,14 +21,14 @@ async function seedSignedIn(ctx){
    that printed FAIL and still exited 0 is one nobody notices. */
 let pass=0, fail=0;
 const ok=(n,c)=>{c?pass++:fail++;console.log((c?'  PASS  ':'  FAIL  ')+n);};
-(async()=>{const b=await chromium.launch();const ctx = await b.newContext({viewport:{width:1280,height:900}}); await seedSignedIn(ctx);
+(async()=>{const b=await chromium.launch();const ctx = await b.newContext({viewport:{width:1000,height:900}}); await seedSignedIn(ctx);
 const p=await ctx.newPage();const errs=[];
 p.on('pageerror',e=>errs.push(String(e).split('\n')[0]));
 p.on('console',m=>{if(m.type()==='error'&&!/sw\.js|service worker|404/i.test(m.text()))errs.push('console: '+m.text())});
 p.on('dialog',d=>d.accept('Rink 2'));
 await p.goto('http://localhost:8200/ice.html'); await p.waitForTimeout(1300);
 
-await p.click('.fl-row'); await p.waitForTimeout(900);
+await p.click('#iceTabs [data-page=build]'); await p.waitForTimeout(900);
 ok('workspace opens', await p.isVisible('#rink'));
 
 // add a round through the real dialog
@@ -37,7 +37,7 @@ await p.click('#roundCreate'); await p.waitForTimeout(800);
 const rounds = await p.$eval('#sessSel',e=>e.options.length);
 ok('a new round is created ('+rounds+' in the picker)', rounds>=2);
 
-await p.click('#homeBtn'); await p.waitForTimeout(600);
+await p.click('#iceTabs [data-page=trends]'); await p.waitForTimeout(600);
 
 await p.reload(); await p.waitForTimeout(1500);
 const st = await p.evaluate(()=>{
@@ -49,11 +49,12 @@ ok('rounds persisted ('+st.se+')',  st.se>=2);
 ok('prefs kept separately',         'theme' in st.prefs && 'activeSheet' in st.prefs);
 ok('prefs hold no rink data',       !('facilities' in st.prefs));
 const body=await p.textContent('body');
-ok('home renders after reload',     /fleet overview/i.test(body));
+ok('the page you were on renders after reload',     await p.isVisible('#home') && /trend/i.test(body));
 
-// the theme toggle still round-trips through the shared key
-await p.click('#thLight'); await p.waitForTimeout(400);
+// the theme is chosen in the shared bar's account menu, and still round-trips through the shared key
+await p.click('#shellbar #acctMenu'); await p.click('#shellbar .dropdown .it:has-text("Light")'); await p.waitForTimeout(400);
 ok('theme still saves',             (await p.evaluate(()=>localStorage.getItem('rink_theme')))==='light');
+ok('and Ice, which holds its own copy, took it',  await p.evaluate(()=>state.theme)==='light');
 
 /* ---------------- the switcher, on a tablet ---------------- */
 
@@ -61,22 +62,22 @@ ok('theme still saves',             (await p.evaluate(()=>localStorage.getItem('
    you are on when you are standing in the rink whose glass you want. */
 await p.setViewportSize({width:900, height:800});
 await p.waitForTimeout(400);
-if(await p.isVisible('.fl-row')) { await p.click('.fl-row'); await p.waitForTimeout(700); }
+await p.click('#iceTabs [data-page=rink]'); await p.waitForTimeout(700);
 ok('the workspace is open', await p.evaluate(()=>state.screen==='work'));
 ok('the switcher is there at tablet width',
-   await p.evaluate(()=>{const s=document.querySelector('.app .appsw');
+   await p.evaluate(()=>{const s=document.querySelector('#shellbar .appsw');
      return !!s && getComputedStyle(s).display!=='none';}));
 ok('and Glass is one click away',
-   await p.evaluate(()=>!!document.querySelector('.app .appsw a[href="glass.html"]')));
+   await p.evaluate(()=>!!document.querySelector('#shellbar .appsw a[href^="glass.html"]')));
 /* The bar loses a button rather than the route home: Ice's own entry in the
    switcher was a link to the page you are already on. */
 ok('the hamburger is gone',
    await p.evaluate(()=>!document.querySelector('#app .iconbtn[title="Home"]')));
-await p.click('#homeBtn'); await p.waitForTimeout(500);
-ok('its own name in the switcher goes back to the sheets',
+await p.click('#iceTabs [data-page=trends]'); await p.waitForTimeout(500);
+ok('the Trends tab leaves the workspace',
    await p.evaluate(()=>state.screen==='home'));
 ok('without leaving the app', /ice\.html/.test(p.url()), p.url());
-await p.setViewportSize({width:1280, height:900});
+await p.setViewportSize({width:1000, height:900});
 
 console.log('\nerrors:', errs.length?errs.slice(0,5):'none');
 console.log('\n  '+pass+' passed, '+fail+' failed');

@@ -210,10 +210,9 @@ await M.ctx.close();
    an arena with two sheets has two sets of glass. */
 const I2 = await device(b);
 await I2.p.goto(B + '/ice.html'); await signIn(I2.p);
-/* Pinned to Conway rather than left to whichever facility happened to be
-   active. A device opening Ice for the first time invents a "Main facility" of
-   its own and pushes it before sync delivers the real one, so which of the two
-   is active comes down to how two random ids happen to sort. */
+/* Pinned to Conway. A device opening Ice for the first time invents a "Main
+   facility" of its own; that is a seed (see seedtest), kept off the wire and dropped
+   when the real one arrives, so the pin is belt and braces rather than a workaround. */
 await I2.p.evaluate(fid => { state.activeFacility = fid; persist(); }, facRow.id);
 await I2.p.evaluate(() => { facility().sheets.push(newSheet('Olympic sheet')); persist(); });
 await sleep(4000);
@@ -244,8 +243,10 @@ await L.p.evaluate(() => localStorage.removeItem('glass_record_v2'));
 await L.p.reload(); await sleep(1500);
 ok('the v1 record migrates into the legacy bucket',
    (await L.p.evaluate(() => (bucketOf('legacy')['007'] || {}).status)) === 'plexi');
-ok('and the marked-by name comes with it',
-   (await L.p.evaluate(() => who)) === 'Pete');
+/* The typed "marked by" name is retired: the server stamps whoever is signed in. An old record's
+   name is not adopted as an identity, and nobody is claimed while nobody is signed in. */
+ok('and the old typed name is not adopted as an identity',
+   (await L.p.evaluate(() => whoName())) === '' && !(await L.p.isVisible('.whoami')));
 ok('v1 is left in place as a fallback',
    await L.p.evaluate(() => !!localStorage.getItem('glass_record_v1')));
 await L.ctx.close();

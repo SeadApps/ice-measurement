@@ -57,7 +57,7 @@ await pa.reload(); await pa.waitForTimeout(1400);
 const t=await pa.textContent('body');
 ok('survives a reload from records',  t.includes('Conway Arena') && t.includes('Rink 1'));
 
-await pa.click('#gearHome'); await pa.waitForTimeout(500);
+await pa.evaluate(()=>openSettings()); await pa.waitForTimeout(500);
 const [dl]=await Promise.all([pa.waitForEvent('download'),pa.click('#backupExport')]);
 const file=path.join('/tmp',dl.suggestedFilename()); await dl.saveAs(file);
 const snap=JSON.parse(fs.readFileSync(file,'utf8'));
@@ -86,18 +86,18 @@ pb.on('dialog',d=>d.accept());
 await pb.goto(B); await pb.waitForTimeout(1400);
 const before=await pb.textContent('body');
 ok('device B starts on its own data', before.includes('Main facility') && !before.includes('Conway Arena'));
+/* An untouched invention is dropped when real data arrives, so B has to have really used its facility. */
+await pb.evaluate(()=>{ session().data['3']='1 1/2"'; persist(); }); await pb.waitForTimeout(600);
 
-await pb.click('#gearHome'); await pb.waitForTimeout(500);
-await pb.setInputFiles('#backupFile', file);
+await pb.evaluate(()=>openSettings()); await pb.waitForTimeout(500);
+await pb.setInputFiles('#backupFile', file); await pb.click('#sureScrim.on #sureYes');
 await pb.waitForTimeout(1800);
 /* Both names used to appear on the home screen, because it listed every
-   facility. It is scoped to the one you are at now - the launcher says which -
+   facility. It is scoped to the one you are at now - the address says which -
    so the merge is checked where every facility is still managed. */
-await pb.click('#gearHome'); await pb.waitForTimeout(500);
-const managed=await pb.evaluate(()=>[...document.querySelectorAll('#facManage input')].map(i=>i.value));
+const managed=await pb.evaluate(()=>state.facilities.map(f=>f.name));
 ok("A's facility arrives on B",       managed.includes('Conway Arena'), JSON.stringify(managed));
 ok('B keeps its own facility too',    managed.includes('Main facility'), JSON.stringify(managed));
-await pb.click('#scrimClose').catch(()=>{}); await pb.waitForTimeout(300);
 const n=await pb.evaluate(()=>Object.values(JSON.parse(localStorage.getItem('ice_v4_sessions')||'{}')).filter(r=>!r.deleted).length);
 ok('B holds both sets of rounds ('+n+')', n===3);
 
@@ -108,10 +108,12 @@ ok('merge survives a reload on B',    kept.includes('Conway Arena') && kept.incl
 
 /* And the scoping itself: this screen is the rink you are standing in. */
 const scoped=await pb.evaluate(()=>({
-  shown:[...document.querySelectorAll('#fleet .fl-fname')].map(e=>e.textContent),
+  heading:document.getElementById('trendsFac').textContent,
   active:facility().name }));
-ok('the home screen shows only the facility you are at',
-   scoped.shown.length===1 && scoped.shown[0]===scoped.active, JSON.stringify(scoped));
+await pb.click('#iceTabs [data-page=trends]'); await pb.waitForTimeout(400);
+const heading=await pb.evaluate(()=>document.getElementById('trendsFac').textContent);
+ok('the Trends page shows only the facility you are at',
+   heading.startsWith(scoped.active+' · ') && !(await pb.$('#fleet')), heading+' / '+scoped.active);
 
 console.log('\nerrors:', errs.length?errs.slice(0,6):'none');
 console.log('\n  '+pass+' passed, '+fail+' failed');

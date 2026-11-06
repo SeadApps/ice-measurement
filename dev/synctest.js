@@ -7,7 +7,11 @@ const ok=(n,c,x)=>{c?pass++:fail++;console.log((c?'  PASS  ':'  FAIL  ')+n+(x&&!
 const CFG={url:B, anon:'test', email:'operations@conwayarena.local'};
 
 async function device(browser, name){
-  const ctx=await browser.newContext({viewport:{width:1280,height:900}});
+  /* No service worker: here the fake server shares the page's origin, so the worker's
+     cache-first rule answers a repeated identical pull from its cache. Supabase is
+     cross-origin in production, which the worker leaves alone. A device that has sent
+     nothing pulls with the same cursor every time, which is how this showed up. */
+  const ctx=await browser.newContext({viewport:{width:1000,height:900},serviceWorkers:'block'});
   await ctx.addInitScript(c=>{window.__SYNC_CONFIG__=c;}, CFG);
   const p=await ctx.newPage();
   p.on('pageerror',e=>console.log('  !! '+name+' pageerror: '+String(e).split('\n')[0]));
@@ -39,7 +43,7 @@ ok('the right code gets in', !(await A.p.isVisible('.sync-gate')));
 ok('a status pill is shown', await A.p.isVisible('.sync-pill'));
 
 /* ---------------- A creates work, it reaches the server ---------------- */
-await A.p.click('.fl-row'); await sleep(800);
+await A.p.evaluate(()=>showPage('build')); await sleep(800);
 await A.p.click('#newRound'); await sleep(400); await A.p.click('#roundCreate'); await sleep(3000);
 let r=await rows();
 ok('A\'s records reached the server ('+r.length+')', r.length>=3, JSON.stringify(r.map(x=>x.kind)));
@@ -55,7 +59,7 @@ const bSess=await Bd.p.evaluate(()=>Object.values(JSON.parse(localStorage.getIte
 ok('B pulled A\'s rounds down ('+bSess+')', bSess>=2);
 
 /* ---------------- B adds its own; A picks it up ---------------- */
-await Bd.p.click('.fl-row'); await sleep(700);
+await Bd.p.evaluate(()=>showPage('build')); await sleep(700);
 await Bd.p.click('#newRound'); await sleep(300); await Bd.p.click('#roundCreate'); await sleep(3000);
 const bAfter=await Bd.p.evaluate(()=>Object.values(JSON.parse(localStorage.getItem('ice_v4_sessions')||'{}')).filter(x=>!x.deleted).length);
 
