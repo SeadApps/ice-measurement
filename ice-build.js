@@ -44,14 +44,15 @@ $("donePrint").addEventListener("click",()=>{$("doneScrim").classList.remove("on
 /* ---------- UI build ---------- */
 function buildChips(){const el=$("chips");el.innerHTML="";for(const o of KEYS){const b=bandOf(decOf.get(o)),btn=document.createElement("button");btn.className="chip";btn.dataset.opt=o;
   btn.innerHTML=`<span class="dot" style="background:${b.color}"></span><span class="f">${fmtLabel(o)}</span><span class="w">${b.word||b.label}</span>`;btn.addEventListener("click",()=>assign(o));el.appendChild(btn);}
-  const clr=document.createElement("button");clr.className="chip clear";clr.textContent="Clear this point";clr.addEventListener("click",clearPoint);el.appendChild(clr);}
+  const clr=document.createElement("button");clr.className="chip clear";clr.textContent="Clear this point";clr.addEventListener("click",clearPoint);el.appendChild(clr);
+  /* Undo lives with the keys, directly under Clear this point: the same size, where a thumb already is (in the card's header it was pushed off the side). */
+  const und=document.createElement("button");und.className="chip clear";und.id="undoBtn";und.textContent="↶ Undo";und.disabled=!undoStack.length;und.addEventListener("click",doUndo);el.appendChild(und);}
 /* ---------- nav / modes ---------- */
 $("prev").addEventListener("click",()=>{hideSel=false;if(entryMode==="guided"){guidedPos=(guidedPos-1+guidedOrder.length)%guidedOrder.length;selIdx=guidedOrder[guidedPos];}else selIdx=(selIdx-1+POINTS.length)%POINTS.length;refresh();});
 $("next").addEventListener("click",()=>{hideSel=false;if(entryMode==="guided"){guidedPos=(guidedPos+1)%guidedOrder.length;selIdx=guidedOrder[guidedPos];}else selIdx=(selIdx+1)%POINTS.length;refresh();});
 window.addEventListener("keydown",e=>{if(state&&state.screen!=="work")return;if(e.target.tagName==="INPUT")return;
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="z"){e.preventDefault();doUndo();return;}
   if(e.key==="ArrowLeft")$("prev").click();else if(e.key==="ArrowRight")$("next").click();});
-$("undoBtn").addEventListener("click",doUndo);
 $("modeFree").addEventListener("click",()=>setEntry("free"));$("modeGuided").addEventListener("click",()=>setEntry("guided"));
 function setEntry(m){entryMode=m;$("modeFree").setAttribute("aria-pressed",String(m==="free"));$("modeGuided").setAttribute("aria-pressed",String(m==="guided"));$("chips").classList.toggle("guided",m==="guided");if(m==="guided"){guidedPos=0;selIdx=guidedOrder[0];}refresh();}
 $("noteInput").addEventListener("input",e=>setNote(e.target.value));
