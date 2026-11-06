@@ -57,5 +57,7 @@
   "synctest": 26,
   "whotest": 18,
   "widthstest": 25,
-  "facremovetest": 14
+  "facremovetest": 14,
+  "reportmapstest": 21,
+  "exporttest": 6
 }

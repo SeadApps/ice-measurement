@@ -8,7 +8,7 @@
    status, and only Management's is accepted. */
 (function (global) {
   var h, Shell, d;
-  var UI = { flagsShow: "open", chArea: "all", chFac: "all", chPerson: "all", chDays: "30", chRows: null, chLoading: false, chError: "", chMore: true,
+  var UI = { glassFor: {}, flagsShow: "open", chArea: "all", chFac: "all", chPerson: "all", chDays: "30", chRows: null, chLoading: false, chError: "", chMore: true,
              repSheet: "", repDays: "30", repSec: { summary: 1, latest: 1, trend: 1, glass: 1, flags: 1, changes: 0 }, repChanges: null };
   var AREAS = { all: null, ice: ["session"], glass: ["glass_panel", "glass_layout", "glass_binding"], inventory: ["glass_spare", "glass_widths"],
                 settings: ["facility", "sheet"], flags: ["flag"] };
@@ -153,6 +153,22 @@
 
   /* ---------- Reports ---------- */
   function ageDays(iso) { return (Date.now() - new Date(iso).getTime()) / 86400000; }
+  /* The drawings (report-maps.js). The map is cached by what it is drawn from, so ticking a section on and off does not redraw it. */
+  var mapCache = {};
+  function mapImage(f, s, z) {
+    if (!global.ReportMaps) return "";
+    var R = global.Records, size = s.size || R.NHL_SIZE(), set = R.settingsOf(f.settings, d.prefs), key = [s.id, z.id, z.updatedAt, JSON.stringify(size), JSON.stringify(set)].join("|");
+    if (!mapCache[key]) {
+      try { mapCache = {}; mapCache[key] = global.ReportMaps.iceMap({ size: size, data: z.data, settings: set }).toDataURL("image/png"); } catch (e) { return ""; }
+    }
+    return '<img class="rp-map" alt="Ice thickness map, latest round" src="' + mapCache[key] + '">';
+  }
+  function glassImage(s) {
+    var gf = UI.glassFor[s.id];
+    if (!gf || !gf.layout || !global.ReportMaps) return "";
+    var svg = global.ReportMaps.glassPlan(gf), c = global.ReportMaps.glassCounts(gf);
+    return svg ? '<div class="rp-planbox">' + svg + "</div>" + (c ? "<p class=\"rp-cap\">" + c.total + " pieces: " + c.ok + " good, " + c.replace + " need replacing, " + c.plexi + " on temporary plexi. Dashed outlines are inferred, not measured.</p>" + "<p class=\"rp-key\">" + [["#e4ecf1", "Good"], ["#c8202f", "Needs replacing"], ["#a85d00", "Temporary plexi"]].map(function (q) { return '<span><i style="background:' + q[0] + '"></i>' + q[1] + "</span>"; }).join("") + "</p>" : "") : "";
+  }
   function reportHTML(x, changes) {
     var f = x.f, s = x.s, days = UI.repDays === "all" ? 1e9 : +UI.repDays, R = global.Records, esc = function (t) { return String(t == null ? "" : t).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
     var p = global.Sync && global.Sync.person && global.Sync.person();
@@ -165,12 +181,12 @@
     if (sec.latest) {
       var z = rounds[rounds.length - 1], vals = z ? Object.keys(z.data).map(function (k) { return readingValue(z.data[k]); }).filter(isFinite) : [];
       out.push('<section data-sec="latest"><h2>Ice, latest round</h2>' + (z ? "<p>" + esc(dayStr(z.date)) + ", " + plural(vals.length, "reading") + ": thinnest " + Math.min.apply(null, vals).toFixed(3) + "″, thickest " + Math.max.apply(null, vals).toFixed(3) +
-        "″, average " + (vals.reduce(function (a, b) { return a + b; }, 0) / vals.length).toFixed(3) + "″.</p>" : "<p>No round with readings in this period.</p>") + "</section>");
+        "″, average " + (vals.reduce(function (a, b) { return a + b; }, 0) / vals.length).toFixed(3) + "″.</p>" + mapImage(f, s, z) : "<p>No round with readings in this period.</p>") + "</section>");
     }
     if (sec.trend) out.push('<section data-sec="trend"><h2>Thickness trend</h2>' + (rounds.length ? "<table><thead><tr><th>Date</th><th>Readings</th><th>Average</th></tr></thead><tbody>" + rounds.map(function (z) {
       var v = Object.keys(z.data).map(function (k) { return readingValue(z.data[k]); }).filter(isFinite); return "<tr><td>" + esc(dayStr(z.date)) + "</td><td>" + v.length + "</td><td>" + (v.reduce(function (a, b) { return a + b; }, 0) / v.length).toFixed(3) + "″</td></tr>"; }).join("") + "</tbody></table>" : "<p>No rounds in this period.</p>") + "</section>");
     if (sec.glass) { var g = d.glass[s.id]; out.push('<section data-sec="glass"><h2>Glass condition</h2><p>' + (!g || !g.known ? "Glass has not been opened on this device." : !g.layout ? "No glass has been built for this sheet." :
-      g.replace + " panel" + (g.replace === 1 ? "" : "s") + " need replacing, " + g.plexi + " on temporary plexi. The order list is in Glass, Rink view.") + "</p></section>"); }
+      g.replace + " panel" + (g.replace === 1 ? "" : "s") + " need replacing, " + g.plexi + " on temporary plexi. The order list is in Glass, Rink view.") + "</p>" + glassImage(s) + "</section>"); }
     if (sec.flags) { var fl = (global.Flags ? global.Flags.all() : []).filter(function (q) { return q.sheetId === s.id && ageDays(q.updatedAt) <= days; });
       out.push('<section data-sec="flags"><h2>Flagged items</h2>' + (fl.length ? "<table><thead><tr><th>What</th><th>Why</th><th>Status</th></tr></thead><tbody>" + fl.map(function (q) { return "<tr><td>" + esc(q.label) + "</td><td>" + esc(q.reason) + (q.note ? ": " + esc(q.note) : "") + "</td><td>" + esc(q.status) + "</td></tr>"; }).join("") + "</tbody></table>" : "<p>Nothing flagged in this period.</p>") + "</section>"); }
     if (sec.changes) out.push('<section data-sec="changes"><h2>Changes in the period</h2>' + (changes == null ? "<p>Loading…</p>" : changes.length ? "<ul>" + changes.slice(0, 60).map(function (r) { return "<li>" + esc(whenStr(r.at)) + ", " + esc(r.changed_by_name || "System") + " " + esc(global.Home.describe(r, d)) + "</li>"; }).join("") + "</ul>" : "<p>No changes recorded.</p>") + "</section>");
@@ -190,6 +206,11 @@
     if (UI.repSec.changes && UI.repChanges === null && global.Sync) {
       UI.repChanges = false;
       global.Sync.activity({ order: "seq.desc", limit: 200, at: "gt." + new Date(Date.now() - (UI.repDays === "all" ? 3650 : +UI.repDays) * 86400000).toISOString() }).then(function (res) { UI.repChanges = res.ok ? res.rows : []; Shell.repaint(); });
+    }
+    /* Glass's layout and panel conditions are read from the device, once per sheet, then the page is drawn again. */
+    if (UI.repSec.glass && x && !(x.s.id in UI.glassFor) && global.Records && global.Records.glassFor) {
+      UI.glassFor[x.s.id] = null;
+      global.Records.glassFor(x.s.id).then(function (gf) { UI.glassFor[x.s.id] = gf; Shell.repaint(); });
     }
     var paper = h("div", { cls: "paper", id: "reportPaper" }); paper.innerHTML = x ? reportHTML(x, UI.repChanges === false ? null : UI.repChanges) : "<p>No sheets.</p>";
     var print = h("button", { cls: "btn", type: "button", id: "repPrint", text: "Print or save as PDF", onclick: function () {

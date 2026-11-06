@@ -213,7 +213,7 @@
   /* Offer the file to the share sheet where there is one (iPad: email, AirDrop), else download it. */
   async function saveFile(content, mime, name) {
     var blob = new Blob([content], { type: mime });
-    if (navigator.share && navigator.canShare) {
+    if (global.matchMedia && global.matchMedia("(pointer: coarse)").matches && navigator.share && navigator.canShare) {   // a laptop saves the file; only a touch device offers the share sheet
       var file = new File([blob], name, { type: mime });
       if (navigator.canShare({ files: [file] })) {
         try { await navigator.share({ files: [file], title: name }); return "shared"; }

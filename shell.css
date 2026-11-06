@@ -208,6 +208,7 @@ label.field,.field{display:grid;gap:4px;font-size:13px;color:var(--ink-dim)}
 .repsecs .chk{font-size:14px;display:flex;align-items:center;gap:6px}
 .paper{background:#fff;color:#000;border:1px solid var(--line);border-radius:6px;padding:28px 34px;max-width:780px;font:13px/1.5 Georgia,serif}
 .paper h1{font-size:20px;margin:0 0 4px}.paper h2{font-size:15px;margin:20px 0 6px;border-bottom:1px solid #000}
+.paper .rp-map,.paper .rp-plan{display:block;width:100%;height:auto;margin:8px 0}.paper .rp-planbox{margin:8px 0}.paper .rp-cap{font-size:11px;margin:2px 0 4px}.paper .rp-key{font-size:11px;margin:0 0 8px}.paper .rp-key span{margin-right:16px;white-space:nowrap}.paper .rp-key i{display:inline-block;width:12px;height:12px;border:1px solid #888;margin-right:5px;vertical-align:-2px}
 .paper table{border-collapse:collapse;width:100%;font-size:12px}.paper th,.paper td{border-bottom:1px solid #bbb;padding:4px 8px;text-align:left}
 #printRoot{display:none}
 @media print{
@@ -218,6 +219,8 @@ label.field,.field{display:grid;gap:4px;font-size:13px;color:var(--ink-dim)}
   body.printing-report #printRoot h1{font-size:20px;margin:0 0 4px}
   body.printing-report #printRoot h2{font-size:14px;margin:18px 0 6px;border-bottom:1px solid #000;break-after:avoid}
   body.printing-report #printRoot section{break-inside:avoid}
+  body.printing-report #printRoot .rp-map,body.printing-report #printRoot .rp-plan{display:block;width:100%;height:auto;break-inside:avoid}
+  body.printing-report #printRoot .rp-key i{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   body.printing-report #printRoot table{border-collapse:collapse;width:100%}
   body.printing-report #printRoot th,body.printing-report #printRoot td{border-bottom:1px solid #999;padding:3px 6px;text-align:left}
 }

@@ -150,7 +150,8 @@ $("expCsv").addEventListener("click",async()=>{const d=data(),nt=notes(),unitCol
    isn't supported for this file type, or the user backs out of a real share attempt. */
 async function exportFile(content,mime,name){
   const blob=content instanceof Blob?content:new Blob([content],{type:mime});
-  if(navigator.share&&navigator.canShare){
+  /* The share sheet is for a touch device (iPad, phone). On a laptop it would open the operating system's share window instead of saving the file. */
+  if(window.matchMedia&&matchMedia('(pointer: coarse)').matches&&navigator.share&&navigator.canShare){
     const file=new File([blob],name,{type:mime});
     if(navigator.canShare({files:[file]})){
       try{await navigator.share({files:[file],title:name});flashNote("shared");return"shared";}
