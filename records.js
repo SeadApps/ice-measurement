@@ -622,6 +622,35 @@
       await this.persistMaps();
       return {changed:true};
     },
+    /* Remove a whole facility: it and its sheets are tombstoned with one stamp, and every round is kept,
+       so Management can bring it all back. The last live facility cannot go. */
+    async removeFacility(fid){
+      await this.load();
+      const rec = SNAP.fac[fid];
+      if(!rec || rec.deleted) return {changed:false, error:"no such facility"};
+      if(Object.values(SNAP.fac).filter(x => x && !x.deleted).length < 2) return {changed:false, error:"keep at least one facility"};
+      const at = nowISO();
+      SNAP.fac[fid] = Object.assign({}, rec, {deleted:true, updatedAt:at});
+      for(const id in SNAP.sh){ const s = SNAP.sh[id]; if(s && !s.deleted && s.facilityId === fid) SNAP.sh[id] = Object.assign({}, s, {deleted:true, removedWith:fid, updatedAt:at}); }
+      await this.persistMaps();
+      return {changed:true};
+    },
+    async readRemovedFacilities(){
+      const fac = await rd(K.fac);
+      return Object.values(fac || {}).filter(x => x && x.deleted && x.name);
+    },
+    /* Bring it back with the sheets that went with it (marked removedWith), not ones removed on their own earlier. */
+    async restoreFacility(fid){
+      await this.load();
+      const rec = SNAP.fac[fid];
+      if(!rec || !rec.deleted || !rec.name) return {changed:false, error:"that facility is not removed"};
+      const at = nowISO();
+      for(const id in SNAP.sh){ const s = SNAP.sh[id]; if(s && s.deleted && s.facilityId === fid && s.removedWith === fid){ const b = Object.assign({}, s, {updatedAt:at}); delete b.deleted; delete b.removedWith; SNAP.sh[id] = b; } }
+      const back = Object.assign({}, rec, {updatedAt:at}); delete back.deleted;
+      SNAP.fac[fid] = back;
+      await this.persistMaps();
+      return {changed:true};
+    },
     /* ---------- backup ----------
        One file holds every record on the device: the same format Ice has always written,
        so a backup from any build restores into any other. It leaves out a facility that is

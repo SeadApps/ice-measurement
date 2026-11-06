@@ -598,7 +598,7 @@ node dev/glasslaptoptest.js # 9 checks: on a laptop the Glass Builder shows the 
 node dev/glassbackuptest.js # 20 checks: Glass in the app-wide backup: every record kind exports and restores, newest wins, a pre-D4 Glass file still loads
 node dev/handovertest.js   # 40 checks: changing hands on a shared iPad, offline, and the idle sign-out
 node dev/gatetest.js       # 19 checks: the access gate on every page, offline versus revoked, a rotated code, the store's read-only contract, the very old blob
-node dev/icebuildtest.js   # 25 checks: the 21 reading keys, the builder's entry, undo, notes, new round, locked controls
+node dev/icebuildtest.js   # 39 checks: the 21 reading keys, the builder's entry, undo, notes, new round, locked controls
 node dev/laptoptest.js     # 20 checks: on a laptop the Ice builder shows the message and cannot be used; the other pages work
 node dev/layoutsynctest.js # 24 checks: a built rink crosses devices as its walk, and goes back off
 node dev/layouttest.js     # 40 checks: the renderer draws a layout, and notes come off it - through the card, not just through set()
@@ -619,6 +619,7 @@ node dev/scheduletest.js   # 31 checks: the schedule opens on what needs attenti
 node dev/scopetest.js      # 53 checks: a Staff person sees and writes only their facilities; the tag; the per-person cursor
 node dev/seedtest.js       # 23 checks: a fresh device's invented facility is a seed: never sent while untouched, sent whole when edited, dropped when real ones arrive
 node dev/settingstest.js   # 68 checks: Sheet settings writes name and shape and nothing else; draft, validation, glass check, Staff read-only, remove and undo; Ice draws the new outline
+node dev/facremovetest.js # 14 checks: Remove facility asks in the page, hides the facility and its sheets and keeps every round, undo and Removed facilities, an earlier hidden sheet stays hidden, the last facility cannot go, another device sees it
 node dev/shapetest.js      # 69 checks: one shape per sheet, the migration, the builder's compare and update, updateSheet
 node dev/shelltest.js      # 91 checks: the chrome at 390/820/1024/1280, breakpoints, menus, theme, tab bar, rail
 node dev/sparestest.js     # 46 checks: spare stock is a ledger per facility, tempered and plexi are different piles, and fitting a pane deducts the right one
@@ -629,7 +630,7 @@ node dev/whotest.js        # 18 checks: nobody types their name; the bar names t
 node dev/widthstest.js     # 25 checks: a facility's one-tap widths (default 43/48, no record until changed); only Management resolves or reopens a flag
 ```
 
-1877 checks in all, over 58 suites. Tests point `window.__SYNC_CONFIG__` at the fake via
+1906 checks in all, over 59 suites. Tests point `window.__SYNC_CONFIG__` at the fake via
 `addInitScript`; the real pages never read it.
 
 **Lessons from the access work, each of which cost a debugging session:**
@@ -1038,12 +1039,22 @@ way, so it can still be loaded once from the account menu (`glassbackuptest`).
 
 ## Known open items
 
-- **The SQL in `supabase/` has not been run against a real database**, nor has the `manage-staff` function:
-  the D1 scripts, `d3-01a` and `d3-01b` (the settings preview and apply). `supabase/README.md` has the
-  checklist, including the two behaviours the client depends on: the "editing is locked" wording, and what
-  the auth service answers for a removed person. The fake server is the only test bed they have had.
-- **The live site is still the build before the people-and-access work**, and this branch has not been pushed.
-  A real-device check on an iPad belongs before it is.
+- **Where the live system stands (6 Nov 2026).** Everything in `supabase/` has been run on the real project
+  (D1 add, backfill, settings migration `d3-01a`/`d3-01b`, the first manager, `d1-04-tighten.sql`), `manage-staff`
+  is deployed, the redesign and the restyle are merged and live, and the server is **tight**: the old app is
+  locked out. It was checked on an iPad and a phone. `d1-05-restore-old-policies.sql` is the way back.
+- **Test data still on the live project:** facility "Conway 2" with sheet "Test Rink" (hide them with
+  *Remove facility* once this build is live), and the `probe` record, which can stay.
+- **Reset code and the shared-code buttons** on the Staff page have only been exercised against the fake
+  server's function, not the real one. Resetting a spare person's code is safe; leave the access code alone.
+  Rotating the access code works but takes up to an hour per device to reach a signed-in device.
+- **Staff scoping with the server tight** and **Staff cannot resolve flags** have been proved against the fake
+  server only; check them once with a test person on the real one.
+- **The bar still shows a "LOGO" placeholder** and the icons are not regenerated (the repo holds no logo PNG).
+- **Conway Arena's custom lowest edge (0.82) was rounded to 7/8 (0.875)** by the settings migration, since
+  settings are in eighths. Panel 111 is unconfirmed (below).
+- **Still to come:** real staff added from the Staff page when Pete wants; moving to a custom domain (the
+  `/ice-measurement` path can then go); `review.js` loads at every width; fonts are linked, not bundled.
 - **Zamboni end, panel 111.** A 43″ panel inferred to close a 43½″ shortfall, drawn dashed and flagged in the
   schedule. Never confirmed on site. Either a missed panel or the Zamboni doorway is wider than its two 57½″
   leaves. Clearing that panel's tag retires the dashes, the tick and the standing explanation together.
@@ -1063,10 +1074,29 @@ way, so it can still be loaded once from the account menu (`glassbackuptest`).
   watch; not needed so far.
 - **Reports have no map image or glass plan** (see *Quality review and flags*), and the order list is not in the report; it is
   in Glass, Rink view.
+- **Removing a facility** is Management's, from the facility's page (*Remove facility*, asked in the page): the
+  facility and its live sheets are tombstoned and each sheet is marked `removedWith`, every round is kept.
+  *Removed facilities* on the Facilities page, and the undo banner, bring it back with exactly those sheets (one
+  removed on its own earlier stays removed). The last facility cannot go. It is tested in `facremovetest`.
 - **The very old single-blob migration stays** (`Repo.load()` moves a device off `ice_sheet_v3`) until nobody
   has such a device.
 - **A fresh device's seed** is checked in `freshdevicetest`; `facilitytest` still pins the active facility as
   belt and braces.
+
+## Lessons that cost an afternoon
+
+- **Two devices on the old app ping-pong records** (its jsonb key order differs from the new store's), which
+  wiped the backfill's `fac` tag and the sheets' `shape`. Before any server data step make sure no device is
+  still on the old app; `tight` finally locks it out. Bracket every data script with the fingerprint query
+  `select count(*), md5(string_agg(kind||'|'||id||'|'||updated_at::text, ',' order by kind, id)) from public.records`.
+- **Two things must not share a CSS class.** The bar and the settings steppers both used `sb`; the steppers'
+  60px buttons collapsed the bar. Steppers are `stpb` now and `shelltest` checks the bar's width.
+- **Tombstone stamps are not equal.** The store stamps each record as it writes, so records removed together
+  carry different `updatedAt`; link them with a field (`removedWith`), never by comparing stamps.
+- **The editing code locks out after five wrong tries in ten minutes**; clear with
+  `delete from app.unlock_failures;`.
+- **Undo in the builder sits under Clear this point** in the keys grid; in the card header it was pushed off a
+  narrow screen (`icebuildtest` checks it at 1000px and 390px).
 
 ## Releasing
 

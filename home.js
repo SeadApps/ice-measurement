@@ -160,8 +160,30 @@
         text: "No facilities on this device yet. They arrive once this device has synced." }));
       return el;
     }
+    if (removedFac) {
+      var gf = removedFac;
+      el.appendChild(h("div", { cls: "banner good", id: "removedFacBanner", style: "margin-bottom:14px" }, [
+        gf.name + " has been hidden. Its sheets and readings are kept, and management can bring it back.",
+        h("button", { cls: "btn sm", type: "button", id: "undoRemoveFac", text: "Undo, bring it back", onclick: async function () {
+          var r = await Repo.restoreFacility(gf.fid); removedFac = null;
+          if (r.changed && typeof Sync !== "undefined") Sync.nudge();
+          await Shell.refresh(); } })]));
+    }
     if (view === "fleet") el.appendChild(fleetTable(d));
     else el.appendChild(h("div", { cls: "rows", id: "facRows" }, d.facilities.map(function (f) { return facilityRow(d, f); })));
+    if ((d.removedFacs || []).length && Shell.canManage()) {
+      var box = h("div", { cls: "card", id: "removedFacList", style: "margin-top:18px" }, [h("div", { cls: "eyebrow", text: "Removed facilities" })]);
+      d.removedFacs.forEach(function (r) {
+        box.appendChild(h("div", { cls: "toolbar", "data-rid": r.id, style: "margin:0 0 8px" }, [
+          h("span", {}, [h("b", { text: r.name })]),
+          h("button", { cls: "btn ghost sm", type: "button", "data-restore": r.id, disabled: !Shell.canEdit(), text: "Bring back",
+            onclick: async function () {
+              var res = await Repo.restoreFacility(r.id);
+              if (res.changed && typeof Sync !== "undefined") Sync.nudge();
+              await Shell.refresh(); } })]));
+      });
+      el.appendChild(box);
+    }
     return el;
   }
 
@@ -218,6 +240,26 @@
       });
       el.appendChild(box);
     }
+    if (Shell.canManage()) {
+      var lone = d.facilities.length < 2, fz = h("div", { cls: "card danger-zone", id: "removeFacZone", style: "margin-top:18px" }, [h("div", { cls: "eyebrow", text: "Remove this facility" })]);
+      if (facConfirm === f.id) {
+        fz.appendChild(h("p", { style: "margin:0 0 10px;font-size:14px" }, ["Hide ", h("b", { text: f.name }), " and its ", plural((f.sheets || []).length, "sheet"), "? They disappear from every list. All readings and glass are kept, and management can bring it back."]));
+        fz.appendChild(h("div", { cls: "foot" }, [
+          h("button", { cls: "btn danger", type: "button", id: "fyes", disabled: !Shell.canEdit(), text: "Yes, hide it", onclick: async function () {
+            var r = await Repo.removeFacility(f.id); facConfirm = null;
+            if (!r.changed) { Shell.toast(r.error); await Shell.refresh(); return; }
+            removedFac = { fid: f.id, name: f.name };
+            if (typeof Sync !== "undefined") Sync.nudge();
+            Shell.go("#/"); } }),
+          h("button", { cls: "btn ghost", type: "button", id: "fno", text: "Keep it", onclick: function () { facConfirm = null; Shell.refresh(); } })]));
+      } else {
+        fz.appendChild(h("p", { style: "margin:0 0 10px;font-size:14px;color:var(--ink-dim)", id: "removeFacNote",
+          text: lone ? "At least one facility must stay, so this one cannot be removed." : "Hides the facility and its sheets without losing anything." }));
+        fz.appendChild(h("button", { cls: "btn danger", type: "button", id: "fask", disabled: !Shell.canEdit() || lone, text: "Remove facility",
+          onclick: function () { facConfirm = f.id; Shell.refresh(); } }));
+      }
+      el.appendChild(fz);
+    }
     return el;
   }
 
@@ -227,7 +269,7 @@
      Repo.updateSheet (all of it or none of it). Readings are never touched: changing
      the size only redraws the outline. The glass is not rebuilt either; the page says
      when what it was built against no longer matches. */
-  var draft = null, savedMsg = "", removed = null;
+  var draft = null, savedMsg = "", removed = null, removedFac = null, facConfirm = null;
   var STEPS = {
     L:   { label: "Length", unit: "ft", step: 0.5, min: 20, max: 300, text: function (v) { return v + "′"; } },
     W:   { label: "Width", unit: "ft", step: 0.5, min: 10, max: 200, text: function (v) { return v + "′"; } },
