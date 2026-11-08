@@ -177,6 +177,12 @@ $("expPng").addEventListener("click",()=>{const Wd=1760,Hd=980,pad=56,c=document
   else for(const b of BANDS){x.fillStyle=b.color;x.fillRect(lx,ly-9,18,18);x.strokeStyle="#ffffff22";x.strokeRect(lx,ly-9,18,18);x.fillStyle="#eaf3f8";x.fillText(b.label,lx+26,ly-1);x.fillStyle="#90a8b8";x.fillText(b.rng,lx+26,ly+15);lx+=Math.max(180,x.measureText(b.label).width+96);}
   c.toBlob(blob=>{exportFile(blob,"image/png",fileStem()+".png");},"image/png");});
 
+/* ---------- the screen in the Zamboni room ---------- */
+$("expTv").addEventListener("click",()=>{const R=Records,sh=sheet(),r=R.lastRound(sh.sessions,sh.id);
+  if(!r){ask({title:"No round to show",text:"This sheet has no round with readings yet.",ok:"OK",cancel:null});return;}
+  const c=ReportMaps.tvImage({facility:facility().name,sheet:sh.name||"Sheet",round:r,size:sh.size||R.NHL_SIZE(),settings:EF()});
+  c.toBlob(blob=>{exportFile(blob,"image/png",(facility().name+"_"+(sh.name||"Sheet")+"_TV_"+new Date(r.date).toISOString().slice(0,10)).replace(/\s+/g,"_")+".png");},"image/png");});
+
 /* ---------- print ---------- */
 $("expPdf").addEventListener("click",()=>{const img=renderToImage(2000).toDataURL("image/png"),d=data(),nt=notes(),rows=[];for(const k in d){const[x,y]=k.split(",").map(Number);rows.push({x,y,v:decOf.get(d[k])});}
   const avg=rows.length?fmtNum(rows.reduce((s,r)=>s+r.v,0)/rows.length):"—",fb=attFlood(),sa=attShave(),flood=rows.filter(r=>r.v<fb).length,shave=rows.filter(r=>r.v>=sa).length;
