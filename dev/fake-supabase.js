@@ -71,14 +71,17 @@ function who(req){
   }
   return {kind:'device'};
 }
-const isMgmt = w => w && w.kind === 'person' && w.user.role === 'management';
-const mayFacility = (w, fac) => isMgmt(w) || (w.kind === 'person' && !!fac && w.user.facilities.includes(fac));
+/* Three roles. An Admin sees and does everything. A Manager is scoped to the facilities they were given, like Staff, and
+   may also change those facilities' settings and sheets, resolve their flags, and look after their own Staff. */
+const isAdmin = w => w && w.kind === 'person' && w.user.role === 'admin';
+const isManagerRole = w => w && w.kind === 'person' && w.user.role === 'manager';
+const mayFacility = (w, fac) => isAdmin(w) || (w.kind === 'person' && !!fac && (w.user.facilities || []).includes(fac));
 const editing = w => w.kind === 'person' && (unlocks.get(w.user.id) || 0) > Date.now();
 
 function visible(w, r){
   if (!opts.tight) return true;
   if (!w || w.kind !== 'person') return false;
-  return isMgmt(w) || mayFacility(w, r.facility_id);
+  return isAdmin(w) || mayFacility(w, r.facility_id);
 }
 
 /* Applies one incoming row the way the table's triggers would. Returns an
@@ -89,18 +92,20 @@ function check(w, r){
      Without this a Staff person could take over another facility's record by
      rewriting it with their own facility's tag. */
   const old = rows.get(r.kind+' '+r.id);
-  if (old && !isMgmt(w) && !(old.facility_id && mayFacility(w, old.facility_id))) return 'not your facility';
+  if (old && !isAdmin(w) && !(old.facility_id && mayFacility(w, old.facility_id))) return 'not your facility';
   if (!w || w.kind !== 'person') return 'the shared account may not write';
   if (!editing(w)) return 'editing is locked';
   const fac = r.body && r.body.fac;
-  if (!fac && !isMgmt(w)) return 'untagged records are Management only';
+  if (!fac && !isAdmin(w)) return 'untagged records are Admin only';
   if (!mayFacility(w, fac)) return 'not your facility';
-  if (!isMgmt(w) && SETTINGS_KINDS.includes(r.kind)) return 'settings are Management only';
-  /* Resolved is Management's to set, and so is taking it back: a Staff write
+  if (w.user.role === 'staff' && SETTINGS_KINDS.includes(r.kind)) return 'settings are for Managers and Admins only';
+  /* A Manager may change their own facility's settings and its sheets, but a facility is made, hidden and brought back by an Admin. */
+  if (isManagerRole(w) && r.kind === 'facility' && (!old || old.deleted || r.deleted)) return 'only an Admin adds, removes or restores a facility';
+  /* Resolved is a Manager's or an Admin's to set, and so is taking it back: a Staff write
      over a resolved flag (reopening it, or editing it) is refused. */
-  if (!isMgmt(w) && r.kind === 'flag' &&
+  if (w.user.role === 'staff' && r.kind === 'flag' &&
       ((r.body && r.body.status === 'resolved') || (old && old.body && old.body.status === 'resolved')))
-    return 'only Management resolves or reopens a flag';
+    return 'only a Manager or Admin resolves or reopens a flag';
   return null;
 }
 
@@ -202,61 +207,84 @@ const server = http.createServer(async (req,res)=>{
 
   /* ---- manage-staff: stands in for the Edge Function (supabase/functions/manage-staff) ----
      Same actions, same refusals, same wording, because the Staff page is tested against it.
-     Only an active Manager may call it. A code it makes is returned once and kept nowhere a
-     list could read it back. */
+     Only an active Admin or Manager may call it; a Manager only for Staff whose every facility is one of theirs. A code
+     it makes is returned once and kept nowhere a list could read it back. */
   if (p === '/functions/v1/manage-staff'){
     if (req.method !== 'POST') return json(res,405,{error:'POST only'});
     const w = who(req);
     if (!w || w.kind !== 'person') return json(res,401,{error:'Sign in first.'});
-    if (!isMgmt(w)) return json(res,403,{error:'Only Management can do this.'});
+    if (!isAdmin(w) && !isManagerRole(w)) return json(res,403,{error:'Only Managers and Admins can do this.'});
     const b = await body(req);
     if (!b || typeof b !== 'object') return json(res,400,{error:'Send JSON.'});
     const fail = (c, m) => json(res,c,{error:m});
     const ALPHABET = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     const makeCode = () => Array.from({length:10}, () => ALPHABET[Math.floor(Math.random()*ALPHABET.length)]).join('');
     const asList = v => Array.isArray(v) ? v.filter(x => typeof x === 'string' && x).map(String) : [];
-    const managers = () => [...staff.values()].filter(s => s.role === 'management' && s.active);
+    const admins = () => [...staff.values()].filter(s => s.role === 'admin' && s.active);
     const find = () => staff.get(String(b.login || ''));
+    const mine = (w.user.facilities || []);
+    const notAdmin = () => { if (isAdmin(w)) return false; fail(403,'Only an Admin can do this.'); return true; };
+    /* A Manager sees Staff who hold at least one of their facilities, and may change those who hold only theirs. */
+    const seen = s => isAdmin(w) || (s.role === 'staff' && (s.facilities || []).some(f => mine.includes(f)));
+    const editable = s => isAdmin(w) || (s.role === 'staff' && (s.facilities || []).length > 0 && s.facilities.every(f => mine.includes(f)));
+    const ROLES = ['admin','manager','staff'];
     switch (b.action){
       case 'list':
-        return json(res,200,{people:[...staff.values()].sort((a,c)=>String(a.name).localeCompare(c.name)).map(s => ({
-          login:s.id, name:s.name, role:s.role, active:s.active, facilities:s.role === 'management' ? [] : (s.facilities || []).slice().sort(),
-          last_sign_in:s.lastSignIn || null}))});
+        return json(res,200,{people:[...staff.values()].filter(seen).sort((a,c)=>String(a.name).localeCompare(c.name)).map(s => ({
+          login:s.id, name:s.name, role:s.role, active:s.active, facilities:s.role === 'admin' ? [] : (s.facilities || []).slice().sort(),
+          last_sign_in:s.lastSignIn || null, editable:editable(s)}))});
       case 'codes':
+        if (notAdmin()) return;
         return json(res,200,{access:codeTimes.access, editing:codeTimes.editing});
       case 'add': {
-        const name = String(b.name || '').trim(), role = b.role === 'management' ? 'management' : 'staff';
+        const name = String(b.name || '').trim(), role = ROLES.includes(b.role) ? b.role : 'staff';
         if (!name) return fail(400,'A name is needed.');
+        const facs = asList(b.facilities);
+        if (!isAdmin(w)){
+          if (role !== 'staff') return fail(403,'Only an Admin can add a Manager or an Admin.');
+          if (!facs.length) return fail(400,'Pick at least one of your facilities.');
+          if (!facs.every(f => mine.includes(f))) return fail(403,'You can only give people your own facilities.');
+        }
         const slug = name.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,24) || 'person';
         const login = slug + '-' + Array.from({length:3}, () => 'abcdefghjkmnpqrstuvwxyz23456789'[Math.floor(Math.random()*31)]).join('');
         const code = makeCode();
-        staff.set(login, {id:login, name, role, code, active:true, facilities:role === 'staff' ? asList(b.facilities) : []});
+        staff.set(login, {id:login, name, role, code, active:true, facilities:role === 'admin' ? [] : facs});
         return json(res,200,{login, code});
       }
       case 'update': {
-        const s = find(); if (!s) return fail(404,'No such person.');
-        const role = b.role === undefined ? s.role : (b.role === 'management' ? 'management' : 'staff');
-        if (s.role === 'management' && role !== 'management' && managers().length <= 1) return fail(409,'That would leave no Manager.');
+        const s = find(); if (!s || !seen(s)) return fail(404,'No such person.');
+        if (!editable(s)) return fail(403,'You can only change people who are in your own facilities.');
+        const role = b.role === undefined ? s.role : (ROLES.includes(b.role) ? b.role : 'staff');
+        if (!isAdmin(w) && role !== s.role) return fail(403,'Only an Admin can change a role.');
+        if (s.role === 'admin' && role !== 'admin' && admins().length <= 1) return fail(409,'That would leave no Admin.');
+        const facs = b.facilities === undefined ? (s.facilities || []) : asList(b.facilities);
+        if (!isAdmin(w) && b.facilities !== undefined){
+          if (!facs.length) return fail(400,'Pick at least one of your facilities.');
+          if (!facs.every(f => mine.includes(f))) return fail(403,'You can only give people your own facilities.');
+        }
         if (b.name !== undefined) s.name = String(b.name).trim() || s.name;
         s.role = role;
-        s.facilities = role === 'management' ? [] : (b.facilities === undefined ? s.facilities : asList(b.facilities));
+        s.facilities = role === 'admin' ? [] : facs;
         return json(res,200,{ok:true});
       }
       case 'reset_code': {
-        const s = find(); if (!s) return fail(404,'No such person.');
+        const s = find(); if (!s || !seen(s)) return fail(404,'No such person.');
+        if (!editable(s)) return fail(403,'You can only change people who are in your own facilities.');
         s.code = makeCode();
         return json(res,200,{code:s.code});
       }
       case 'remove': case 'restore': {
-        const s = find(); if (!s) return fail(404,'No such person.');
+        const s = find(); if (!s || !seen(s)) return fail(404,'No such person.');
+        if (!editable(s)) return fail(403,'You can only change people who are in your own facilities.');
         const removing = b.action === 'remove';
         if (removing && s.id === w.user.id) return fail(409,'You cannot remove yourself.');
-        if (removing && s.role === 'management' && managers().filter(m => m.id !== s.id).length === 0) return fail(409,'That would leave no Manager.');
+        if (removing && s.role === 'admin' && admins().filter(m => m.id !== s.id).length === 0) return fail(409,'That would leave no Admin.');
         s.active = !removing;
         if (removing) unlocks.delete(s.id);
         return json(res,200,{ok:true});
       }
       case 'set_access_code': {
+        if (notAdmin()) return;
         const code = String(b.code || '');
         if (code.length < 8) return fail(400,'The access code needs at least 8 characters.');
         opts.code = code; codeTimes.access = new Date().toISOString();
@@ -264,6 +292,7 @@ const server = http.createServer(async (req,res)=>{
         return json(res,200,{ok:true});
       }
       case 'set_editing_code': {
+        if (notAdmin()) return;
         const code = String(b.code || '');
         if (code.length < 8) return fail(400,'The editing code needs at least 8 characters.');
         opts.editCode = code; codeTimes.editing = new Date().toISOString();
@@ -311,14 +340,15 @@ const server = http.createServer(async (req,res)=>{
     return json(res,404,{message:'no such function'});
   }
 
-  // ---- activity: readable by Management, never written by a device ----
+  // ---- activity: readable by an Admin (all of it) and a Manager (their facilities), never written by a device ----
   if (p === '/rest/v1/activity'){
     const w = who(req);
     if (!w) return json(res,401,{message:'JWT expired or missing'});
     if (req.method !== 'GET') return json(res,403,{message:'the log is append-only'});
-    if (!isMgmt(w)) return json(res,403,{message:'Management only'});
+    if (!isAdmin(w) && !isManagerRole(w)) return json(res,403,{message:'Managers and Admins only'});
     /* The few PostgREST filters the Changes page needs. */
     let out = activity.slice();
+    if (!isAdmin(w)) out = out.filter(r => r.facility_id && (w.user.facilities || []).includes(r.facility_id));
     const eq = k => { const m = u.query[k] && /^eq\.(.*)$/.exec(u.query[k]); return m ? decodeURIComponent(m[1]) : null; };
     for (const k of ['id','kind','facility_id','changed_by']) { const v = eq(k); if (v !== null) out = out.filter(r=>String(r[k]) === v); }
     const gt = u.query.at && /^gt\.(.*)$/.exec(u.query.at);

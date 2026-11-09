@@ -47,7 +47,7 @@ const widthRows = async () => (await rows()).filter(r => r.kind === 'glass_width
 await fetch(B + '/__reset');
 
 /* ---- the server rules, as a modified page would meet them ---------------------- */
-await addStaff({ id: 'pete', name: 'Pete', role: 'management', code: 'pete-code-1' });
+await addStaff({ id: 'pete', name: 'Pete', role: 'admin', code: 'pete-code-1' });
 await addStaff({ id: 'flo', name: 'Flo', role: 'staff', code: 'flo-code-1', facilities: ['flynn'] });
 await ctl('tight=1');
 const pete = await login('pete' + DOM, 'pete-code-1'), flo = await login('flo' + DOM, 'flo-code-1');

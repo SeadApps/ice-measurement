@@ -13,7 +13,7 @@ const { ok, sleep, B } = k;
 (async () => {
 await fetch(B + '/__reset');
 await k.seed();
-await k.addStaff({ id: 'pete', name: 'Pete', role: 'management', code: 'pete-code-1' });
+await k.addStaff({ id: 'pete', name: 'Pete', role: 'admin', code: 'pete-code-1' });
 await k.addStaff({ id: 'dana', name: 'Dana', role: 'staff', code: 'dana-code-1', facilities: ['f1'] });
 await k.ctl('tight=1');
 const b = await k.chromium.launch();
@@ -74,7 +74,7 @@ const unlock = tok => fetch(B + '/rest/v1/rpc/unlock_editing', { method: 'POST',
 await unlock(dana); await unlock(pete);
 const target = rows[0].id;
 const refused = await send(dana, target, { status: 'resolved' });
-ok('Staff cannot resolve a flag', refused.status === 403 && /Management/.test(await refused.text()));
+ok('Staff cannot resolve a flag', refused.status === 403 && /Manager or Admin/.test(await refused.text()));
 ok('Management can', (await send(pete, target, { status: 'resolved' })).ok);
 ok('Staff cannot reopen it', (await send(dana, target, { status: 'open' })).status === 403);
 ok('Management can reopen it', (await send(pete, target, { status: 'open' })).ok);

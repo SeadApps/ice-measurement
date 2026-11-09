@@ -160,7 +160,7 @@ await R.ctx.close();
 
 /* ---- people ---------------------------------------------------------------------------------------------------------------------- */
 await fetch(B + '/__reset');
-await k.addStaff({ id: 'pete', name: 'Pete', role: 'management', code: 'pete-code-1' });
+await k.addStaff({ id: 'pete', name: 'Pete', role: 'admin', code: 'pete-code-1' });
 await k.addStaff({ id: 'flo', name: 'Flo', role: 'staff', code: 'flo-code-1', facilities: ['f2'] });
 await k.ctl('tight=1'); await k.seed(k.PETE);
 const F = await k.device(b, 1280);

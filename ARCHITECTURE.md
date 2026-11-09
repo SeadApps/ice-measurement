@@ -132,7 +132,7 @@ A facility's `settings` (and its `edges` array) are detached from the snapshot l
 an object with itself, so the facility was never restamped and the edit reached no other
 device until something else about the facility changed.
 
-**Restoring a backup is Management's.** `Sync.canRestore()` is true when nobody is
+**Restoring a backup is the Admin's** (and so is making one: see *Roles*). `Sync.canRestore()` is true when nobody is
 signed in as a person yet (the shared account carries the data, rollout step 3) or when
 the person's scope is `*`, and false otherwise, including while a person's scope has not
 been fetched. Ice's *Restore from backup* and Glass's *Load record* check it on the
@@ -465,8 +465,51 @@ forward, so a record the server hid from this person when it passed would never 
 offered again — giving someone a facility later, or handing a device to a second
 person, would miss everything older than where the cursor stood. The key is
 `rink_sync_cursor:<kinds>:<personId>:<scope>`, where scope comes from
-`my_facilities()` (`*` for Management). A change of either starts one fresh pull,
+`my_facilities()` (`*` for an Admin). A change of either starts one fresh pull,
 which is safe: pulling what is already held changes nothing.
+
+### Roles: Admin, Manager and Staff
+
+The server knows three roles (`app.staff.role`: `admin`, `manager`, `staff`; `supabase/d7-01-roles.sql`). The page hides
+what a role cannot do, and the server refuses it regardless (`dev/rolestest.js` proves both).
+
+| | **Admin** | **Manager** | **Staff** |
+|---|---|---|---|
+| Facilities seen | all, including later ones | only those they were given | only those they were given |
+| Take rounds, edit readings, raise flags | yes | yes | yes |
+| Resolve or reopen a flag | yes | yes, in their facilities | no |
+| Facility settings (Preferences) | yes | yes, in theirs | read only |
+| Add, rename, hide, restore a **sheet** | yes | yes, in theirs | no |
+| Add, hide, restore a **facility** | yes | **no** (the server says only an Admin) | no |
+| Quality review: Changes, Current state, Reports | all | their facilities | no (Flags only) |
+| Change log | all | their facilities | no |
+| Staff page | everyone | Staff whose every facility is theirs | no |
+| Roles; Managers and Admins | yes | no | no |
+| Access code, editing code | yes | no | no |
+| Back up, restore | yes | no | no |
+| Untagged records | yes | no | no |
+
+Rules worth knowing:
+
+- **`Sync.canManage(fid)`** asks "may this person change settings, sheets and flags here": true for an Admin everywhere, for a
+  Manager where `canSee(fid)`; with no argument it means "somewhere". `Sync.isAdmin()` is the Admin-only questions (a facility,
+  the shared codes, backup and restore: `canBackup`, `canRestore`). Before anybody signs in as a person every answer is yes,
+  as before. The role is fetched with the scope (`my_facilities()`) and kept in `rink_role`, so an offline start shows the same pages.
+- **A server not yet moved on says `management` for an Admin.** `refreshScope()` and the manage-staff function both read it as
+  `admin`, which is what lets the app, the function and the SQL be rolled out one after the other in that order.
+- **A Manager's Staff.** The manage-staff function lists a Manager the Staff who hold at least one of their facilities and marks
+  each `editable` only when every one of that person's facilities is the Manager's. A Manager cannot see a Manager or an Admin
+  (so cannot change themselves), cannot change a role, and cannot give a facility they do not hold; the page shows a locked
+  card for Staff who are also elsewhere. Only an Admin makes a Manager or an Admin.
+- **The last Admin** cannot be removed or made Staff. An Admin has no facility list: they cover all.
+- **Backup is the Admin's**, since a backup holds everything on the device. The account menu and Ice's Preferences show it to
+  an Admin only, and Ice stops nagging anybody else to back up.
+- **Glass records are tagged** (`fac` on panels, layouts, binding, spares and widths, taken from the sheet), so a Manager's Glass
+  is their own facility's. `supabase/live-checks.md` has the count that proves none are left bare on the real server.
+- **The names on the sign-in page** (`staff_names()`) are everyone's, across facilities: the access code is one shared code.
+
+Rolling it out (each step is safe on its own; see the header of `d7-01-roles.sql`): merge the app, deploy the manage-staff
+function, run `d7-01-roles.sql` (one transaction), then run its checks. `d7-02-undo-roles.sql` and `d1-01-add.sql` put it back.
 
 ### The activity log
 
@@ -571,7 +614,7 @@ update its number in `dev/expected.json` by hand: the number is a claim.
 
 ```
 node dev/fake-supabase.js &
-node dev/activitytest.js   # 48 checks: one log row per write with old and new, append-only, Management only
+node dev/activitytest.js   # 48 checks: one log row per write with old and new, append-only, read by Admins and (their facilities) Managers only
 node dev/authtest.js       # 57 checks: the two-step gate, a rotated code, a removed person, first sign-in offline, the rollout
 node dev/backuptest.js     # 44 checks: backup and restore from the account menu, merging, old files, units, Ice and the shell make the same file, Staff cannot restore and never export what they may not see
 node dev/bandmigrationtest.js # 31 checks: eighths keep every reading in its band (15 readings, defaults and 2,000 random edge sets); the migration; a settings edit reaches the server
@@ -586,9 +629,9 @@ node dev/facilitiestest.js # 45 checks: Facilities and Sheets agree with Ice, tr
 node dev/facilitytest.js   # 32 checks: facilities in Glass, ids scoped without a migration,
 node dev/gentest.js        # 19 checks: the generator reproduces Conway's survey, either way round
 node dev/genpuretest.js    # 8 checks: glass-gen.js runs with no page: a walk becomes the same layout every time
-node dev/navtest.js        # 121 checks: the flow chart's access table: every page, Quality review included, by address at four widths for Management and Staff
+node dev/navtest.js        # 121 checks: the flow chart's access table: every page, Quality review included, by address at four widths for Admin and Staff (Managers are in rolestest)
 node dev/reviewtest.js     # 39 checks: Quality review: Flags, Current state agreeing with the Fleet table, Changes (sentences, filters, paging, the Large change hint, offline), Reports (sections, same in either theme, print black on white, a PDF)
-node dev/flagtest.js       # 23 checks: flags: raised from a reading and a panel on any width, only Management resolves or reopens (the server says so), counts on the cards and the Fleet table, marks, nothing restamped by looking
+node dev/flagtest.js       # 23 checks: flags: raised from a reading and a panel on any width, only a Manager or Admin resolves or reopens (the server says so), counts on the cards and the Fleet table, marks, nothing restamped by looking
 node dev/clicktest.js      # 36 checks: every page reached by clicking from sign-in
 node dev/swtest.js         # 14 checks: the precache list is exactly what ships; an activate drops old caches
 node dev/manifesttest.js   # 15 checks: the manifest is valid, its shortcuts open Facilities, its icons are the size they say
@@ -613,9 +656,10 @@ node dev/suretest.js       # 10 checks: Ice asks in the page, never with a brows
 node dev/trendtest.js      # 19 checks: Trends: the average by whole sheet, third or one spot, against a direct calculation
 node dev/themetest.js      # 9 checks: the canvas colours follow the theme: band tokens per theme, the ring and the trend line, no record written
 node dev/reg.js            # 15 checks: rounds persist, prefs stay separate, the switcher is reachable
-node dev/restoretest.js    # 12 checks: restoring a backup is Management's, for an Ice backup and for a Glass file through the account menu; Staff are told and nothing merges
+node dev/restoretest.js    # 12 checks: restoring a backup is the Admin's, for an Ice backup and for a Glass file through the account menu; Staff are told and nothing merges
 node dev/resume.js         # 8 checks: coming back lands where you left off
 node dev/rinktest.js       # 19 checks: the Rink view: Compare to and its delta legend, no 3D, the old Map | Trend buttons gone
+node dev/rolestest.js      # 90 checks: Admin, Manager and Staff: what each reads and writes, the change log, the manage-staff function (a Manager's Staff only), and the pages for each role
 node dev/routetest.js      # 40 checks: the shell's addresses, back/forward, a Staff person and a shared iPad, the apps follow where you are
 node dev/scheduletest.js   # 31 checks: the schedule opens on what needs attention, and print still carries all 127
 node dev/scopetest.js      # 53 checks: a Staff person sees and writes only their facilities; the tag; the per-person cursor
@@ -632,10 +676,10 @@ node dev/stafftest.js      # 65 checks: Staff page: add, edit, reset, remove, re
 node dev/stamptest.js      # 25 checks: the server stamps who changed a record; a pulled stamp never looks like an edit
 node dev/synctest.js       # 26 checks: sign-in, two devices, offline, paused, and the readings inside a round
 node dev/whotest.js        # 18 checks: nobody types their name; the bar names the person; the server's stamp is shown; old marks keep their typed name
-node dev/widthstest.js     # 25 checks: a facility's one-tap widths (default 43/48, no record until changed); only Management resolves or reopens a flag
+node dev/widthstest.js     # 25 checks: a facility's one-tap widths (default 43/48, no record until changed); only a Manager or Admin resolves or reopens a flag
 ```
 
-1957 checks in all, over 62 suites. Tests point `window.__SYNC_CONFIG__` at the fake via
+2047 checks in all, over 63 suites. Tests point `window.__SYNC_CONFIG__` at the fake via
 `addInitScript`; the real pages never read it.
 
 **Lessons from the access work, each of which cost a debugging session:**
@@ -715,7 +759,7 @@ the front door: the old front page is gone, and an address that names nothing la
   invents a facility: an empty device shows an empty Facilities page until the first pull.
 - **Hiding by person**: `Sync.canSee(facilityId)` filters every list, the menus, the rail and
   the addresses. It hides, it is not a boundary (the data may already be on the device).
-  `Sync.canManage()` gates Add facility and Add sheet (Management, or nobody signed in as a
+  `Sync.isAdmin()` gates Add facility and `Sync.canManage(fid)` Add sheet (an Admin, a Manager of that facility, or nobody signed in as a
   person yet); they also grey until the editing window is open, like every edit control.
 - **Reads and writes**: `Repo.read()`, `Repo.savePrefs()` and `Repo.addSheet()` only, so the
   shell cannot restamp a record by looking. `Records.trendOf()` and `Records.glassSummary()`
@@ -740,12 +784,13 @@ the front door: the old front page is gone, and an address that names nothing la
   send anywhere, so it never carries a facility they may not see, even if it is on the device);
   `Repo.previewImport(obj)` reads the record format and the older whole-state one and says what is
   in it; `Repo.importAll(obj)` merges, newest wins, readings inside a round kept from both. Restore is
-  Management's (`Sync.canRestore`) and needs the editing window, and is confirmed in the page, not a
+  the Admin's (`Sync.canRestore`) and needs the editing window, and is confirmed in the page, not a
   browser dialog; messages are a toast on the body, which a redraw cannot take away. Ice's own
   backup buttons call the same functions. Glass's own panel conditions, binding, walked layouts, spare-glass
   movements and widths are part of that file too (see *Glass in the backup*).
-- **Staff** (`#/staff`, Management only; the rail and the account menu list it, and any other person
-  is sent to Facilities with the one message even by address): People and Activity tabs. People:
+- **Staff** (`#/staff`, Admins and Managers; the rail and the account menu list it, and any other person
+  is sent to Facilities with the one message even by address; a Manager sees only the Staff in their own facilities and has no
+  shared codes or role to choose): People and Activity tabs. People:
   add, edit (name, role, facilities), reset code, remove and restore, with an in-page confirmation for
   remove and for changing a shared code, plus the access code and editing code with when each was last
   changed. Everything goes through `Sync.manage(action, body)`, which calls the `manage-staff` function
@@ -996,7 +1041,7 @@ panel or a setting. `dev/navdata.js` is the flow chart's access table as data an
   Check reading, Other), a free note, and a status of open or resolved. It is held on the device under `rink_flags_v1`, synced
   by whichever page is open (the shell, Ice and Glass all attach the kind), merged newest-wins, and stamped by the server with
   who last changed it. Anyone with access to the facility can raise one, from the Flag button in Ice's Rink view (the spot you
-  tapped) or on a panel's card in Glass, on every device. **Only Management resolves or reopens**, enforced by the server (the
+  tapped) or on a panel's card in Glass, on every device. **Only a Manager or Admin resolves or reopens**, enforced by the server (the
   rule in `d1-01-add.sql`, mirrored in the fake); the page hides the buttons from Staff as well. A flag whose sheet has gone still
   lists and says so. Open flags are counted on the Facilities cards, the sheet rows and the Fleet table, and marked on the map
   (a dashed amber ring and a small flag) and on the plan (a dashed outline).
@@ -1075,7 +1120,7 @@ way, so it can still be loaded once from the account menu (`glassbackuptest`).
   `restoretest` check both.
 - **Ice's image export keeps a dark background**, so in the light theme its legend draws the light band colours
   on it. Not looked at.
-- **Staff cannot update a sheet from the glass builder.** Writing a sheet is Management-only, so the builder's
+- **Staff cannot update a sheet from the glass builder.** Writing a sheet is for Managers and Admins, so the builder's
   offer to update the sheet's size is refused for a Staff person. Staff exports and backups also carry no
   Glass records, because those are not tagged by facility.
 - **Glass-only rinks.** The builder cannot make one any more (a rink is always a sheet), but one that already
@@ -1091,7 +1136,7 @@ way, so it can still be loaded once from the account menu (`glassbackuptest`).
   that signs in (a rotated access code would put the sign-in prompt on the wall screen), and an automatic 5am job that publishes the
   picture at a fixed address (needs a read-only Staff person for Conway, a GitHub secret, and Pete's agreement that the address is
   public). `ReportMaps.tvImage` is the piece either would reuse.
-- **Removing a facility** is Management's, from the facility's page (*Remove facility*, asked in the page): the
+- **Removing a facility** is the Admin's, from the facility's page (*Remove facility*, asked in the page): the
   facility and its live sheets are tombstoned and each sheet is marked `removedWith`, every round is kept.
   *Removed facilities* on the Facilities page, and the undo banner, bring it back with exactly those sheets (one
   removed on its own earlier stays removed). The last facility cannot go. It is tested in `facremovetest`.

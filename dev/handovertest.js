@@ -51,8 +51,8 @@ const pill=async p=>(await p.textContent('.sync-pill').catch(()=>''))||'';
 const unlock=p=>p.evaluate(c=>window.Sync.unlockEditing(c),EDIT);
 const people=async()=>{
   await fetch(B+'/__reset');
-  await addStaff({id:'dana',name:'Dana',role:'management',code:'dana-code-1'});
-  await addStaff({id:'pete',name:'Pete',role:'management',code:'pete-code-1'});
+  await addStaff({id:'dana',name:'Dana',role:'admin',code:'dana-code-1'});
+  await addStaff({id:'pete',name:'Pete',role:'admin',code:'pete-code-1'});
 };
 
 (async()=>{

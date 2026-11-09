@@ -14,7 +14,7 @@ const { ok, sleep, B } = k;
 (async () => {
 await fetch(B + '/__reset');
 await k.seed();
-await k.addStaff({ id: 'pete', name: 'Pete', role: 'management', code: 'pete-code-1' });
+await k.addStaff({ id: 'pete', name: 'Pete', role: 'admin', code: 'pete-code-1' });
 await k.addStaff({ id: 'dana', name: 'Dana', role: 'staff', code: 'dana-code-1', facilities: ['f1'] });
 await k.ctl('tight=1');
 const b = await k.chromium.launch();

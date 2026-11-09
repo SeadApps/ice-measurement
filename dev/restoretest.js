@@ -13,7 +13,7 @@
 const { chromium } = require('playwright');
 
 const B = 'http://localhost:8200';
-const EDIT = 'test-editing-code', MSG = 'Only Management can restore a backup.';
+const EDIT = 'test-editing-code', MSG = 'Only an Admin can restore a backup.';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let pass = 0, fail = 0;
 const ok = (n, c, x) => { c ? pass++ : fail++; console.log((c ? '  PASS  ' : '  FAIL  ') + n + (x && !c ? '   [' + x + ']' : '')); };
@@ -64,7 +64,7 @@ await L.ctx.close();
 
 /* ---- once people exist -------------------------------------------------------- */
 await fetch(B + '/__reset');
-await addStaff({ id: 'pete', name: 'Pete', role: 'management', code: 'pete-code-1' });
+await addStaff({ id: 'pete', name: 'Pete', role: 'admin', code: 'pete-code-1' });
 await addStaff({ id: 'flo', name: 'Flo', role: 'staff', code: 'flo-code-1', facilities: ['flynn'] });
 await ctl('tight=1');
 
@@ -89,8 +89,9 @@ ok('and the backup merges for them', (await names(M.p)).includes('Backup Rink'),
 const menuRestore = async p => { await p.click('#acctMenu'); await p.click('.dropdown .it:has-text("Restore from backup")'); await sleep(400); };
 const GS = await device(b, 'GS');
 await GS.p.goto(B + '/index.html'); await signInAs(GS.p, 'flo', 'flo-code-1'); await unlock(GS.p); await sleep(1500);
-await menuRestore(GS.p);
-ok('the account menu tells Staff the same', (await GS.p.evaluate(() => document.body.innerText)).includes(MSG));
+await GS.p.click('#acctMenu'); await sleep(250);
+ok('the account menu does not offer Staff a restore at all', !(await GS.p.$$eval('.dropdown .it', e => e.map(x => x.textContent))).some(t => /Restore from backup|Back up/.test(t)));
+await GS.p.keyboard.press('Escape');
 await GS.p.goto(B + '/glass.html'); await sleep(2500);
 ok('and nothing came from it', (await panel(GS.p)) !== 'replace', await panel(GS.p));
 

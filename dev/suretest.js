@@ -6,7 +6,7 @@ const { ok, sleep, B } = k;
 (async () => {
 await fetch(B + '/__reset');
 await k.seed();
-await k.addStaff({ id: 'pete', name: 'Pete', role: 'management', code: 'pete-code-1' });
+await k.addStaff({ id: 'pete', name: 'Pete', role: 'admin', code: 'pete-code-1' });
 const b = await k.chromium.launch();
 const D = await k.device(b, 1000), p = D.p;
 let native = 0; p.on('dialog', d => { native++; d.dismiss(); });

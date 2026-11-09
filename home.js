@@ -101,7 +101,8 @@
     return form;
   }
   function addButton(kind, label, facility) {
-    if (!Shell.canManage()) return null;
+    /* A facility is added by an Admin; a sheet by an Admin or by the Manager of its facility. */
+    if (kind === "fac" ? !Shell.isAdmin() : !Shell.canManage(facility && facility.id)) return null;
     return h("button", { cls: "btn", type: "button", id: kind === "fac" ? "addFac" : "addSheet", text: label,
       onclick: function () { addOpen = kind; Shell.refresh().then(function () { var n = document.getElementById("addName"); if (n) n.focus(); }); } });
   }
@@ -163,7 +164,7 @@
     if (removedFac) {
       var gf = removedFac;
       el.appendChild(h("div", { cls: "banner good", id: "removedFacBanner", style: "margin-bottom:14px" }, [
-        gf.name + " has been hidden. Its sheets and readings are kept, and management can bring it back.",
+        gf.name + " has been hidden. Its sheets and readings are kept, and an Admin can bring it back.",
         h("button", { cls: "btn sm", type: "button", id: "undoRemoveFac", text: "Undo, bring it back", onclick: async function () {
           var r = await Repo.restoreFacility(gf.fid); removedFac = null;
           if (r.changed && typeof Sync !== "undefined") Sync.nudge();
@@ -171,7 +172,7 @@
     }
     if (view === "fleet") el.appendChild(fleetTable(d));
     else el.appendChild(h("div", { cls: "rows", id: "facRows" }, d.facilities.map(function (f) { return facilityRow(d, f); })));
-    if ((d.removedFacs || []).length && Shell.canManage()) {
+    if ((d.removedFacs || []).length && Shell.isAdmin()) {
       var box = h("div", { cls: "card", id: "removedFacList", style: "margin-top:18px" }, [h("div", { cls: "eyebrow", text: "Removed facilities" })]);
       d.removedFacs.forEach(function (r) {
         box.appendChild(h("div", { cls: "toolbar", "data-rid": r.id, style: "margin:0 0 8px" }, [
@@ -214,7 +215,7 @@
     if (removed) {
       var gone = removed;
       el.appendChild(h("div", { cls: "banner good", id: "removedBanner", style: "margin-bottom:14px" }, [
-        gone.name + " has been hidden. Its readings and glass are kept, and management can bring it back.",
+        gone.name + " has been hidden. Its readings and glass are kept, and a Manager or Admin can bring it back.",
         h("button", { cls: "btn sm", type: "button", id: "undoRemove", text: "Undo, bring it back", onclick: async function () {
           var r = await Repo.restoreSheet(gone.sid); removed = null;
           if (r.changed && typeof Sync !== "undefined") Sync.nudge();
@@ -227,12 +228,12 @@
     el.appendChild(h("div", { cls: "rows", id: "sheetRows" }, (f.sheets || []).map(function (s) { return sheetRow(d, f, s); })));
     /* Management can bring a hidden sheet back, with its readings, from here at any time. */
     var hidden = (d.removed || []).filter(function (r) { return r.facilityId === f.id; });
-    if (hidden.length && Shell.canManage()) {
+    if (hidden.length && Shell.canManage(f.id)) {
       var box = h("div", { cls: "card", id: "removedList", style: "margin-top:18px" }, [h("div", { cls: "eyebrow", text: "Removed sheets" })]);
       hidden.forEach(function (r) {
         box.appendChild(h("div", { cls: "toolbar", "data-rid": r.id, style: "margin:0 0 8px" }, [
           h("span", {}, [h("b", { text: r.name }), h("span", { cls: "meta", text: "  " + sizeText(r) })]),
-          h("button", { cls: "btn ghost sm", type: "button", "data-restore": r.id, disabled: !Shell.canEdit(), text: "Bring back",
+          h("button", { cls: "btn ghost sm", type: "button", "data-restore": r.id, disabled: !Shell.canEdit(f.id), text: "Bring back",
             onclick: async function () {
               var res = await Repo.restoreSheet(r.id);
               if (res.changed && typeof Sync !== "undefined") Sync.nudge();
@@ -240,10 +241,10 @@
       });
       el.appendChild(box);
     }
-    if (Shell.canManage()) {
+    if (Shell.isAdmin()) {
       var lone = d.facilities.length < 2, fz = h("div", { cls: "card danger-zone", id: "removeFacZone", style: "margin-top:18px" }, [h("div", { cls: "eyebrow", text: "Remove this facility" })]);
       if (facConfirm === f.id) {
-        fz.appendChild(h("p", { style: "margin:0 0 10px;font-size:14px" }, ["Hide ", h("b", { text: f.name }), " and its ", plural((f.sheets || []).length, "sheet"), "? They disappear from every list. All readings and glass are kept, and management can bring it back."]));
+        fz.appendChild(h("p", { style: "margin:0 0 10px;font-size:14px" }, ["Hide ", h("b", { text: f.name }), " and its ", plural((f.sheets || []).length, "sheet"), "? They disappear from every list. All readings and glass are kept, and an Admin can bring it back."]));
         fz.appendChild(h("div", { cls: "foot" }, [
           h("button", { cls: "btn danger", type: "button", id: "fyes", disabled: !Shell.canEdit(), text: "Yes, hide it", onclick: async function () {
             var r = await Repo.removeFacility(f.id); facConfirm = null;
@@ -338,7 +339,7 @@
     var sheet = (f.sheets || []).filter(function (x) { return x.id === route.sid; })[0];
     if (!sheet) return holding("Sheet settings", "Facilities", "That page is not available.");
     if (!draft || draft.sid !== sheet.id) initDraft(sheet);
-    var canEdit = Shell.canEdit(), dis = !canEdit;
+    var canEdit = Shell.canEdit(f.id), dis = !canEdit;
     var shape = draftShape(), bad = Records.shapeProblem(shape) ? problemText(shape) : "", per = Records.shapePerimeter(shape);
     var R = shape.Rft + shape.Rin / 12;
 
@@ -348,7 +349,7 @@
     el.appendChild(h("p", { cls: "sub", text: "Set here. Ice Manager and Glass Manager both draw from these values. The glass builder asks again and offers to update them." }));
     var body = h("div", { cls: "stack" });
     if (dis) body.appendChild(h("div", { cls: "banner warn", id: "viewOnly",
-      text: Shell.canManage() ? "Viewing only. Unlock to edit to change these settings." : "Viewing only. Only Management can change these settings." }));
+      text: Shell.canManage(f.id) ? "Viewing only. Unlock to edit to change these settings." : "Viewing only. Only a Manager or Admin can change these settings." }));
 
     var nameIn = h("input", { type: "text", id: "sname", value: draft.name, placeholder: "e.g. Standard, Mini", disabled: dis, autocomplete: "off",
       oninput: function (e) { draft.name = e.target.value; savedMsg = ""; } });
@@ -391,10 +392,10 @@
       h("div", { cls: "banner info", text: "Changing the size redraws the Ice map and the Glass plan from the new outline. Existing readings are never touched. Glass panels stay as built until the glass build is checked again." })]);
     body.appendChild(h("div", { cls: "two" }, [left, right]));
 
-    if (Shell.canManage()) {
+    if (Shell.canManage(f.id)) {
       var only = (f.sheets || []).length < 2, zone = h("div", { cls: "card danger-zone", id: "removeZone" }, [h("div", { cls: "eyebrow", text: "Remove this sheet" })]);
       if (draft.confirm) {
-        zone.appendChild(h("p", { style: "margin:0 0 10px;font-size:14px" }, ["Hide ", h("b", { text: sheet.name || "this sheet" }), "? It disappears from every list. Its readings and glass are kept, and management can bring it back."]));
+        zone.appendChild(h("p", { style: "margin:0 0 10px;font-size:14px" }, ["Hide ", h("b", { text: sheet.name || "this sheet" }), "? It disappears from every list. Its readings and glass are kept, and a Manager or Admin can bring it back."]));
         zone.appendChild(h("div", { cls: "foot" }, [
           h("button", { cls: "btn danger", type: "button", id: "dyes", disabled: dis, text: "Yes, hide it", onclick: async function () {
             var r = await Repo.removeSheet(sheet.id);
@@ -425,7 +426,8 @@
   }
 
   /* ---------- Staff ----------
-     Management's page for the people who can make changes. Everything goes through the
+     The page for the people who can make changes: an Admin sees and changes everyone, a Manager the Staff in their own
+     facilities. Everything goes through the
      manage-staff function (Sync.manage), because creating a sign-in or changing a password
      needs a key that must never be in a page. A code it hands back is shown ONCE, here, and
      lives only in this variable: it is not written to storage, not put in the address, and
@@ -452,7 +454,7 @@
   async function loadStaff() {
     if (staffLoading) return;
     staffLoading = true;
-    var a = await Sync.manage("list"), c = await Sync.manage("codes");
+    var a = await Sync.manage("list"), c = Shell.isAdmin() ? await Sync.manage("codes") : { ok: false };     // the shared codes are the Admin's
     staffLoading = false;
     if (!a.ok) { staffMsg = a.error; staffData = { people: [], codes: {} }; }
     else staffData = { people: a.people || [], codes: c.ok ? { access: c.access, editing: c.editing } : {} };
@@ -481,12 +483,16 @@
     var f = (d.facilities || []).filter(function (x) { return x.id === id; })[0];
     return f ? f.name : id;
   }
+  var ROLE_NAME = { admin: "Admin", manager: "Manager", staff: "Staff" };
   function personCard(d, p, me) {
     var self = me && me.id === p.login;
-    var meta = (p.role === "management" ? "All facilities" : ((p.facilities || []).map(function (id) { return facName(d, id); }).join(", ") || "No facilities")) +
+    var meta = (p.role === "admin" ? "All facilities" : ((p.facilities || []).map(function (id) { return facName(d, id); }).join(", ") || "No facilities")) +
       " \u00b7 " + (p.last_sign_in ? "last signed in " + when(p.last_sign_in) : "never signed in");
     var acts = h("div", { cls: "acts" });
-    if (ask && ask.kind === "remove" && ask.login === p.login) {
+    if (p.editable === false) {
+      /* A Manager sees Staff who are also in a facility that is not theirs, and leaves them to an Admin. */
+      acts.appendChild(h("span", { cls: "pmeta", "data-locked": p.login, text: "Also in a facility that is not yours. An Admin changes them." }));
+    } else if (ask && ask.kind === "remove" && ask.login === p.login) {
       acts.appendChild(h("span", { style: "font-size:13px", text: "Switch off " + p.name + "\u2019s code?" }));
       acts.appendChild(h("button", { cls: "btn danger sm", type: "button", id: "rmYes", text: "Yes, remove", onclick: function () {
         ask = null; act("remove", { login: p.login }, function () { reveal = null; Shell.toast(p.name + " has been removed. Their code no longer works."); }); } }));
@@ -507,31 +513,33 @@
     return h("div", { cls: "pcard" + (p.active ? "" : " off"), "data-login": p.login }, [
       h("div", { cls: "pid" }, [h("span", { cls: "av", text: (p.name || "?").charAt(0).toUpperCase() }), h("div", {}, [
         h("div", { cls: "pname" }, [p.name, self ? h("span", { cls: "chip st", text: "you" }) : null]), h("div", { cls: "pmeta", text: meta })])]),
-      h("div", { cls: "pst" }, [h("span", { cls: "chip " + (p.role === "management" ? "mg" : "st"), text: p.role === "management" ? "Management" : "Staff" }),
+      h("div", { cls: "pst" }, [h("span", { cls: "chip " + (p.role === "staff" ? "st" : "mg"), text: ROLE_NAME[p.role] || "Staff" }),
         h("span", { cls: "chip " + (p.active ? "ok" : "no"), text: p.active ? "Active" : "Removed" })]), acts]);
   }
   function personForm(d, p) {
     var isNew = formFor === "new";
     var name = h("input", { type: "text", id: "pName", placeholder: "e.g. Jordan", autocomplete: "off", value: isNew ? "" : p.name });
-    var role = h("select", { id: "pRole" }, [h("option", { value: "staff", text: "Staff" }), h("option", { value: "management", text: "Management" })]);
+    /* Only an Admin chooses a role. A Manager adds and changes Staff, so there is nothing to choose. */
+    var admin = Shell.isAdmin();
+    var role = h("select", { id: "pRole" }, [h("option", { value: "staff", text: "Staff" }), h("option", { value: "manager", text: "Manager" }), h("option", { value: "admin", text: "Admin" })]);
     role.value = isNew ? "staff" : p.role;
-    var box = h("fieldset", { cls: "facset", id: "pFacs" }, [h("legend", { text: "Facilities (Management covers all)" })]);
+    var box = h("fieldset", { cls: "facset", id: "pFacs" }, [h("legend", { text: admin ? "Facilities (Admins cover all)" : "Facilities" })]);
     (d.facilities || []).forEach(function (f) {
       box.appendChild(h("label", { cls: "bigcheck" }, [h("input", { type: "checkbox", cls: "pfac", value: f.id, checked: !isNew && (p.facilities || []).indexOf(f.id) >= 0 }), f.name]));
     });
-    function sync() { var off = role.value === "management"; box.disabled = off; box.classList.toggle("off", off); }
+    function sync() { var off = admin && role.value === "admin"; box.disabled = off; box.classList.toggle("off", off); }
     role.addEventListener("change", sync); setTimeout(sync, 0);
     var save = h("button", { cls: "btn", type: "button", id: "pSave", text: isNew ? "Add and show code" : "Save changes", onclick: async function () {
       var n = name.value.trim();
       if (!n) { staffMsg = "A name is needed."; Shell.repaint(); return; }
       var facs = [].map.call(box.querySelectorAll(".pfac"), function (c) { return c.checked ? c.value : null; }).filter(Boolean);
-      var body = { name: n, role: role.value, facilities: facs };
+      var body = { name: n, role: admin ? role.value : "staff", facilities: facs };
       formFor = null;
       if (isNew) await act("add", body, function (r) { showCode("Added " + n + ". Their code is", r.code, "Give it to them now. It will not be shown again."); });
       else await act("update", Object.assign({ login: p.login }, body), function () { Shell.toast("Saved " + n); });
     } });
     return h("div", { cls: "addform", id: "personForm" }, [
-      h("label", { cls: "af" }, [h("span", { text: "Name" }), name]), h("label", { cls: "af" }, [h("span", { text: "Role" }), role]), box,
+      h("label", { cls: "af" }, [h("span", { text: "Name" }), name]), admin ? h("label", { cls: "af" }, [h("span", { text: "Role" }), role]) : null, box,
       h("div", { cls: "afrow" }, [save, h("button", { cls: "btn ghost", type: "button", id: "pCancel", text: "Cancel", onclick: function () { formFor = null; staffMsg = ""; Shell.repaint(); } })])]);
   }
   function sharedCodes(codes) {
@@ -575,7 +583,7 @@
       card.appendChild(h("div", { cls: "subbar", style: "margin-top:10px", text: "A removed person\u2019s code stops working at once. Their name stays on the changes they made." }));
     }
     box.appendChild(card);
-    if (staffData) box.appendChild(sharedCodes(staffData.codes || {}));
+    if (staffData && Shell.isAdmin()) box.appendChild(sharedCodes(staffData.codes || {}));
     return box;
   }
 
@@ -653,7 +661,7 @@
     var el = h("div", { cls: "screen", id: "pageStaff" });
     el.appendChild(h("div", { cls: "crumb", text: "Account / Staff" }));
     el.appendChild(h("h2", { text: "Staff" }));
-    el.appendChild(h("p", { cls: "sub", text: "People who can make changes. Each signs in with their own code." }));
+    el.appendChild(h("p", { cls: "sub", text: Shell.isAdmin() ? "People who can make changes. Each signs in with their own code." : "Staff in your facilities. Each signs in with their own code." }));
     el.appendChild(h("div", { cls: "tabs", role: "tablist" }, [["people", "People", "tabPeople"], ["activity", "Activity", "tabActivity"]].map(function (t) {
       return h("button", { cls: "tab", type: "button", role: "tab", id: t[2], text: t[1], "aria-selected": String(staffTab === t[0]),
         onclick: function () { staffTab = t[0]; reveal = null; ask = null; formFor = null; staffMsg = ""; if (t[0] === "activity") actLog = null; Shell.repaint(); } });

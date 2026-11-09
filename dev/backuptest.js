@@ -169,7 +169,7 @@ await S0.ctx.close();
 
 /* ---- people ---------------------------------------------------------------------------------------------------------------- */
 await fetch(B + '/__reset');
-await k.addStaff({ id: 'pete', name: 'Pete', role: 'management', code: 'pete-code-1' });
+await k.addStaff({ id: 'pete', name: 'Pete', role: 'admin', code: 'pete-code-1' });
 await k.addStaff({ id: 'flo', name: 'Flo', role: 'staff', code: 'flo-code-1', facilities: ['f2'] });
 await k.ctl('tight=1');
 await k.seed(k.PETE);
@@ -195,10 +195,12 @@ await F.p.evaluate(() => Sync.switchUser()); await sleep(1500);
 await F.p.waitForSelector('.sync-gate .sync-name[data-id="flo"]'); await F.p.click('.sync-gate .sync-name[data-id="flo"]');
 await F.p.fill('.sync-gate #sg-personal', 'flo-code-1'); await F.p.click('.sync-gate .sync-go'); await sleep(3500);
 ok('(setup) the device still holds Conway, and Flo is signed in', (await maps(F.p)).f.f1 && /Flo/.test(await text(F.p, '#acctMenu')));
-await menu(F.p, 'Restore from backup');
-ok('Staff are told only Management can restore, and no question is asked', /Only Management can restore/.test(await text(F.p, '#toast')) && !(await F.p.$('#restoreDlg')));
-const fex = await exportFile(F.p);
-ok('Staff can back up, but only their own facility is in the file, though the device holds both', Object.keys(fex.json.facilities).join() === 'f2' && Object.keys(fex.json.sheets).sort().join() === 's2,s3' && !JSON.stringify(fex.json).includes('Conway'), JSON.stringify(Object.keys(fex.json.facilities)));
+await F.p.click('#acctMenu');
+const fmenu = await F.p.$$eval('.dropdown .it', e => e.map(x => x.textContent)); await F.p.keyboard.press('Escape');
+ok('Staff are not offered a backup or a restore: only an Admin backs up', !fmenu.some(t => /Back up|Restore/.test(t)) && await F.p.evaluate(() => !Sync.canBackup() && !Sync.canRestore()), fmenu.join('|'));
+/* the filter is still there in case a backup is ever asked for: it leaves out what the person may not see */
+const fex = { json: await F.p.evaluate(() => Records.Repo.exportAll({ only: Sync.canSee })) };
+ok('and a backup, if one were ever asked for, holds only their own facility though the device holds both', Object.keys(fex.json.facilities).join() === 'f2' && Object.keys(fex.json.sheets).sort().join() === 's2,s3' && !JSON.stringify(fex.json).includes('Conway'), JSON.stringify(Object.keys(fex.json.facilities)));
 await F.ctx.close();
 
 await k.done(b);

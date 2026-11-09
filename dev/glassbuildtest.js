@@ -22,7 +22,7 @@ await k.seed();
   await fetch(B + '/rest/v1/records?on_conflict=kind,id', { method: 'POST', headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' },
     body: JSON.stringify([rec('s4', { name: 'Practice', ord: 2, size: { L: 150, W: 70, corner: 20 } }), rec('s5', { name: 'Third', ord: 3, size: { L: 200, W: 85, corner: 28 } })]) });
 }
-await k.addStaff({ id: 'pete', name: 'Pete', role: 'management', code: 'pete-code-1' });
+await k.addStaff({ id: 'pete', name: 'Pete', role: 'admin', code: 'pete-code-1' });
 const b = await k.chromium.launch();
 const errs = [];
 let native = 0;

@@ -50,7 +50,7 @@ const snap=async()=>(await rows()).map(r=>r.kind+' '+r.id+' '+r.updated_at).sort
 (async()=>{
 await fetch(B+'/__reset');
 await addStaff({id:'dana',name:'Dana',role:'staff',code:'dana-code-1',facilities:['f1']});
-await addStaff({id:'pete',name:'Pete',role:'management',code:'pete-code-1'});
+await addStaff({id:'pete',name:'Pete',role:'admin',code:'pete-code-1'});
 
 /* ---- the server stamps, whatever the page says --------------------------- */
 const dana=await login('dana'+DOM,'dana-code-1');
@@ -86,7 +86,7 @@ ok('changed_by comes back on a pull', pull.every(x=>'changed_by' in x && 'change
 /* ---- the client: a pulled stamp must never look like an edit ------------- */
 await fetch(B+'/__reset');
 await addStaff({id:'dana',name:'Dana',role:'staff',code:'dana-code-1',facilities:[]});
-await addStaff({id:'pete',name:'Pete',role:'management',code:'pete-code-1'});
+await addStaff({id:'pete',name:'Pete',role:'admin',code:'pete-code-1'});
 const b=await chromium.launch();
 
 const A=await device(b,'A');

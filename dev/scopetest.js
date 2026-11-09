@@ -50,7 +50,7 @@ const unlockUI=p=>p.evaluate(c=>window.Sync.unlockEditing(c),EDIT);
 
 (async()=>{
 await fetch(B+'/__reset');
-await addStaff({id:'pete',name:'Pete',role:'management',code:'pete-code-1'});
+await addStaff({id:'pete',name:'Pete',role:'admin',code:'pete-code-1'});
 await addStaff({id:'flo', name:'Flo', role:'staff',code:'flo-code-1', facilities:['flynn']});
 await addStaff({id:'cam', name:'Cam', role:'staff',code:'cam-code-1', facilities:['conway','flynn']});
 await addStaff({id:'nan', name:'Nan', role:'staff',code:'nan-code-1', facilities:[]});
@@ -122,7 +122,7 @@ ok('until they are', await (async()=>{ await addStaff({id:'cam',facilities:['con
 
 /* ---- the real apps ---------------------------------------------------------- */
 await fetch(B+'/__reset');
-await addStaff({id:'pete',name:'Pete',role:'management',code:'pete-code-1'});
+await addStaff({id:'pete',name:'Pete',role:'admin',code:'pete-code-1'});
 await ctl('tight=1');
 /* A facility whose records are older than anything Zed will pull first. */
 const pt2=await login('pete'+DOM,'pete-code-1'); await unlock(pt2);

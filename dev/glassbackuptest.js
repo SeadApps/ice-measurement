@@ -13,7 +13,7 @@ const { ok, sleep, B } = k;
 (async () => {
 await fetch(B + '/__reset');
 await k.seed();
-await k.addStaff({ id: 'pete', name: 'Pete', role: 'management', code: 'pete-code-1' });
+await k.addStaff({ id: 'pete', name: 'Pete', role: 'admin', code: 'pete-code-1' });
 const b = await k.chromium.launch();
 const errs = [];
 const open = async (path) => {
@@ -51,7 +51,7 @@ ok('and the binding', file.glass.boundSheetId === 's1');
 ok('the Ice records are still there too', Object.keys(file.sheets).length >= 3 && file.format === 'rink-ice-v4');
 await A.ctx.close();
 /* the server forgets everything: what comes back below can only have come from the file */
-await fetch(B + '/__reset'); await k.seed(); await k.addStaff({ id: 'pete', name: 'Pete', role: 'management', code: 'pete-code-1' });
+await fetch(B + '/__reset'); await k.seed(); await k.addStaff({ id: 'pete', name: 'Pete', role: 'admin', code: 'pete-code-1' });
 
 /* ---------------- onto an empty device ---------------- */
 const E = await open('/index.html'), e = E.p;

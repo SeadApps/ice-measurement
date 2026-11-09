@@ -14,7 +14,7 @@ const fs = require('fs');
 (async () => {
 await fetch(B + '/__reset');
 await k.seed();
-await k.addStaff({ id: 'pete', name: 'Pete', role: 'management', code: 'pete-code-1' });
+await k.addStaff({ id: 'pete', name: 'Pete', role: 'admin', code: 'pete-code-1' });
 const b = await k.chromium.launch();
 const errs = [];
 

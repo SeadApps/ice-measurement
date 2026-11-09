@@ -154,7 +154,7 @@
 <section id="prefsPage" aria-label="Preferences">
   <div class="modal">
     <h2>Preferences</h2>
-    <div class="lead ro-note" id="prefRo" hidden>You can see these settings but only Management can change them.</div>
+    <div class="lead ro-note" id="prefRo" hidden>You can see these settings but only a Manager or Admin can change them.</div>
     <div class="lead">These apply to <b id="prefFac"></b>, on every device. Theme and units are in the account menu; facilities and sheets are on their own pages.</div>
     <div class="msec">
       <h3>Overdue</h3>
@@ -178,7 +178,7 @@
       <div class="manage" id="roundManage"></div>
       <div class="lead" style="margin:6px 0 0">Edit a round's date to fix it, or delete a round logged by mistake.</div>
     </div>
-    <div class="msec">
+    <div class="msec" id="backupSec">
       <h3>Backup &amp; restore</h3>
       <div class="lead" style="margin:-2px 0 10px">Save everything — all facilities, sheets, rounds, and settings — to one file, or restore from a backup. Worth doing periodically, since browser storage can be cleared.</div>
       <div class="lead" id="backupStatus" style="margin:-6px 0 10px"></div>
@@ -276,7 +276,7 @@ function setUnit(u){if(state.unit===u)return;state.unit=u;applyUnitButtons();bui
 const BACKUP_STALE_DAYS=30;
 function updateBackupBanner(){const el=$("backupWarn");if(!el)return;const last=state.lastBackup;
   let stale=true,days=null;if(last){days=Math.floor((Date.now()-new Date(last).getTime())/86400000);stale=days>=BACKUP_STALE_DAYS;}
-  el.classList.toggle("on",stale);
+  el.classList.toggle("on",stale&&(typeof Shell==="undefined"||Shell.isAdmin()));      // only an Admin backs up, so only an Admin is nagged
   $("backupWarnTxt").textContent=last?`⚠ Last backup ${days} day${days===1?"":"s"} ago — export a fresh copy in case browser storage gets cleared.`:"⚠ No backup yet — export one to protect your data.";}
 function updateBackupStatus(){const el=$("backupStatus");if(!el)return;const last=state.lastBackup;
   if(!last){el.textContent="No backup exported yet.";return;}
@@ -376,6 +376,9 @@ boot().then(()=>{
   SYNC.lockControls(["#flagBtn","#logNew","#newRound","#roundCreate",
     "#resetBands","#undoBtn","#clearBtn","#impBtn","#backupImport","#noteInput",".chip[data-opt]",".chip.clear",
     "#overdueIn","#targetIn","#floodIn","#shaveIn","#tieChk","#edges input",".stp button","#roundManage input","#roundManage .del",".rdel"]);
+  /* Who is signed in, and so what Preferences and the backup banner may offer, is known only once sync has started and
+     the server has said; ask again whenever its status moves. */
+  SYNC.onStatus(()=>{if(state.screen)applyPrefsRole();updateBackupBanner();});
   SYNC.start({title:"Arena Management System"}).then(()=>{
     if(typeof Shell==="undefined")return;
     return Shell.mountBar($("shellbar"),{app:"ice"}).then(()=>Shell.setAddress(facility().id,sheet().id,page));

@@ -65,7 +65,7 @@ ok('the shared session is the one holding data', !!(await ls(D.p,'rink_session')
 /* ---- people exist: step 2 appears ------------------------------------------ */
 await fetch(B+'/__reset');
 await addStaff({id:'dana',name:'Dana',role:'staff',code:'dana-code-1',facilities:[]});
-await addStaff({id:'pete',name:'Pete',role:'management',code:'pete-code-1'});
+await addStaff({id:'pete',name:'Pete',role:'admin',code:'pete-code-1'});
 await addStaff({id:'gone',name:'Gone',role:'staff',code:'gone-code-1',active:false});
 D=await device(b,'D2'); await open(D);
 await access(D.p,ACCESS);
@@ -184,7 +184,7 @@ ok('signing in carries on', !(await gateUp(D.p)) && (await D.p.evaluate(()=>wind
    out - not left on "can't reach the server" with a session that does nothing. */
 await fetch(B+'/__reset');
 await addStaff({id:'dana',name:'Dana',role:'staff',code:'dana-code-1',facilities:[]});
-await addStaff({id:'pete',name:'Pete',role:'management',code:'pete-code-1'});
+await addStaff({id:'pete',name:'Pete',role:'admin',code:'pete-code-1'});
 await ctl('softremove=1');
 D=await device(b,'D5'); await open(D);
 await access(D.p,ACCESS); await pick(D.p,'dana','dana-code-1');

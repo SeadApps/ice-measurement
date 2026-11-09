@@ -59,7 +59,7 @@
           h("div", { cls: "meta", text: (r.note ? r.note + " · " : "") + (r.changedBy ? r.changedBy + ", " : "") + whenStr(r.updatedAt) })]), acts]));
     });
     if (!list.length) box.appendChild(h("div", { cls: "empty-state", id: "noFlags", text: show === "open" ? "Nothing is flagged. A flag is raised from a reading in Ice or a panel in Glass." : "No flags." }));
-    return frame("Flags", isMgmt() ? "Everything somebody flagged. Management resolves and reopens." : "What has been flagged in your facilities. Management resolves them.", [bar, box]);
+    return frame("Flags", isMgmt() ? "Everything somebody flagged. A Manager or Admin resolves and reopens." : "What has been flagged in your facilities. A Manager or Admin resolves them.", [bar, box]);
   }
 
   /* ---------- Current state ---------- */
