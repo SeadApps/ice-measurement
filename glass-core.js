@@ -396,8 +396,12 @@ function BUILT_DRAWN(){
    layout is the fallback drawing for the rest of the page, and was being shown for any other rink's sheet: an empty state with
    a way to the Builder is the truth there. */
 function sheetWithoutGlass(){
-  const m = /#\/f\/[^/]+\/s\/([^/]+)/.exec(location.hash), sid = (m && m[1]) || hereSheet;
-  return (sid && sheets[sid] && !LAYOUTS[sid] && sid !== boundSheetId) ? sheets[sid] : null;
+  const m = /#\/f\/([^/]+)\/s\/([^/]+)/.exec(location.hash), sid = (m && m[2]) || hereSheet;
+  if(!sid || LAYOUTS[sid] || sid === boundSheetId) return null;
+  if(sheets[sid]) return sheets[sid];
+  /* The address names a sheet this page has not been told about yet (the bar knows it; Glass reads its list once, at load).
+     With Conway's own sheet known it is somebody else's, with no glass of ours, and its facility is in the address. */
+  return (m && boundSheetId) ? {id:sid, facilityId:m[1], name:''} : null;
 }
 function paintEmpty(){
   const wrap = document.getElementById('glassWrap'), card = document.getElementById('noGlass');

@@ -1464,7 +1464,13 @@ async function bldSave(){
      so it falls back to that rather than rewriting the address to the glass it happens to be showing. */
   async function addressWhere(){
     let w = await Shell.whereFromAddress().catch(() => null);
-    if(!w){ const hs = hashSheet(); if(hs && sheets[hs]) w = {fid:sheets[hs].facilityId, sid:hs, view:viewFromHash()}; }
+    if(!w){
+      const hs = hashSheet(), hf = /#\/f\/([^/]+)\//.exec(location.hash);
+      if(hs && sheets[hs]) w = {fid:sheets[hs].facilityId, sid:hs, view:viewFromHash()};
+      /* A sheet Glass has not been told about (the bar knows it) is still where the person is: its facility is in the address.
+         Rewriting the address to the glass on screen is what sent a Manager at another rink to Conway's pages. */
+      else if(hs && hf && boundSheetId) w = {fid:hf[1], sid:hs, view:viewFromHash()};
+    }
     return w;
   }
   window.__glassShow = (p, fromAddress) => showGlassPage(p, fromAddress);
