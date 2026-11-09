@@ -69,4 +69,11 @@ const text = (p, sel) => p.evaluate(s => (document.querySelector(s) || {}).textC
 const stamps = async () => JSON.stringify((await rows()).map(r => [r.kind, r.id, r.updated_at]).sort());
 
 const PETE = { email: 'pete' + DOM, password: 'pete-code-1', unlock: true };
-module.exports = { PETE, chromium, B, sleep, ACCESS, EDIT, DOM, ok, done, ctl, rows, addStaff, login, seed, device, signIn, signInAs, text, stamps, ago };
+/* What an Admin's Glass writes the first time it opens: Conway's glass is bound to Conway's sheet. A Manager's or Staff's device takes it
+   from the server and never makes one, so a test with a scoped person at Conway's glass needs it there first. */
+async function bindConway() {
+  const tok = await login('operations@conwayarena.local', ACCESS);
+  await fetch(B + '/rest/v1/records?on_conflict=kind,id', { method: 'POST', headers: H(tok), body: JSON.stringify([
+    { kind: 'glass_binding', id: 'legacy', deleted: false, body: { id: 'legacy', sheetId: 's1', facilityId: 'f1', fac: 'f1', updatedAt: ago(30) } }]) });
+}
+module.exports = { bindConway, PETE, chromium, B, sleep, ACCESS, EDIT, DOM, ok, done, ctl, rows, addStaff, login, seed, device, signIn, signInAs, text, stamps, ago };

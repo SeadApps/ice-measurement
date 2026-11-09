@@ -292,6 +292,8 @@ footer{font-size:12.5px;color:var(--ink-3);text-align:center;font-family:var(--m
 .gtabs button{appearance:none;font:inherit;font-size:13px;min-height:44px;padding:0 16px;border:1px solid var(--line);border-radius:3px;background:var(--surface);color:var(--ink-2);cursor:pointer}
 .gtabs button[aria-current="page"]{background:var(--accent);color:var(--ground);border-color:var(--accent);font-weight:600}
 #glassWrap[data-page="rink"] #spares{display:none}
+#glassWrap[data-page="rink"][data-empty="1"] .specstrip,#glassWrap[data-page="rink"][data-empty="1"] .rail,#glassWrap[data-page="rink"][data-empty="1"] #planCard,#glassWrap[data-page="rink"][data-empty="1"] .grid{display:none}
+#noGlass[hidden],#glassWrap:not([data-page="rink"]) #noGlass{display:none}
 #glassWrap[data-page="inventory"] .specstrip,#glassWrap[data-page="inventory"] .rail,#glassWrap[data-page="inventory"] #planCard,
 #glassWrap[data-page="inventory"] .grid>section.card,#glassWrap[data-page="inventory"] .aside>:not(#spares){display:none}
 #glassWrap[data-page="inventory"] .grid{grid-template-columns:minmax(0,1fr)}

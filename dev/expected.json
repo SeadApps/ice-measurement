@@ -24,6 +24,7 @@
   "glassrinktest": 20,
   "glassinvtest": 23,
   "glassbuildtest": 30,
+  "glassscopetest": 9,
   "glasslaptoptest": 9,
   "glassbackuptest": 20,
   "handovertest": 40,
