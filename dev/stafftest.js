@@ -198,10 +198,18 @@ ok('and the editing code too, but not a short one', /at least 8/.test(await text
 await C.p.fill('#editingOwn', 'my own editing code'); await C.p.click('#editingYes'); await sleep(1500);
 ok('which then opens a window, and the old one does not', !(await unl(ec.code)).ok && (await unl('my own editing code')).ok);
 await C.p.click('#revealDone');
+await C.p.click('#setEdit'); await C.p.click('#editingYes'); await sleep(400);
+ok('Set code… on the editing code needs a code typed and changes nothing without one', /at least 8/.test(await text(C.p, '#staffMsg')) && (await unl('my own editing code')).ok);
+await C.p.fill('#editingOwn', 'typed via set code'); await C.p.click('#editingYes'); await sleep(1500);
+ok('and with one, it takes effect', !(await unl('my own editing code')).ok && (await unl('typed via set code')).ok);
+await C.p.click('#revealDone');
+await C.p.click('#setAccess'); await C.p.fill('#accessOwn', 'set access code 77'); await C.p.click('#accessYes'); await sleep(1500);
+ok('Set code… on the access code too', await dev('set access code 77') && !(await dev('a code I made up')));
+await C.p.click('#revealDone');
 
 /* ---- activity ------------------------------------------------------------------------------------------------------ */
 const dTok = await k.login('dana' + DOM, 'blue otter lamp 42');      // the code chosen by hand above
-await fetch(B + '/rest/v1/rpc/unlock_editing', { method: 'POST', headers: k.H ? k.H(dTok) : { Authorization: 'Bearer ' + dTok, 'Content-Type': 'application/json', apikey: 'test' }, body: JSON.stringify({ code: 'my own editing code' }) });      // the one chosen by hand above
+await fetch(B + '/rest/v1/rpc/unlock_editing', { method: 'POST', headers: k.H ? k.H(dTok) : { Authorization: 'Bearer ' + dTok, 'Content-Type': 'application/json', apikey: 'test' }, body: JSON.stringify({ code: 'typed via set code' }) });      // the last one chosen by hand above
 const hd = { Authorization: 'Bearer ' + dTok, 'Content-Type': 'application/json', apikey: 'test' };
 const w = await fetch(B + '/rest/v1/records?on_conflict=kind,id', { method: 'POST', headers: hd, body: JSON.stringify([{ kind: 'glass_panel', id: 's2:045', deleted: false, body: { fac: 'f2', status: 'replace', note: '' } }]) });
 ok('(setup) Dana made a change under her own name', w.ok);
