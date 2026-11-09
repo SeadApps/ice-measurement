@@ -68,7 +68,9 @@ then run its CHECKS block. Then, with a throwaway facility "Role Test" (one shee
 4. **The upsert case.** As the Manager, change a Preferences value on Role Test (it saves as you type). It must reach the server (this is the write
    the facility rule is written around: an upsert over an existing row fires the INSERT trigger first).
 5. **Admin.** As yourself, everything still works, including Conway, the shared codes, and Back up all data.
-6. Remove the test people and the facility.
+6. **Deleting a round.** As the Manager, delete the empty round in Preferences. It must reach the server (the pill stays clean), and
+   the Staff person's device must lose that round too. This needs `d7-04-tombstone-tag.sql` run first.
+7. Remove the test people and the facility.
 
 If step 4 is refused with "only an Admin adds, removes or restores a facility", tell me before doing anything else: it means the
 facility rule is judging the write as new, and `d7-02-undo-roles.sql` (then `d1-01-add.sql`) puts everything back.
