@@ -33,7 +33,7 @@ await p.waitForSelector('#shellbar .nav'); await sleep(1500);
 
 /* ---- an address with no page opens the rink ------------------------------------------------------ */
 ok('no page in the address opens the Rink view', await cur() === 'rink' && /\/s\/s1\/rink$/.test(await hash()), await hash());
-ok('the tab row has the three pages, in order', await R(() => [...document.querySelectorAll('#iceTabs button')].map(x => x.textContent).join('|')) === 'Rink view|Trends|Measurement builder');
+ok('the tab row has the four pages, in order', await R(() => [...document.querySelectorAll('#iceTabs button')].map(x => x.textContent).join('|')) === 'Rink view|Trends|Measurement builder|Preferences');
 ok('the rink is drawn', await vis('#rink') && !(await vis('#home')));
 ok('Rink view shows its own controls', await vis('#legend') && await vis('#mapModeRow') && await vis('#expCsv') && await vis('#expPng') && await vis('#expPdf') && await vis('.readout'));
 ok('and puts the builder\'s away', !(await vis('#chips')) && !(await vis('#noteInput')) && !(await vis('#undoBtn')) && !(await vis('#newRound')) && !(await vis('#impBtn')) && !(await vis('#clearBtn')));

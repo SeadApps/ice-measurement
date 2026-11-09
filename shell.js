@@ -75,7 +75,7 @@
       if (p[2] === "s" && p[3] && p[4] === "settings" && p.length === 5) return { page: "settings", fid: p[1], sid: p[3] };
       /* Ice's own pages. The shell's pages never draw these; they are read by Ice (and by
          whereFromAddress), and the sheet they sit under is the sheet you are on. */
-      if (p[2] === "s" && p[3] && (p[4] === "rink" || p[4] === "trends" || p[4] === "build" || p[4] === "inventory") && p.length === 5) return { page: "sheets", fid: p[1], sid: p[3], view: p[4] };
+      if (p[2] === "s" && p[3] && (p[4] === "rink" || p[4] === "trends" || p[4] === "build" || p[4] === "prefs" || p[4] === "inventory") && p.length === 5) return { page: "sheets", fid: p[1], sid: p[3], view: p[4] };
     }
     return { page: "unknown" };
   }

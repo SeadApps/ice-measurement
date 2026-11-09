@@ -99,14 +99,14 @@ await D.p.click('#expCsv'); await dl; await sleep(300);
 ok('and exporting', !(await asking(D.p)));
 
 /* preferences */
-await D.p.click('#gear'); await sleep(500);
+await D.p.click('#iceTabs [data-page=prefs]'); await sleep(500);
 ok('Staff see the preferences read only: the target and the overdue days cannot be touched', await D.p.isDisabled('#targetIn') && await D.p.isDisabled('#overdueIn') && await D.p.isVisible('#prefRo'));
 await D.p.click('#backupImport'); await sleep(300);
 ok('nor a backup restored', await asking(D.p)); await cancel(D.p);
-await D.p.click('#settingsDone'); await sleep(300);
+await D.p.click('#iceTabs [data-page=rink]'); await sleep(300);
 /* Management are locked the same way until they unlock: tapping asks, it does not change */
 { const P=await device(b,'P1'); await P.p.goto(B+'/ice.html'); await sleep(1200); await signInAs(P.p,'pete','pete-code-1');
-  await P.p.click('#gear'); await sleep(500);
+  await P.p.click('#iceTabs [data-page=prefs]'); await sleep(500);
   await P.p.click('#targetIn'); await P.p.keyboard.type('9'); await sleep(300);
   ok('Management: a preference that changes the facility cannot be typed into until unlocked', (await P.p.inputValue('#targetIn'))!=='9' && await asking(P.p));
   await cancel(P.p);

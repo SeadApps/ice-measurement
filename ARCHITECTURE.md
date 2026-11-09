@@ -608,7 +608,7 @@ node dev/maptest.js        # 37 checks: Color map blend (zero span = old pixels,
 node dev/overduetest.js    # 16 checks: overdue days belong to the facility; Ice, the cards and the Fleet table agree
 node dev/pagestest.js      # 26 checks: (see the file header)
 node dev/phonetest.js      # 41 checks: no page scrolls sideways on a phone, tapping a panel shows it, and the desktop is untouched
-node dev/prefstest.js      # 22 checks: Preferences as a window of steppers in eighths, written to the facility only; Staff read only
+node dev/prefstest.js      # 26 checks: Preferences as a tab (its own address, the gear gone) of steppers in eighths, written to the facility only; Staff read only
 node dev/suretest.js       # 10 checks: Ice asks in the page, never with a browser dialog: delete a round (and not the last), clear a round
 node dev/trendtest.js      # 19 checks: Trends: the average by whole sheet, third or one spot, against a direct calculation
 node dev/themetest.js      # 9 checks: the canvas colours follow the theme: band tokens per theme, the ring and the trend line, no record written
@@ -635,7 +635,7 @@ node dev/whotest.js        # 18 checks: nobody types their name; the bar names t
 node dev/widthstest.js     # 25 checks: a facility's one-tap widths (default 43/48, no record until changed); only Management resolves or reopens a flag
 ```
 
-1953 checks in all, over 62 suites. Tests point `window.__SYNC_CONFIG__` at the fake via
+1957 checks in all, over 62 suites. Tests point `window.__SYNC_CONFIG__` at the fake via
 `addInitScript`; the real pages never read it.
 
 **Lessons from the access work, each of which cost a debugging session:**
@@ -694,7 +694,8 @@ the front door: the old front page is gone, and an address that names nothing la
   facility and sheet menus, Ice|Glass switch, sync pill, unlock, account menu), with `sb-app` on it so
   the app switch stays on a phone (each app has its own page tabs instead of the shell's tab bar or rail).
   The apps have no app switcher, theme or unit buttons or sign-out of their own. Kept on purpose: Ice's
-  Preferences window, opened from its gear. Glass has no header at all: its three pages are tabs, and a
+  Preferences, now the fourth tab (`#/f/FID/s/SID/prefs`) beside the Measurement builder, a page and no longer a window
+  opened from a gear (v44). Glass has no header at all: its three pages are tabs, and a
   sheet is walked by naming it in the address.
   *Where you are* is read from the address by `Shell.whereFromAddress()` at boot (the preference is only
   the fallback), kept in step by `Shell.setAddress(fid, sid)` when the app changes sheet itself (called on
