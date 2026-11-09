@@ -36,6 +36,12 @@ document.documentElement.setAttribute("data-theme",_t==="light"?"light":"dark");
   <button type="button" class="btn" id="bldLaptopRink">Back to the Rink view</button>
 </section>
 
+<section class="card pad" id="noGlass" hidden>
+  <h2 style="margin:0 0 6px;font-size:18px" id="noGlassName"></h2>
+  <p style="margin:0 0 12px">No glass has been built for this sheet yet. Walk it in the Builder to add its panels.</p>
+  <button type="button" class="btn" id="noGlassBuild">Open the Builder</button>
+</section>
+
 <div class="specstrip">
   <p class="lede"><span id="facName">Conway Arena</span><span id="ledeRest"></span></p>
   <div class="specs">
@@ -1444,6 +1450,7 @@ async function bldSave(){
     }
     if(p === 'build' && !laptop && !has){ if(document.getElementById('builder').hidden) bldOpen(); }
     else if(!document.getElementById('builder').hidden) bldClose();
+    paintEmpty();
     const a = glassAddress();
     if(!fromAddress && a && typeof Shell !== 'undefined') Shell.setAddress(a.fid, a.sid, p);
   }
@@ -1479,6 +1486,7 @@ async function bldSave(){
     closeFlag(); if(SYNC) SYNC.nudge(); say('Flag raised.');
   });
   document.getElementById('bldLaptopRink').addEventListener('click', () => showGlassPage('rink'));
+  document.getElementById('noGlassBuild').addEventListener('click', () => showGlassPage('build'));
   document.getElementById('bldRemove').addEventListener('click', () => {
     const sid = hashSheet() || (glassAddress() && glassAddress().sid);
     if(sid && LAYOUTS[sid]) deleteRink(sid, () => showGlassPage('build', true));
@@ -1513,6 +1521,7 @@ async function bldSave(){
     }
     Shell.setAddress(w.fid, w.sid);               // and a facility alone is filled out to a sheet
     hereSheet = w.sid; hereFacility = w.fid;
+    paintEmpty();
     const b = LAYOUTS[w.sid] ? w.sid : (boundSheetId && w.sid === boundSheetId ? LEGACY : null);
     if(b){ await switchRink(b);  return; }
     

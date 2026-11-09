@@ -685,7 +685,7 @@ node dev/whotest.js        # 18 checks: nobody types their name; the bar names t
 node dev/widthstest.js     # 25 checks: a facility's one-tap widths (default 43/48, no record until changed); only a Manager or Admin resolves or reopens a flag
 ```
 
-2069 checks in all, over 63 suites. Tests point `window.__SYNC_CONFIG__` at the fake via
+2081 checks in all, over 64 suites. Tests point `window.__SYNC_CONFIG__` at the fake via
 `addInitScript`; the real pages never read it.
 
 **Lessons from the access work, each of which cost a debugging session:**
@@ -1185,3 +1185,6 @@ way, so it can still be loaded once from the account menu (`glassbackuptest`).
    open the site once on each device so the service worker updates.
 6. **The way back:** the redesign is on one branch, so reverting the merge restores the old pages. The server
    rules keep their own saved restore script (`supabase/`).
+
+### Glass at a rink that is not Conway
+Conway's glass is compiled into the program and is bound to Conway's sheet by a `glass_binding` record. A sheet with no glass of its own shows an empty state ("Open the Builder"), never Conway's drawing. Only an Admin's device creates the binding (`ensureBinding`, glass-core.js): a scoped person's device would otherwise bind Conway's glass to its own first sheet. Scoped devices take the binding from the server (tests seed it with `k.bindConway()`).

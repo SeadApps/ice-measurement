@@ -388,7 +388,26 @@ function BUILT_DRAWN(){
   }
   return out;
 }
+/* The sheet in the address (or the one this device last stood on) when nobody has walked glass for it. Conway's compiled
+   layout is the fallback drawing for the rest of the page, and was being shown for any other rink's sheet: an empty state with
+   a way to the Builder is the truth there. */
+function sheetWithoutGlass(){
+  const m = /#\/f\/[^/]+\/s\/([^/]+)/.exec(location.hash), sid = (m && m[1]) || hereSheet;
+  return (sid && sheets[sid] && !LAYOUTS[sid] && sid !== boundSheetId) ? sheets[sid] : null;
+}
+function paintEmpty(){
+  const wrap = document.getElementById('glassWrap'), card = document.getElementById('noGlass');
+  if(!wrap || !card) return;
+  const sh = sheetWithoutGlass();
+  wrap.dataset.empty = sh ? '1' : '';
+  card.hidden = !sh;
+  if(sh){
+    const f = facilities[sh.facilityId], many = Object.keys(sheets).filter(k => sheets[k].facilityId === sh.facilityId).length > 1;
+    document.getElementById('noGlassName').textContent = ((f && f.name) || 'This facility') + ((many && sh.name) ? ' · ' + sh.name : '');
+  }
+}
 function paintFacility(){
+  paintEmpty();
   const set = (id, txt) => { const el = document.getElementById(id); if(el) el.textContent = txt; };
   set('facName', facilityName(activeBucket));
   const copy = LAYOUT.copy || {};
@@ -494,6 +513,10 @@ function firstSheet(){
    so every device agrees; never move it afterwards. */
 function ensureBinding(){
   if(boundSheetId) return false;
+  /* Only an Admin's device sees every facility, so only there is "the first surface of the first facility" Conway's. For a
+     Manager or Staff scoped to another rink it would be their own sheet: Conway's compiled glass would be drawn on it and the
+     wrong binding sent. Theirs comes down from the server if Conway is in their scope, and is otherwise left unset. */
+  if(SYNC && !(SYNC.isAdmin && SYNC.isAdmin())) return false;
   /* An unresolved facility binding outranks picking one. Wait for that
      facility's sheets rather than bind to a different rink and sync it out. */
   if(pendingFacilityId){
