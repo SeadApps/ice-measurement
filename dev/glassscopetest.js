@@ -63,6 +63,13 @@ const vis = (p, sel) => p.evaluate(s => { const e = document.querySelector(s); r
   ok('Conway Inventory does not hold it', cw[0] === 0 && cw[1] === 1 && /Conway/.test(cw[3]), JSON.stringify(cw));
   await A.ctx.close();
 }
+/* ---- a sheet the page has not been told about (the bar knows it; Glass reads its list at load) ---- */
+{
+  const A = await open('f1/s/s1/rink', 'pete', 'pete-code-1'); const p = A.p;
+  await p.goto(B + '/glass.html#/f/f2/s/zz9/inventory'); await sleep(2500);
+  ok('an unknown sheet in the address is empty and stays on its own arena', await p.evaluate(() => !!sheetWithoutGlass() && activeFacilityId() === 'f2' && /#\/f\/f2\/s\/zz9\/inventory/.test(location.hash)), await p.evaluate(() => location.hash));
+  await A.ctx.close();
+}
 ok('no errors', errs.length === 0, errs.slice(0, 3).join(' | '));
 await k.done(b);
 })();
