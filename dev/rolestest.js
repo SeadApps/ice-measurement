@@ -144,6 +144,10 @@ ok('or a Manager, or an Admin, or themselves', (await manage(tok.gwen, { action:
 const oldDee = 'dee-code-1', reset = await manage(tok.gwen, { action: 'reset_code', login: 'dee' });
 ok('a Manager resets their Staff\'s code, and the old one stops working', reset.status === 200 && !!reset.code && !(await k.login('dee' + DOM, oldDee)) && !!(await k.login('dee' + DOM, reset.code)));
 ok('but not someone who is also elsewhere', (await manage(tok.gwen, { action: 'reset_code', login: 'cam' })).status === 403);
+const ownReset = await manage(tok.gwen, { action: 'reset_code', login: gAdd.login, code: 'plain wooden spoon' });
+ok('a Manager can set a code of their own choosing for their Staff, 8 or more characters', ownReset.status === 200 && !!(await k.login(gAdd.login + DOM, 'plain wooden spoon')) && (await manage(tok.gwen, { action: 'reset_code', login: gAdd.login, code: 'tiny' })).status === 400);
+const ownAdd = await manage(tok.pete, { action: 'add', name: 'Opal', facilities: ['f2'], code: 'grey heron lake' });
+ok('and an Admin can add someone with one', ownAdd.status === 200 && ownAdd.code === 'grey heron lake' && !!(await k.login(ownAdd.login + DOM, 'grey heron lake')));
 ok('a Manager removes their Staff, who is then signed out', (await manage(tok.gwen, { action: 'remove', login: 'dee' })).status === 200 && !(await k.login('dee' + DOM, reset.code)));
 ok('and restores them', (await manage(tok.gwen, { action: 'restore', login: 'dee' })).status === 200);
 ok('but not someone who is also elsewhere', (await manage(tok.gwen, { action: 'remove', login: 'cam' })).status === 403);

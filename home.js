@@ -497,10 +497,19 @@
       acts.appendChild(h("button", { cls: "btn danger sm", type: "button", id: "rmYes", text: "Yes, remove", onclick: function () {
         ask = null; act("remove", { login: p.login }, function () { reveal = null; Shell.toast(p.name + " has been removed. Their code no longer works."); }); } }));
       acts.appendChild(h("button", { cls: "btn ghost sm", type: "button", id: "rmNo", text: "Keep", onclick: function () { ask = null; Shell.repaint(); } }));
+    } else if (ask && ask.kind === "setcode" && ask.login === p.login) {
+      var ownIn = h("input", { type: "text", id: "ownCode", autocomplete: "off", maxlength: "72", placeholder: "A code, 8 or more characters", "aria-label": "A code for " + p.name });
+      acts.appendChild(ownIn);
+      acts.appendChild(h("button", { cls: "btn sm", type: "button", id: "ownYes", text: "Set it", onclick: function () {
+        if (ownIn.value.length < 8) { staffMsg = "A code needs at least 8 characters."; Shell.repaint(); return; }
+        var v = ownIn.value; ask = null;
+        act("reset_code", { login: p.login, code: v }, function (r) { showCode("New code for " + p.name + ":", r.code, "Their old code no longer works. It will not be shown again."); }); } }));
+      acts.appendChild(h("button", { cls: "btn ghost sm", type: "button", id: "ownNo", text: "Cancel", onclick: function () { ask = null; staffMsg = ""; Shell.repaint(); } }));
     } else if (p.active) {
       acts.appendChild(h("button", { cls: "btn ghost sm", type: "button", "data-edit": p.login, text: "Edit", onclick: function () { formFor = p.login; staffMsg = ""; Shell.repaint(); } }));
       acts.appendChild(h("button", { cls: "btn ghost sm", type: "button", "data-reset": p.login, text: "Reset code", onclick: function () {
         act("reset_code", { login: p.login }, function (r) { showCode("New code for " + p.name + ":", r.code, "Their old code no longer works. It will not be shown again."); }); } }));
+      acts.appendChild(h("button", { cls: "btn ghost sm", type: "button", "data-setcode": p.login, text: "Set code\u2026", onclick: function () { ask = { kind: "setcode", login: p.login }; staffMsg = ""; Shell.repaint(); } }));
       if (!self) acts.appendChild(h("button", { cls: "btn danger sm", type: "button", "data-ask": p.login, text: "Remove", onclick: function () { ask = { kind: "remove", login: p.login }; Shell.repaint(); } }));
     } else {
       acts.appendChild(h("button", { cls: "btn ghost sm", type: "button", "data-back": p.login, text: "Restore", onclick: async function () {
@@ -529,17 +538,23 @@
     });
     function sync() { var off = admin && role.value === "admin"; box.disabled = off; box.classList.toggle("off", off); }
     role.addEventListener("change", sync); setTimeout(sync, 0);
+    /* Their sign-in code is made for them unless the person adding them types one. */
+    var codeNote = h("span", { cls: "afnote bad", id: "pNote", role: "alert" });
+    var own = isNew ? h("input", { type: "text", id: "pCode", autocomplete: "off", maxlength: "72", placeholder: "Leave empty to make one", "aria-label": "Their code" }) : null;
     var save = h("button", { cls: "btn", type: "button", id: "pSave", text: isNew ? "Add and show code" : "Save changes", onclick: async function () {
       var n = name.value.trim();
       if (!n) { staffMsg = "A name is needed."; Shell.repaint(); return; }
+      if (own && own.value && own.value.length < 8) { codeNote.textContent = "A code needs at least 8 characters."; own.focus(); return; }     // in the form, so what was typed stays
       var facs = [].map.call(box.querySelectorAll(".pfac"), function (c) { return c.checked ? c.value : null; }).filter(Boolean);
       var body = { name: n, role: admin ? role.value : "staff", facilities: facs };
+      if (own && own.value) body.code = own.value;
       formFor = null;
       if (isNew) await act("add", body, function (r) { showCode("Added " + n + ". Their code is", r.code, "Give it to them now. It will not be shown again."); });
       else await act("update", Object.assign({ login: p.login }, body), function () { Shell.toast("Saved " + n); });
     } });
     return h("div", { cls: "addform", id: "personForm" }, [
       h("label", { cls: "af" }, [h("span", { text: "Name" }), name]), admin ? h("label", { cls: "af" }, [h("span", { text: "Role" }), role]) : null, box,
+      own ? h("label", { cls: "af" }, [h("span", { text: "Their code (8 or more characters)" }), own]) : null, own ? codeNote : null,
       h("div", { cls: "afrow" }, [save, h("button", { cls: "btn ghost", type: "button", id: "pCancel", text: "Cancel", onclick: function () { formFor = null; staffMsg = ""; Shell.repaint(); } })])]);
   }
   function sharedCodes(codes) {
@@ -549,8 +564,11 @@
       if (asking) {
         line.appendChild(h("span", { style: "font-size:13px", text: kind === "access"
           ? "Everyone is signed out until they enter the new code. Nothing saved on their devices is lost." : "Everyone\u2019s open editing window ends." }));
+        var ownIn = h("input", { type: "text", id: kind + "Own", autocomplete: "off", maxlength: "72", placeholder: "or type your own (8 or more characters)", "aria-label": "Your own " + title.toLowerCase() });
+        line.appendChild(ownIn);
         line.appendChild(h("button", { cls: "btn danger sm", type: "button", id: kind + "Yes", text: "Yes, change it", onclick: function () {
-          var code = newCode(); ask = null;
+          if (ownIn.value && ownIn.value.length < 8) { staffMsg = "A code needs at least 8 characters."; Shell.repaint(); return; }
+          var code = ownIn.value || newCode(); ask = null;
           act(kind === "access" ? "set_access_code" : "set_editing_code", { code: code }, function () {
             showCode("New " + title.toLowerCase() + ":", code, kind === "access" ? "Share it with the team. Everyone is signed out until they enter it. It will not be shown again." : "Share it with the people who edit. It will not be shown again."); }); } }));
         line.appendChild(h("button", { cls: "btn ghost sm", type: "button", id: kind + "No", text: "Keep", onclick: function () { ask = null; Shell.repaint(); } }));

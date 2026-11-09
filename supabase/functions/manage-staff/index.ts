@@ -96,6 +96,16 @@ Deno.serve(async (req) => {
       isAdmin || (p.role === "staff" && (p.facilities as string[]).length > 0 && (p.facilities as string[]).every((f) => mine.includes(f)));
     const admins = () => all.filter((p) => p.role === "admin" && p.active);
     const adminOnly = () => (isAdmin ? null : fail(403, "Only an Admin can do this."));
+    // A code somebody typed instead of a generated one, for add and reset_code. The same rule as the shared codes: 8 or more
+    // characters (and at most 72, which is all the sign-in system keeps). Nothing else is checked, so say so in the page.
+    const ownCode = (): { code: string | null; err?: Response } => {
+      const v = b.code;
+      if (v === undefined || v === null || v === "") return { code: null };
+      const s = String(v);
+      if (s.length < 8) return { code: null, err: fail(400, "A code needs at least 8 characters.") };
+      if (s.length > 72) return { code: null, err: fail(400, "A code can be at most 72 characters.") };
+      return { code: s };
+    };
     // The one place a Manager's limits on facilities are checked, for add and for update.
     const facilitiesAllowed = (facs: string[]) => {
       if (isAdmin) return null;
@@ -130,7 +140,8 @@ Deno.serve(async (req) => {
         if (!isAdmin && newRole !== "staff") return fail(403, "Only an Admin can add a Manager or an Admin.");
         const facs = asList(b.facilities);
         const no = facilitiesAllowed(facs); if (no) return no;
-        const login = makeLogin(name), code = makeCode();
+        const oc = ownCode(); if (oc.err) return oc.err;
+        const login = makeLogin(name), code = oc.code ?? makeCode();
         const { data: made, error: mkErr } = await admin.auth.admin.createUser({
           email: login + DOMAIN, password: code, email_confirm: true,
         });
@@ -170,7 +181,8 @@ Deno.serve(async (req) => {
         const t = target(); if (t.err) return t.err;
         const { data: uid } = await admin.rpc("admin_user_of", { p_login: t.p.login });
         if (!uid) return fail(404, "No such person.");
-        const code = makeCode();
+        const oc = ownCode(); if (oc.err) return oc.err;
+        const code = oc.code ?? makeCode();
         const { error } = await admin.auth.admin.updateUserById(uid as string, { password: code });
         if (error) throw error;
         return reply(200, { code });

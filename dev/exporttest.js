@@ -28,12 +28,14 @@ const mk = async (opts) => {
 };
 const iceIn = async p => { await p.goto(B + '/ice.html#/f/f1/s/s1/rink'); await p.waitForSelector('.sync-gate #sg-code'); await p.fill('.sync-gate #sg-code', k.ACCESS); await p.click('.sync-gate button'); await p.waitForSelector('#expPng'); await sleep(1800); };
 const shares = p => p.evaluate(() => window.__shares);
+/* An export draws a picture first, which takes as long as the machine takes: wait for what is expected, not for a fixed time. */
+const until = async (fn, ms) => { const t0 = Date.now(); for (;;) { const v = await fn(); if (v || Date.now() - t0 > (ms || 10000)) { if (process.env.TIMING) console.log('    waited ' + (Date.now() - t0) + 'ms'); return v; } await sleep(100); } };
 
 /* ---- a laptop ---------------------------------------------------------------------------------- */
 let { ctx, p } = await mk({ viewport: { width: 1280, height: 900 } });
 await iceIn(p);
 ok('laptop: the browser has a share sheet to be tempted by, and no touch', await p.evaluate(() => !matchMedia('(pointer: coarse)').matches && !!navigator.share));
-await p.click('#expPng'); await sleep(1200);
+await p.click('#expPng'); await until(() => p.dl.some(n => /\.png$/.test(n)));
 ok('laptop: Export image downloads a .png at once, with no question and no share window', await shares(p) === 0 && p.dl.some(n => /\.png$/.test(n)) && !(await p.$('#sureScrim.on')), String(await shares(p)) + ' ' + p.dl);
 await p.click('#expCsv'); await sleep(1000);
 ok('laptop: Export CSV downloads a .csv', await shares(p) === 0 && p.dl.some(n => /\.csv$/.test(n)));
@@ -42,12 +44,12 @@ await ctx.close();
 /* ---- an iPad ----------------------------------------------------------------------------------- */
 ({ ctx, p } = await mk({ viewport: { width: 820, height: 1100 }, hasTouch: true, isMobile: true }));
 await iceIn(p);
-await p.click('#expPng'); await sleep(1200);
+await p.click('#expPng'); await until(() => p.$('#sureScrim.on'));
 ok('iPad: Export image asks whether to share or save, and names the file', await p.evaluate(() => document.getElementById('sureScrim').classList.contains('on') && /Share or save/.test(document.getElementById('sureTitle').textContent) && /\.png/.test(document.getElementById('sureText').textContent)));
 ok('and nothing has happened yet', await shares(p) === 0 && p.dl.length === 0);
 await p.click('#sureYes'); await sleep(800);
 ok('iPad: Share offers the share sheet and saves no file', await shares(p) === 1 && p.dl.length === 0, String(await shares(p)) + ' ' + p.dl);
-await p.click('#expPng'); await sleep(500); await p.click('#sureNo'); await sleep(1000);
+await p.click('#expPng'); await until(() => p.$('#sureScrim.on')); await p.click('#sureNo'); await until(() => p.dl.some(n => /\.png$/.test(n)));
 ok('iPad: Save to device downloads the .png and does not share', await shares(p) === 1 && p.dl.some(n => /\.png$/.test(n)), String(await shares(p)) + ' ' + p.dl);
 const before = p.dl.length;
 await p.click('#expCsv'); await sleep(500);

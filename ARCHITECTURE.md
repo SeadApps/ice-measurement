@@ -501,6 +501,12 @@ Rules worth knowing:
   each `editable` only when every one of that person's facilities is the Manager's. A Manager cannot see a Manager or an Admin
   (so cannot change themselves), cannot change a role, and cannot give a facility they do not hold; the page shows a locked
   card for Staff who are also elsewhere. Only an Admin makes a Manager or an Admin.
+- **Codes can be chosen by hand.** Add person and *Set code…* (and the access and editing code confirmations) take a code the person
+  typed instead of a generated one: 8 to 72 characters, nothing else checked, shown once like any other. A Manager may do it for
+  their own Staff's sign-in codes only. The Edge function reads it from `code` on `add` and `reset_code`; a code you pick is
+  easier to guess than a generated one, so the page asks for several words.
+- **Reset code does not sign anybody out.** A person already signed in on a device keeps working until they sign out or are removed
+  (Remove bans the login, which does cut them off). Decided to leave it that way.
 - **The last Admin** cannot be removed or made Staff. An Admin has no facility list: they cover all.
 - **Backup is the Admin's**, since a backup holds everything on the device. The account menu and Ice's Preferences show it to
   an Admin only, and Ice stops nagging anybody else to back up.
@@ -659,7 +665,7 @@ node dev/reg.js            # 15 checks: rounds persist, prefs stay separate, the
 node dev/restoretest.js    # 12 checks: restoring a backup is the Admin's, for an Ice backup and for a Glass file through the account menu; Staff are told and nothing merges
 node dev/resume.js         # 8 checks: coming back lands where you left off
 node dev/rinktest.js       # 19 checks: the Rink view: Compare to and its delta legend, no 3D, the old Map | Trend buttons gone
-node dev/rolestest.js      # 101 checks: Admin, Manager and Staff: what each reads and writes, the change log, the manage-staff function (a Manager's Staff only), the pages for each role, and the refused-changes view on the pill
+node dev/rolestest.js      # 103 checks: Admin, Manager and Staff: what each reads and writes, the change log, the manage-staff function (a Manager's Staff only), the pages for each role, and the refused-changes view on the pill
 node dev/routetest.js      # 40 checks: the shell's addresses, back/forward, a Staff person and a shared iPad, the apps follow where you are
 node dev/scheduletest.js   # 31 checks: the schedule opens on what needs attention, and print still carries all 127
 node dev/scopetest.js      # 53 checks: a Staff person sees and writes only their facilities; the tag; the per-person cursor
@@ -672,14 +678,14 @@ node dev/facremovetest.js # 14 checks: Remove facility asks in the page, hides t
 node dev/shapetest.js      # 69 checks: one shape per sheet, the migration, the builder's compare and update, updateSheet
 node dev/shelltest.js      # 91 checks: the chrome at 390/820/1024/1280, breakpoints, menus, theme, tab bar, rail
 node dev/sparestest.js     # 46 checks: spare stock is a ledger per facility, tempered and plexi are different piles, and fitting a pane deducts the right one
-node dev/stafftest.js      # 65 checks: Staff page: add, edit, reset, remove, restore, shared codes, activity; a code shown once and stored nowhere; new people can sign in; Staff cannot reach it
+node dev/stafftest.js      # 74 checks: Staff page: add, edit, reset, remove, restore, shared codes, activity; a code shown once and stored nowhere; new people can sign in; Staff cannot reach it
 node dev/stamptest.js      # 25 checks: the server stamps who changed a record; a pulled stamp never looks like an edit
 node dev/synctest.js       # 26 checks: sign-in, two devices, offline, paused, and the readings inside a round
 node dev/whotest.js        # 18 checks: nobody types their name; the bar names the person; the server's stamp is shown; old marks keep their typed name
 node dev/widthstest.js     # 25 checks: a facility's one-tap widths (default 43/48, no record until changed); only a Manager or Admin resolves or reopens a flag
 ```
 
-2058 checks in all, over 63 suites. Tests point `window.__SYNC_CONFIG__` at the fake via
+2069 checks in all, over 63 suites. Tests point `window.__SYNC_CONFIG__` at the fake via
 `addInitScript`; the real pages never read it.
 
 **Lessons from the access work, each of which cost a debugging session:**

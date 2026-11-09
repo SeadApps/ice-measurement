@@ -173,9 +173,35 @@ ok('the editing code is on the page once and nowhere else', !(await C.p.evaluate
 await C.p.click('#revealDone'); await C.p.reload(); await C.p.waitForSelector('#peopleList'); await sleep(500);
 ok('after a reload both say when they were changed', /Last changed Today/.test(await text(C.p, '#accessWhen')) && /Last changed Today/.test(await text(C.p, '#editingWhen')));
 
+/* ---- codes chosen by hand ------------------------------------------------------------------------------------------ */
+await open(C.p);
+await C.p.click('[data-setcode="dana"]');
+ok('Set code asks for a code, in the page', !!(await C.p.$('#ownCode')) && !!(await C.p.$('#ownYes')) && !!(await C.p.$('#ownNo')));
+await C.p.fill('#ownCode', 'short'); await C.p.click('#ownYes'); await sleep(400);
+ok('a code that is too short is refused in the page, and nothing changes', /at least 8/.test(await text(C.p, '#staffMsg')) && await canSignIn('dana', 'dana-code-1'));
+await C.p.fill('#ownCode', 'blue otter lamp 42'); await C.p.click('#ownYes'); await sleep(1500);
+const own = await shown(C.p);
+ok('a code of her own choosing is set, and shown once', /New code for Dana/.test(own.title) && own.code === 'blue otter lamp 42', JSON.stringify(own));
+ok('it signs her in, and the old one no longer does', await canSignIn('dana', 'blue otter lamp 42') && !(await canSignIn('dana', 'dana-code-1')));
+await C.p.click('#revealDone');
+await C.p.click('#addPerson'); await C.p.fill('#pName', 'Eli'); await C.p.fill('#pCode', 'abc'); await C.p.check('#pFacs .pfac[value="f2"]'); await C.p.click('#pSave'); await sleep(400);
+ok('a person added with a code that is too short is refused inside the form, which keeps what was typed', /at least 8/.test(await text(C.p, '#pNote')) && await C.p.inputValue('#pName') === 'Eli' && await C.p.isChecked('#pFacs .pfac[value="f2"]'));
+await C.p.fill('#pCode', 'pine marten ridge'); await C.p.click('#pSave'); await sleep(1500);
+const eli = await loginOf(C.p, 'Eli');
+ok('and added with one, that code signs them in', /Added Eli/.test((await shown(C.p)).title) && await canSignIn(eli, 'pine marten ridge'));
+await C.p.click('#revealDone');
+await C.p.click('#chgAccess'); await C.p.fill('#accessOwn', 'a code I made up'); await C.p.click('#accessYes'); await sleep(1500);
+ok('the access code can be one you choose', await dev('a code I made up') && !(await dev(ac.code)) && /New access code/.test((await shown(C.p)).title));
+await C.p.click('#revealDone');
+await C.p.click('#chgEdit'); await C.p.fill('#editingOwn', 'short'); await C.p.click('#editingYes'); await sleep(400);
+ok('and the editing code too, but not a short one', /at least 8/.test(await text(C.p, '#staffMsg')) && (await unl(ec.code)).ok);
+await C.p.fill('#editingOwn', 'my own editing code'); await C.p.click('#editingYes'); await sleep(1500);
+ok('which then opens a window, and the old one does not', !(await unl(ec.code)).ok && (await unl('my own editing code')).ok);
+await C.p.click('#revealDone');
+
 /* ---- activity ------------------------------------------------------------------------------------------------------ */
-const dTok = await k.login('dana' + DOM, 'dana-code-1');
-await fetch(B + '/rest/v1/rpc/unlock_editing', { method: 'POST', headers: k.H ? k.H(dTok) : { Authorization: 'Bearer ' + dTok, 'Content-Type': 'application/json', apikey: 'test' }, body: JSON.stringify({ code: ec.code }) });
+const dTok = await k.login('dana' + DOM, 'blue otter lamp 42');      // the code chosen by hand above
+await fetch(B + '/rest/v1/rpc/unlock_editing', { method: 'POST', headers: k.H ? k.H(dTok) : { Authorization: 'Bearer ' + dTok, 'Content-Type': 'application/json', apikey: 'test' }, body: JSON.stringify({ code: 'my own editing code' }) });      // the one chosen by hand above
 const hd = { Authorization: 'Bearer ' + dTok, 'Content-Type': 'application/json', apikey: 'test' };
 const w = await fetch(B + '/rest/v1/records?on_conflict=kind,id', { method: 'POST', headers: hd, body: JSON.stringify([{ kind: 'glass_panel', id: 's2:045', deleted: false, body: { fac: 'f2', status: 'replace', note: '' } }]) });
 ok('(setup) Dana made a change under her own name', w.ok);

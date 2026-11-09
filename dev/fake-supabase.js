@@ -228,6 +228,9 @@ const server = http.createServer(async (req,res)=>{
     const seen = s => isAdmin(w) || (s.role === 'staff' && (s.facilities || []).some(f => mine.includes(f)));
     const editable = s => isAdmin(w) || (s.role === 'staff' && (s.facilities || []).length > 0 && s.facilities.every(f => mine.includes(f)));
     const ROLES = ['admin','manager','staff'];
+    /* A code somebody typed instead of a generated one (add, reset_code): 8 to 72 characters, nothing else checked. */
+    const ownCode = () => { const v = b.code; if (v === undefined || v === null || v === '') return {code:null};
+      const s = String(v); if (s.length < 8) return {err:'A code needs at least 8 characters.'}; if (s.length > 72) return {err:'A code can be at most 72 characters.'}; return {code:s}; };
     switch (b.action){
       case 'list':
         return json(res,200,{people:[...staff.values()].filter(seen).sort((a,c)=>String(a.name).localeCompare(c.name)).map(s => ({
@@ -247,7 +250,8 @@ const server = http.createServer(async (req,res)=>{
         }
         const slug = name.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,24) || 'person';
         const login = slug + '-' + Array.from({length:3}, () => 'abcdefghjkmnpqrstuvwxyz23456789'[Math.floor(Math.random()*31)]).join('');
-        const code = makeCode();
+        const oc = ownCode(); if (oc.err) return fail(400, oc.err);
+        const code = oc.code || makeCode();
         staff.set(login, {id:login, name, role, code, active:true, facilities:role === 'admin' ? [] : facs});
         return json(res,200,{login, code});
       }
@@ -270,7 +274,8 @@ const server = http.createServer(async (req,res)=>{
       case 'reset_code': {
         const s = find(); if (!s || !seen(s)) return fail(404,'No such person.');
         if (!editable(s)) return fail(403,'You can only change people who are in your own facilities.');
-        s.code = makeCode();
+        const oc = ownCode(); if (oc.err) return fail(400, oc.err);
+        s.code = oc.code || makeCode();
         return json(res,200,{code:s.code});
       }
       case 'remove': case 'restore': {
