@@ -485,7 +485,10 @@ async function removeRink(bucket){
 }
 
 async function switchRink(b){
-  if(!LAYOUTS[b] || b === activeBucket) return;
+  if(!LAYOUTS[b]) return;
+  /* Already on this bucket: nothing to switch, but the page may still be showing a sheet with no glass (it draws Conway's
+     bucket there), so what is on screen is repainted for the sheet now chosen. */
+  if(b === activeBucket){ defaultScope(); buildPlan(); rail(); totals(); table(); detail(); paint(); paintFacility(); spares(); return; }
   setBucket(b);                         // records, layout and `state`, together
   /* Written straight out rather than through store(), which would also nudge
      sync and claim a save. Looking at a different rink changes no record. */

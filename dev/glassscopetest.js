@@ -53,6 +53,14 @@ const vis = (p, sel) => p.evaluate(s => { const e = document.querySelector(s); r
   await p.click('#glassTabs [data-page="inventory"]'); await sleep(1000);
   ok('its Inventory tab stays on the address of that sheet, not Conways', /#\/f\/f2\/s\/s2\/inventory/.test(await p.evaluate(() => location.hash)), await p.evaluate(() => location.hash));
   ok('and is the stock of that arena, with no flagged glass of Conways wanted', /Flynn Rink/.test(await p.textContent('#spWhere')) && await p.evaluate(() => coverage().rows.length === 0));
+  /* stock added here belongs to Flynn, not to Conway, whichever glass this device happens to be drawing */
+  await p.evaluate(() => { addMovement(43, 75, '1/2"', 'tempered', 5, 'count'); store(); spares(); }); await sleep(2500);
+  const mv = (await k.rows()).filter(r => r.kind === 'glass_spare' && !r.deleted);
+  ok('stock added on the test sheet belongs to Flynn on the server, and none of it to Conway', mv.length === 1 && mv[0].body.fac === 'f2' && mv[0].facility_id === 'f2', JSON.stringify(mv.map(r => [r.body.fac, r.facility_id])));
+  ok('and the Inventory page shows it', /5/.test(await p.textContent('#spStock')));
+  await p.goto(B + '/glass.html#/f/f1/s/s1/inventory'); await sleep(2500);
+  const cw = await p.evaluate(() => [Object.keys(stockOf('f1')).length, Object.keys(stockOf('f2')).length, activeFacilityId(), document.getElementById('spWhere').textContent]);
+  ok('Conway Inventory does not hold it', cw[0] === 0 && cw[1] === 1 && /Conway/.test(cw[3]), JSON.stringify(cw));
   await A.ctx.close();
 }
 ok('no errors', errs.length === 0, errs.slice(0, 3).join(' | '));
