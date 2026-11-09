@@ -29,6 +29,7 @@
   var K_DEPARTED = "rink_departed";   // people who left with changes unsent: their session, kept send-only, and which changes were theirs
   var K_ACTIVE  = "rink_active";      // when this device was last used, so a device left closed still times out
   var K_SCOPE   = "rink_scope";       // the facilities the signed-in person last had, so an offline start keeps the same cursor
+  var K_ROLE    = "rink_role";        // admin, manager or staff: what the person last was, so an offline start shows the same pages
   var K_EDIT    = "rink_edit_until";  // when the editing window this person opened ends (ms). The server is the authority; this is only what to show.
   var K_CURSOR  = "rink_sync_cursor"; // newest updated_at we have already seen
   var K_SENT    = "rink_sync_sent";   // "kind id" -> the updatedAt we last successfully sent
@@ -56,6 +57,7 @@
   var departed = [];                          // see K_DEPARTED
   var lastActive = Date.now(), lastSaved = 0, handing = false;
   var scope = "";                             // what the signed-in person may see, so a change of it re-pulls from the start
+  var role = "";                              // "admin", "manager" or "staff" once the server has said; empty until then
   var lockSel = "";                           // the controls a page says change records; see lockControls
   var editUntil = 0, editCbs = [];            // the editing window, as far as this device knows
   var refusal = "";                           // why the last push was turned away: "locked" or "refused"
@@ -321,7 +323,7 @@
     return K_CURSOR + ":" + ks + (person ? ":" + person.id + ":" + scope : "");
   }
 
-  /* What this person may see. Management is "*", Staff the facilities they were
+  /* What this person may see. An Admin is "*"; a Manager and Staff the facilities they were
      given. Kept if it cannot be fetched, so being offline never re-pulls. */
   function refreshScope() {
     if (!person) return Promise.resolve();
@@ -334,8 +336,10 @@
     }).then(function (j) {
       if (j === "revoked") return j;
       if (!j) return;
-      var s = j.role === "management" ? "*" : (j.facilities || []).slice().sort().join("|");
-      scope = s; return writeJSON(K_SCOPE, s);
+      /* A server not yet moved on still calls its top role "management": that is the Admin. */
+      var r = j.role === "management" ? "admin" : j.role;
+      var s = r === "admin" ? "*" : (j.facilities || []).slice().sort().join("|");
+      scope = s; role = r || ""; return Promise.all([writeJSON(K_SCOPE, s), writeJSON(K_ROLE, role)]);
     }).catch(function () {});
   }
 
@@ -880,8 +884,8 @@
       injectCSS();
       if (opts.title) gateTitle = opts.title;
       return Promise.all([readJSON(K_SESSION, null), readJSON(K_DEVICE, null), readJSON(K_PERSON, null), readJSON(K_EDIT, 0), readJSON(K_SCOPE, ""),
-                          readJSON(K_DEPARTED, []), readJSON(K_ACTIVE, 0)]).then(function (a) {
-        session = a[0]; device = a[1]; person = a[2]; editUntil = a[3] || 0; scope = a[4] || "";
+                          readJSON(K_DEPARTED, []), readJSON(K_ACTIVE, 0), readJSON(K_ROLE, "")]).then(function (a) {
+        session = a[0]; device = a[1]; person = a[2]; editUntil = a[3] || 0; scope = a[4] || ""; role = a[7] || "";
         departed = a[5] || [];
         lastActive = person && a[6] ? a[6] : Date.now();
         paintLock();
@@ -938,7 +942,7 @@
       return ensureToken().then(function (res) {
         if (res !== "ok") return offline;
         return fetch(CFG.url + "/rest/v1/activity" + (qs ? "?" + qs : ""), { headers: headers(true), cache: "no-store" }).then(function (r) {
-          if (r.status === 403) return { ok: false, error: "Only Management can read the activity log." };
+          if (r.status === 403) return { ok: false, error: "Only Managers and Admins can read the activity log." };
           if (!r.ok) return offline;
           return r.json().then(function (rows) { return { ok: true, rows: rows }; });
         });
@@ -953,14 +957,22 @@
     /* Who is signed in: {id, name}, or null while the shared account is still
        doing the work. The server stamps their name on what they change. */
     person: function () { return person; },
-    /* Restoring a backup writes records for whichever facilities are in the file, so
-       it is Management's. Before anybody is signed in as a person (rollout step 3) the
-       shared account carries the data and nothing is stricter than it was. A person
-       whose scope has not been fetched yet is not Management until it is. */
-    canRestore: function () { return !person || scope === "*"; },
-    /* Adding or removing a facility or a sheet is Management's, on the same terms
-       as restoring: open before anybody signs in as a person, Management after. */
-    canManage: function () { return !person || scope === "*"; },
+    /* Three roles. Before anybody is signed in as a person (rollout step 3) the shared account carries the data and nothing
+       is stricter than it was, so every question below says yes. After that a person whose role has not been fetched yet
+       is nobody in particular until it is. */
+    role: function () { return person ? role : ""; },
+    /* An Admin: every facility, the shared codes, backups and restores, adding and removing a facility. */
+    isAdmin: function () { return !person || scope === "*"; },
+    /* Restoring a backup writes records for whichever facilities are in the file, and a backup holds everything on the device, so both are the Admin's. */
+    canRestore: function () { return Sync.isAdmin(); },
+    canBackup: function () { return Sync.isAdmin(); },
+    /* Settings, sheets and flags: an Admin's anywhere, a Manager's in the facilities they were given. Asked without a
+       facility it means "somewhere", which is what a menu or a page link needs. */
+    canManage: function (facilityId) {
+      if (Sync.isAdmin()) return true;
+      if (role !== "manager") return false;
+      return facilityId === undefined || Sync.canSee(facilityId);
+    },
     /* The one way people and codes are changed: the manage-staff function, called with this
        person's own token. It refuses anyone who is not an active Manager, and its messages are
        fit to show. A code it returns is shown once by whoever asked; nothing here keeps it.
@@ -979,14 +991,14 @@
       }).catch(function () { return offline; });
     },
     /* May this person see this facility? Everyone before people exist and
-       Management always; Staff only what they were given. A person whose scope has
+       an Admin always; a Manager and Staff only what they were given. A person whose scope has
        not been fetched yet sees nothing until it is. This hides, it is not a security
        boundary: the data may already be on the device. */
     canSee: function (facilityId) {
       if (!person || scope === "*") return true;
       return !!scope && scope.split("|").indexOf(facilityId) >= 0;
     },
-    restoreMessage: "Only Management can restore a backup.",
+    restoreMessage: "Only an Admin can restore a backup.",
     isSignedIn: function () { return !!session; },
     pending: pendingCount,
     /* A pill the pages can drop into a header. */

@@ -101,13 +101,16 @@
   /* ---------- who may do what ---------- */
   var SYNC = (typeof Sync !== "undefined") ? Sync : null;
   var canSee = function (fid) { return !SYNC || SYNC.canSee(fid); };
-  var canManage = function () { return !SYNC || SYNC.canManage(); };
+  /* An Admin does everything. A Manager does what an Admin does inside the facilities they were given, except adding, hiding
+     and restoring a facility and the shared codes, backups and restores. canManage(fid) asks about one facility. */
+  var canManage = function (fid) { return !SYNC || SYNC.canManage(fid); };
+  var isAdmin = function () { return !SYNC || SYNC.isAdmin(); };
   var person = function () { return SYNC ? SYNC.person() : null; };
   /* Can this person change things right now? Management (or nobody signed in as a person
      yet), and, once people exist, with the editing window open. A page greys its own
      controls from this; the server enforces it regardless. */
-  function canEdit() { return canManage() && (!SYNC || !SYNC.person() || SYNC.isEditing()); }
-  /* The Staff page needs people to exist and the person to be Management. */
+  function canEdit(fid) { return canManage(fid) && (!SYNC || !SYNC.person() || SYNC.isEditing()); }
+  /* The Staff page and the review pages need people to exist and the person to be an Admin or a Manager. */
   function isManager() { return !!(SYNC && SYNC.person() && SYNC.canManage()); }
 
   /* ---------- data, read-only ---------- */
@@ -124,7 +127,7 @@
     /* Open flags, so the cards and the Fleet table can count them (flags.js; only what this person may see). */
     var flags = [];
     if (global.Flags) { await global.Flags.load(); flags = global.Flags.all().filter(function (r) { return r.status === "open" && (!r.fac || live[r.fac]); }); }
-    return { prefs: (st && st.prefs) || {}, facilities: facs, sessions: (st && st.sessions) || [], glass: glass, removed: removed, removedFacs: canManage() ? (await Repo.readRemovedFacilities()).filter(function (r) { return canSee(r.id); }) : [], flags: flags };
+    return { prefs: (st && st.prefs) || {}, facilities: facs, sessions: (st && st.sessions) || [], glass: glass, removed: removed, removedFacs: isAdmin() ? (await Repo.readRemovedFacilities()).filter(function (r) { return canSee(r.id); }) : [], flags: flags };
   }
 
   /* How a sheet is doing. The overdue rule is the store's, read from the
@@ -370,12 +373,13 @@
         { label: "Dark", current: currentTheme() === "dark", onclick: function () { theme("dark"); acctRefresh(); } },
         { hr: true }, { hd: "Units" },
         { label: "Inches", current: ((data.prefs || {}).unit || "in") !== "mm", onclick: function () { setUnit("in"); } },
-        { label: "Millimetres", current: (data.prefs || {}).unit === "mm", onclick: function () { setUnit("mm"); } },
-        { hr: true }, { hd: "Data" },
+        { label: "Millimetres", current: (data.prefs || {}).unit === "mm", onclick: function () { setUnit("mm"); } });
+      /* A backup holds everything on the device and a restore writes to any facility, so both are the Admin's. */
+      if (isAdmin()) it.push({ hr: true }, { hd: "Data" },
         { label: "Back up all data", onclick: function () { backUp(); } },
         { label: "Restore from backup\u2026", onclick: function () { restore(); } },
-        { label: backupAgo((data.prefs || {}).lastBackup), disabled: true },
-        { hr: true });
+        { label: backupAgo((data.prefs || {}).lastBackup), disabled: true });
+      it.push({ hr: true });
       /* Restoring merges records into storage under a page that holds its own copy and would
          save it straight back over them, so inside an app it stays where it is safe: on the shell's
          pages (and Ice's own Preferences, which fixes up its state afterwards). */
@@ -592,7 +596,7 @@
     layout: function () { return layoutName; },
     onLayout: function (cb) { layoutCbs.push(cb); cb(layoutName); },
     route: function () { return route; }, data: function () { return data; },
-    activeSheetOf: activeSheetOf, canManage: canManage, isManager: isManager, notice: NOTICE,
+    activeSheetOf: activeSheetOf, canManage: canManage, isAdmin: isAdmin, isManager: isManager, notice: NOTICE,
     parse: parse,
     /* the width at which each layout starts, for the tests and for D3/D4 to ask */
     breakpoints: { phoneMax: PHONE_MAX, ipadMax: IPAD_MAX }

@@ -192,7 +192,7 @@ await D.ctx.close();
 
 /* ---- people: locked, unlocked and Staff ----------------------------------------------------------------------------------------- */
 await fetch(B + '/__reset');
-await k.addStaff({ id: 'pete', name: 'Pete', role: 'management', code: 'pete-code-1' });
+await k.addStaff({ id: 'pete', name: 'Pete', role: 'admin', code: 'pete-code-1' });
 await k.addStaff({ id: 'flo', name: 'Flo', role: 'staff', code: 'flo-code-1', facilities: ['f2'] });
 await k.ctl('tight=1');
 await k.seed(k.PETE);
@@ -210,7 +210,7 @@ await M.ctx.close();
 const S = await k.device(b, 1280);
 await S.p.goto(B + '/index.html' + SET); await k.signInAs(S.p, 'flo', 'flo-code-1'); await S.p.waitForSelector('#pageSettings'); await sleep(600);
 ok('Staff can look: the page and its values are there', await S.p.inputValue('#sname') === 'Pete\'s Standard' && await val(S.p, 'L') === '200′');
-ok('but are told only Management can change it', /Only Management can change/.test(await text(S.p, '#viewOnly')));
+ok('but are told only Management can change it', /Only a Manager or Admin can change/.test(await text(S.p, '#viewOnly')));
 await S.p.evaluate(c => Sync.unlockEditing(c), k.EDIT); await sleep(800);
 ok('even with the editing window open, everything stays off', await S.p.$eval('#ssave', e => e.disabled) && await S.p.$eval('#sname', e => e.disabled) && !(await S.p.$('#removeZone')));
 await S.ctx.close();

@@ -21,7 +21,7 @@ const loginOf = (p, name) => p.evaluate(n => [...document.querySelectorAll('.pca
 
 (async () => {
 await fetch(B + '/__reset');
-await k.addStaff({ id: 'pete', name: 'Pete', role: 'management', code: 'pete-code-1' });
+await k.addStaff({ id: 'pete', name: 'Pete', role: 'admin', code: 'pete-code-1' });
 await k.addStaff({ id: 'dana', name: 'Dana', role: 'staff', code: 'dana-code-1', facilities: ['f2'] });
 await k.addStaff({ id: 'alex', name: 'Alex', role: 'staff', code: 'alex-code-1', facilities: ['f1'], active: false });
 await k.ctl('tight=1');
@@ -43,7 +43,7 @@ ok('the rail has it too', !!(await p.$('#rail a[href="#/staff"]')));
 await open(p);
 ok('people in name order, removed ones included', (await names(p)).join() === 'Alex,Dana,Pete', (await names(p)).join());
 const pete = await cardOf(p, 'pete'), dana = await cardOf(p, 'dana'), alex = await cardOf(p, 'alex');
-ok('Pete is marked as you, and is Management with all facilities', /you/.test(await pete.textContent()) && /Management/.test(await pete.textContent()) && /All facilities/.test(await pete.textContent()));
+ok('Pete is marked as you, and is an Admin with all facilities', /you/.test(await pete.textContent()) && /Admin/.test(await pete.textContent()) && /All facilities/.test(await pete.textContent()));
 ok('Dana is Staff with her facility by name', /Staff/.test(await dana.textContent()) && /Flynn Rink/.test(await dana.textContent()) && !/Conway/.test(await dana.textContent()));
 ok('Pete\'s last sign-in is today; Dana has never signed in', /last signed in Today/.test(await pete.textContent()) && /never signed in/.test(await dana.textContent()));
 ok('Alex is marked Removed and offers Restore, not Remove', /Removed/.test(await alex.textContent()) && !!(await alex.$('[data-back]')) && !(await alex.$('[data-ask]')));
@@ -53,7 +53,7 @@ const s0 = await stamps();
 
 /* ---- add a person ------------------------------------------------------------------------- */
 await p.click('#addPerson');
-ok('Add staff opens a form in the page, with the facilities to choose from', !!(await p.$('#personForm')) && (await p.$$('#pFacs .pfac')).length === 2 && /Management covers all/.test(await text(p, '#pFacs legend')));
+ok('Add staff opens a form in the page, with the facilities to choose from', !!(await p.$('#personForm')) && (await p.$$('#pFacs .pfac')).length === 2 && /Admins cover all/.test(await text(p, '#pFacs legend')));
 await p.click('#pSave'); await sleep(300);
 ok('no name is refused, in the page', /A name is needed/.test(await text(p, '#staffMsg')) && (await names(p)).length === 3);
 await p.click('#addPerson'); await p.fill('#pName', 'Jordan <b id="boom">X</b>');
@@ -121,30 +121,30 @@ ok('and she now sees both facilities when she signs in', /Conway Arena/.test(awa
 await D.ctx.close();
 await open(p);
 await p.click('[data-edit="pete"]'); await p.selectOption('#pRole', 'staff'); await p.click('#pSave'); await sleep(1500);
-ok('the last Manager cannot be made Staff: the server\'s answer is shown', /no Manager/.test(await text(p, '#staffMsg')), await text(p, '#staffMsg'));
-ok('and nothing changed', /Management/.test(await (await cardOf(p, 'pete')).textContent()));
+ok('the last Admin cannot be made Staff: the server\'s answer is shown', /no Admin/.test(await text(p, '#staffMsg')), await text(p, '#staffMsg'));
+ok('and nothing changed', /Admin/.test(await (await cardOf(p, 'pete')).textContent()));
 await p.click('#pCancel').catch(() => {});
 const self = await p.evaluate(() => Sync.manage('remove', { login: 'pete' }));
 ok('and the server refuses a person removing themselves, whatever the page does', self.ok === false && /cannot remove yourself/.test(self.error), JSON.stringify(self));
 
 /* a second Manager makes the first removable */
 await open(p);
-await p.click('#addPerson'); await p.fill('#pName', 'Casey'); await p.selectOption('#pRole', 'management'); await sleep(200);
+await p.click('#addPerson'); await p.fill('#pName', 'Casey'); await p.selectOption('#pRole', 'admin'); await sleep(200);
 ok('a Manager needs no facilities: the list is greyed', await p.$eval('#pFacs', f => f.disabled));
 await p.click('#pSave'); await sleep(1500);
 const cLogin = await loginOf(p, 'Casey'); await p.click('#revealDone');
-ok('Casey is Management with all facilities', /Management/.test(await (await cardOf(p, cLogin)).textContent()) && /All facilities/.test(await (await cardOf(p, cLogin)).textContent()));
+ok('Casey is an Admin with all facilities', /Admin/.test(await (await cardOf(p, cLogin)).textContent()) && /All facilities/.test(await (await cardOf(p, cLogin)).textContent()));
 await p.click('[data-edit="pete"]'); await p.selectOption('#pRole', 'staff'); await p.click('#pSave'); await sleep(1500);
 const allStaff = async () => (await (await fetch(B + '/__staff', { method: 'POST', body: JSON.stringify({}) })).json());
 ok('with a second Manager, the first can be made Staff', (await allStaff()).find(x => x.id === 'pete').role === 'staff');
-ok('and, now Staff, his next request is refused by the server, which the page says', /Only Management can do this/.test(await text(p, '#staffMsg')), await text(p, '#staffMsg'));
+ok('and, now Staff, his next request is refused by the server, which the page says', /Only Managers and Admins can do this/.test(await text(p, '#staffMsg')), await text(p, '#staffMsg'));
 await p.reload(); await sleep(2500);
 ok('and after a reload he is turned away from the page', /That page is not available/.test(await text(p, '#page .notice')) && !(await p.$('#pageStaff')), await text(p, '#page'));
 await M.ctx.close();
 
 /* ---- the shared codes ----------------------------------------------------------------------------------------- */
 await fetch(B + '/__reset');
-await k.addStaff({ id: 'pete', name: 'Pete', role: 'management', code: 'pete-code-1' });
+await k.addStaff({ id: 'pete', name: 'Pete', role: 'admin', code: 'pete-code-1' });
 await k.addStaff({ id: 'dana', name: 'Dana', role: 'staff', code: 'dana-code-1', facilities: ['f2'] });
 await k.ctl('tight=1'); await k.seed(k.PETE);
 const C = await k.device(b, 1280);

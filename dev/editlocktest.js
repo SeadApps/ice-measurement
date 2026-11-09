@@ -53,7 +53,7 @@ const pill=async p=>(await p.textContent('.sync-pill').catch(()=>''))||'';
 (async()=>{
 await fetch(B+'/__reset');
 await addStaff({id:'dana',name:'Dana',role:'staff',code:'dana-code-1',facilities:['f1']});
-await addStaff({id:'pete',name:'Pete',role:'management',code:'pete-code-1'});
+await addStaff({id:'pete',name:'Pete',role:'admin',code:'pete-code-1'});
 await addStaff({id:'sam',name:'Sam',role:'staff',code:'sam-code-1',facilities:['f1']});
 await ctl('tight=1');
 
@@ -128,7 +128,7 @@ ok('a changed editing code takes effect for the next unlock', await (async()=>{
 
 /* ---- a real device ---------------------------------------------------------- */
 await fetch(B+'/__reset');
-await addStaff({id:'pete',name:'Pete',role:'management',code:'pete-code-1'});
+await addStaff({id:'pete',name:'Pete',role:'admin',code:'pete-code-1'});
 await ctl('tight=1');
 const b=await chromium.launch();
 const P=await device(b,'P');

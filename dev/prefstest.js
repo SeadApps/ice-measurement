@@ -13,7 +13,7 @@ const { ok, sleep, B } = k;
 (async () => {
 await fetch(B + '/__reset');
 await k.seed();
-await k.addStaff({ id: 'pete', name: 'Pete', role: 'management', code: 'pete-code-1' });
+await k.addStaff({ id: 'pete', name: 'Pete', role: 'admin', code: 'pete-code-1' });
 await k.addStaff({ id: 'dana', name: 'Dana', role: 'staff', code: 'dana-code-1', facilities: ['f1'] });
 const b = await k.chromium.launch();
 const errs = [];
@@ -92,7 +92,7 @@ await D.ctx.close();
 const S = await open('dana', 'dana-code-1'), q = S.p;
 await q.evaluate(() => openSettings()); await sleep(500);
 ok('Staff can open the window', await q.isVisible('#prefsPage .modal') && await q.isVisible('#prefRo'));
-ok('it says only Management can change it', /only Management/.test(await q.textContent('#prefRo')));
+ok('it says only a Manager or Admin can change it', /only a Manager or Admin/.test(await q.textContent('#prefRo')));
 ok('every input and stepper is disabled', await q.evaluate(() => [...document.querySelectorAll('#prefsPage .modal input:not([type=file]), #prefsPage .stp button, #resetBands')].every(e => e.disabled)));
 const before = await q.inputValue('#targetIn');
 await q.click('#targetIn', { force: true, timeout: 1500 }).catch(() => {}); await q.keyboard.type('9');

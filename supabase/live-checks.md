@@ -50,3 +50,25 @@ when you are ready to type the new code into each of them.
 1. Change it. The "last changed" time updates.
 2. A device already signed in is asked for the code again within about an hour and keeps its local records.
 3. The old code is refused at the gate, the new one works.
+
+## 5. After `d7-01-roles.sql`: the three roles on the real server
+
+Do the rollout in the order in the header of `d7-01-roles.sql` (app, then `supabase functions deploy manage-staff`, then the SQL),
+then run its CHECKS block. Then, with a throwaway facility "Role Test" (one sheet) and two test people:
+
+1. **Manager.** On the Staff page add a **Manager** for Role Test only. Sign in as them in a private window (access code, their code,
+   the editing code):
+   - they see Role Test and nothing of Conway (Facilities, Reports, Changes, Ice, Glass);
+   - Preferences is editable; there is no backup in the account menu or on the Preferences tab;
+   - they can add a sheet, rename it and remove it, and cannot add a facility;
+   - on their Staff page they see only people in Role Test, with no shared codes and no role to pick; they can add a Staff person
+     for Role Test, reset their code and remove them.
+2. **Staff.** Sign in as the Staff person they made: Role Test only, read-only settings, cannot resolve a flag.
+3. **Flags.** Raise a flag as Staff, resolve it as the Manager, and check Staff cannot reopen it.
+4. **The upsert case.** As the Manager, change a Preferences value on Role Test (it saves as you type). It must reach the server (this is the write
+   the facility rule is written around: an upsert over an existing row fires the INSERT trigger first).
+5. **Admin.** As yourself, everything still works, including Conway, the shared codes, and Back up all data.
+6. Remove the test people and the facility.
+
+If step 4 is refused with "only an Admin adds, removes or restores a facility", tell me before doing anything else: it means the
+facility rule is judging the write as new, and `d7-02-undo-roles.sql` (then `d1-01-add.sql`) puts everything back.

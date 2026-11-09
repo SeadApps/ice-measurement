@@ -52,7 +52,7 @@ await D.p.click('#roundCancel');
 /* ---- Ice ------------------------------------------------------------------- */
 await fetch(B+'/__reset');
 await addStaff({id:'dana',name:'Dana',role:'staff',code:'dana-code-1',facilities:[]});
-await addStaff({id:'pete',name:'Pete',role:'management',code:'pete-code-1'});
+await addStaff({id:'pete',name:'Pete',role:'admin',code:'pete-code-1'});
 D=await device(b,'D1'); await D.p.goto(B+'/ice.html'); await sleep(1200);
 await signInAs(D.p,'dana','dana-code-1');
 ok('a person signs in locked', await locked(D.p));
@@ -101,8 +101,7 @@ ok('and exporting', !(await asking(D.p)));
 /* preferences */
 await D.p.click('#iceTabs [data-page=prefs]'); await sleep(500);
 ok('Staff see the preferences read only: the target and the overdue days cannot be touched', await D.p.isDisabled('#targetIn') && await D.p.isDisabled('#overdueIn') && await D.p.isVisible('#prefRo'));
-await D.p.click('#backupImport'); await sleep(300);
-ok('nor a backup restored', await asking(D.p)); await cancel(D.p);
+ok('nor is a backup or a restore on offer: that is for an Admin', !(await D.p.isVisible('#backupSec')) && !(await D.p.isVisible('#backupImport')));
 await D.p.click('#iceTabs [data-page=rink]'); await sleep(300);
 /* Management are locked the same way until they unlock: tapping asks, it does not change */
 { const P=await device(b,'P1'); await P.p.goto(B+'/ice.html'); await sleep(1200); await signInAs(P.p,'pete','pete-code-1');

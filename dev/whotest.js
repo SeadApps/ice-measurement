@@ -50,7 +50,7 @@ ok('a mark is written with no name on it', gp0.length>0 && gp0.every(r=>!('by' i
 /* ---- signed in --------------------------------------------------------------- */
 await fetch(B+'/__reset');
 await addStaff({id:'dana',name:'Dana',role:'staff',code:'dana-code-1',facilities:[]});
-await addStaff({id:'pete',name:'Pete',role:'management',code:'pete-code-1'});
+await addStaff({id:'pete',name:'Pete',role:'admin',code:'pete-code-1'});
 const D=await device(b,'D'); await D.p.goto(B+'/glass.html'); await sleep(1200);
 await signIn(D.p,'dana','dana-code-1');
 ok('the bar names who is signed in', (await D.p.textContent('#shellbar #whoName'))==='Dana', await D.p.textContent('#shellbar #whoName'));

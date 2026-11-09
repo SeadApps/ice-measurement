@@ -41,7 +41,7 @@ async function signIn(p,id,code){
 
 (async()=>{
 await fetch(B+'/__reset');
-await addStaff({id:'pete',name:'Pete',role:'management',code:'pete-code-1'});
+await addStaff({id:'pete',name:'Pete',role:'admin',code:'pete-code-1'});
 await addStaff({id:'dana',name:'Dana',role:'staff',code:'dana-code-1',facilities:['f1']});
 await ctl('tight=1');
 const pete=await login('pete'+DOM,'pete-code-1'), dana=await login('dana'+DOM,'dana-code-1'),
@@ -132,7 +132,7 @@ ok('and nothing from the future', a.length===0);
 
 /* ---- a real device ---------------------------------------------------------- */
 await fetch(B+'/__reset');
-await addStaff({id:'pete',name:'Pete',role:'management',code:'pete-code-1'});
+await addStaff({id:'pete',name:'Pete',role:'admin',code:'pete-code-1'});
 await addStaff({id:'dana',name:'Dana',role:'staff',code:'dana-code-1',facilities:[]});
 await ctl('tight=1');
 const b=await chromium.launch();
@@ -162,7 +162,7 @@ const D=await device(b,'D');
 await D.p.goto(B+'/ice.html'); await sleep(1200);
 await signIn(D.p,'dana','dana-code-1');
 const dl=await D.p.evaluate(()=>window.Sync.activity());
-ok('Staff asking through Sync are told it is Management only', !dl.ok && /management/i.test(dl.error||''), JSON.stringify(dl));
+ok('Staff asking through Sync are told it is for Managers and Admins only', !dl.ok && /admin/i.test(dl.error||''), JSON.stringify(dl));
 ok('and get no rows', !dl.rows || dl.rows.length===0);
 
 console.log('\n  '+pass+' passed, '+fail+' failed');

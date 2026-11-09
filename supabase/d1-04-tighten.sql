@@ -14,7 +14,7 @@ do $$
 declare
   n_mgr int; n_codes int; n_untagged int; n_people int;
 begin
-  select count(*) into n_mgr from app.staff where role = 'management' and active;
+  select count(*) into n_mgr from app.staff where role in ('admin', 'management') and active;
   select count(*) into n_people from app.staff where active;
   select count(*) into n_codes from app.codes where name = 'editing';
   select count(*) into n_untagged from public.records where facility_id is null;

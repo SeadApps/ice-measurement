@@ -11,8 +11,10 @@ function stepper(inp,step,min,max){if(inp.parentNode.classList.contains("stp"))r
   const mk=(t,d,lab)=>{const b=document.createElement("button");b.type="button";b.textContent=t;b.setAttribute("aria-label",lab);
     b.addEventListener("click",()=>{const cur=parseFloat(inp.value);const v=Math.max(min,Math.min(max,Math.round(((isNaN(cur)?min:cur)+d*step)/step)*step));inp.value=v;inp.dispatchEvent(new Event("input",{bubbles:true}));});return b;};
   w.appendChild(mk("−",-1,"Less"));w.appendChild(inp);w.appendChild(mk("+",1,"More"));}
-/* Staff see the window, but only Management changes what is in it. */
-function applyPrefsRole(){const ro=typeof Shell!=="undefined"&&!Shell.canManage();$("prefRo").hidden=!ro;
+/* Staff see the page, but only an Admin or the Manager of this facility changes what is in it. A backup holds every facility on the device, so that
+   section is the Admin's alone. */
+function applyPrefsRole(){const ro=typeof Shell!=="undefined"&&!Shell.canManage(facility().id);$("prefRo").hidden=!ro;
+  $("backupSec").hidden=typeof Shell!=="undefined"&&!Shell.isAdmin();
   document.querySelectorAll("#prefsPage .modal input:not([type=file]),#prefsPage .modal .stp button,#resetBands,#roundManage .del").forEach(e=>{if(ro)e.disabled=true;else if(e.dataset.roLocked!=="1")e.disabled=false;});}
 function buildSettings(){applyTheme();applyUnitButtons();
   $("prefFac").textContent=facility().name;$("prefSheet").textContent=sheet().name;
