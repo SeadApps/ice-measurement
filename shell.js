@@ -309,7 +309,7 @@
 
   function buildNav(f, s) {
     var nav = h("header", { cls: "nav sb" + (barApp ? " sb-app" : ""), "data-layout": layoutName });
-    nav.appendChild(h("a", { cls: "logo", href: barApp ? "index.html" : "#/", title: "Facilities", text: "LOGO", id: "logo" }));
+    nav.appendChild(h("a", { cls: "logo", href: barApp ? "index.html" : "#/", title: "Facilities", id: "logo" }, [h("img", { src: "logo-bar.png", alt: "Arena Management System", width: "36", height: "36" })]));
 
     // the facility menu
     var fb = h("button", { cls: "menu", type: "button", id: "facMenu" }, [h("span", { text: f ? f.name : "Facility" })]);

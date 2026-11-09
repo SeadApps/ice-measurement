@@ -1060,7 +1060,9 @@ way, so it can still be loaded once from the account menu (`glassbackuptest`).
   Rotating the access code works but takes up to an hour per device to reach a signed-in device.
 - **Staff scoping with the server tight** and **Staff cannot resolve flags** have been proved against the fake
   server only; check them once with a test person on the real one.
-- **The bar still shows a "LOGO" placeholder** and the icons are not regenerated (the repo holds no logo PNG).
+- **The logo** is `AMS_Logo.png` (2000x2000, opaque, works on both themes). The home-screen icons `icon-512.png` and `icon-192.png` are
+  the whole logo scaled down; the bar shows `logo-bar.png`, the machine alone on a tile of the logo's pale blue, because the words
+  cannot be read at 36px.
 - **Conway Arena's custom lowest edge (0.82) was rounded to 7/8 (0.875)** by the settings migration, since
   settings are in eighths. Panel 111 is unconfirmed (below).
 - **Still to come:** real staff added from the Staff page when Pete wants; moving to a custom domain (the

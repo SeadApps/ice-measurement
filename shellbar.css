@@ -23,9 +23,10 @@
 /* ---- the bar ---- */
 .sb.nav{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:10px 16px;background:var(--panel);
   border-bottom:3px solid var(--bad);position:relative;z-index:50;font-size:15px;line-height:1.55}
-.sb .logo{width:36px;height:36px;border:1.5px dashed var(--line-2);border-radius:3px;display:inline-flex;align-items:center;
-  justify-content:center;font:600 9px var(--mono);letter-spacing:.06em;color:var(--ink-faint);text-decoration:none;margin-right:4px}
-.sb .logo:hover{border-color:var(--frost);color:var(--frost)}
+.sb .logo{width:36px;height:36px;border:1.5px solid var(--line-2);border-radius:3px;display:inline-flex;overflow:hidden;
+  text-decoration:none;margin-right:4px;flex:none}
+.sb .logo img{display:block;width:100%;height:100%}
+.sb .logo:hover{border-color:var(--frost)}
 .sb .menuwrap{position:relative}
 .sb .menu{font:700 13px var(--sans);text-transform:uppercase;letter-spacing:.03em;color:var(--ink);background:var(--panel-2);
   border:1px solid var(--line);border-radius:3px;padding:0 12px;min-height:44px;display:inline-flex;gap:8px;align-items:center;
