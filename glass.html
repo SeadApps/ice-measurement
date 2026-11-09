@@ -391,7 +391,8 @@ function spares(){
     return;
   }
   addBox.hidden = false;
-  where.innerHTML = `Kept per arena, shared across every sheet at <b>${esc(facilityName(activeBucket))}</b>.`;
+  const nogSheet = sheetWithoutGlass();
+  where.innerHTML = `Kept per arena, shared across every sheet at <b>${esc(nogSheet ? ((facilities[fac] && facilities[fac].name) || 'this arena') : facilityName(activeBucket))}</b>.`;
 
   const cov = coverage(), have = cov.have;
   /* How many flagged pieces on this rink want each size, so a short shelf is
@@ -1425,6 +1426,9 @@ async function bldSave(){
   /* The shell's name for the layout, and the width it means (above 1100px): before the bar has mounted the shell's answer is a default. */
   const isLaptop = () => typeof Shell !== 'undefined' && Shell.layout() === 'laptop' && innerWidth > 1100;
   function glassAddress(){
+    /* The sheet in the address when it has no glass yet: Glass is drawing Conway's, but the address must stay where the person is. */
+    const nog = sheetWithoutGlass();
+    if(nog && nog.facilityId) return {fid: nog.facilityId, sid: nog.id};
     const sid = (activeBucket === LEGACY) ? boundSheetId : activeBucket, sh = sid && sheets[sid];
     return sh && sh.facilityId ? {fid: sh.facilityId, sid} : null;
   }

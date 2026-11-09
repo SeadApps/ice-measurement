@@ -210,6 +210,9 @@ const sizeLabel = s => `${s.w}″ × ${s.h}″ · ${s.thk}`
    rather than inventing a shelf, the same way a facility-only binding is held
    pending rather than guessed at. */
 function activeFacilityId(){
+  /* A sheet with no glass has no bucket, but the facility it belongs to is still the one whose stock is meant. */
+  const nog = sheetWithoutGlass();
+  if(nog && nog.facilityId) return nog.facilityId;
   const sid = activeBucket === LEGACY ? boundSheetId : activeBucket;
   const sh = sid && sheets[sid];
   if(sh && sh.facilityId) return sh.facilityId;
@@ -240,7 +243,8 @@ function stockOf(fac){
 function coverage(){
   const fac = activeFacilityId(), have = stockOf(fac), left = {};
   for(const k in have) left[k] = have[k].qty;
-  const rows = GLASS.filter(p => st(p.id) !== 'ok').map(p => {
+  /* The pieces drawn are Conway's fallback, not this sheet's: a sheet with no glass wants nothing yet. */
+  const rows = (sheetWithoutGlass() ? [] : GLASS).filter(p => st(p.id) !== 'ok').map(p => {
     /* The rink is built from tempered, so a flagged pane wants tempered. A
        plexi sheet the same size is the stopgap, not the fix: counting it as
        cover would tell somebody not to order glass they are going to need.

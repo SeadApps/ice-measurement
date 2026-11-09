@@ -50,6 +50,9 @@ const vis = (p, sel) => p.evaluate(s => { const e = document.querySelector(s); r
   ok('and the Admin\'s device binds it to that sheet', await p.evaluate(() => boundSheetId === 's1'));
   await p.goto(B + '/glass.html#/f/f2/s/s2/rink'); await sleep(2500);
   ok('another rink\'s sheet with no glass is empty for an Admin too', await vis(p, '#noGlass') && !(await vis(p, '#planCard')));
+  await p.click('#glassTabs [data-page="inventory"]'); await sleep(1000);
+  ok('its Inventory tab stays on the address of that sheet, not Conways', /#\/f\/f2\/s\/s2\/inventory/.test(await p.evaluate(() => location.hash)), await p.evaluate(() => location.hash));
+  ok('and is the stock of that arena, with no flagged glass of Conways wanted', /Flynn Rink/.test(await p.textContent('#spWhere')) && await p.evaluate(() => coverage().rows.length === 0));
   await A.ctx.close();
 }
 ok('no errors', errs.length === 0, errs.slice(0, 3).join(' | '));

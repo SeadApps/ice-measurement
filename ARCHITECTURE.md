@@ -685,7 +685,7 @@ node dev/whotest.js        # 18 checks: nobody types their name; the bar names t
 node dev/widthstest.js     # 25 checks: a facility's one-tap widths (default 43/48, no record until changed); only a Manager or Admin resolves or reopens a flag
 ```
 
-2081 checks in all, over 64 suites. Tests point `window.__SYNC_CONFIG__` at the fake via
+2083 checks in all, over 64 suites. Tests point `window.__SYNC_CONFIG__` at the fake via
 `addInitScript`; the real pages never read it.
 
 **Lessons from the access work, each of which cost a debugging session:**
