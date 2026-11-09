@@ -48,8 +48,8 @@ ok('the logo goes to the shell\'s Facilities page', await p.getAttribute('#shell
 ok('Ice\'s own app switcher is gone, from the home bar and the workspace bar', !(await p.$('#home .appsw')) && !(await p.$('#app .appsw')));
 ok('and its theme and unit buttons, and the sign-out it used to add', !(await p.$('#thLight')) && !(await p.$('#thDark')) && !(await p.$('#unitHomeBtn')) && !(await p.$('#unitBtn')) && !(await p.$('#themeBtn')) && !(await p.$('#home .sync-signout')));
 ok('Preferences no longer carries display buttons: theme and units are in the bar', !(await p.$('#thLight2')) && !(await p.$('#unitPrefIn')) && !(await p.$('#unitPrefMM')));
-ok('and the gear that opens it is still there', !!(await p.$('#gearHome')) && !!(await p.$('#gear')));
-ok('the way back to the sheets is the shell is now, and Ice has a tab row in its place', await p.evaluate(() => !document.getElementById('homeBtn') && document.querySelectorAll('#iceTabs button').length === 3));
+ok('and it is a tab beside the Measurement builder, not a gear', !!(await p.$('#iceTabs [data-page=prefs]')) && !(await p.$('#gearHome')) && !(await p.$('#gear')));
+ok('the way back to the sheets is the shell is now, and Ice has a tab row in its place', await p.evaluate(() => !document.getElementById('homeBtn') && document.querySelectorAll('#iceTabs button').length === 4));
 
 /* ---- the app you are in is marked ---------------------------------------------------------------------- */
 const sw = await p.$$eval('#shellbar #appSw a', a => a.map(x => [x.textContent, x.getAttribute('aria-current'), x.hasAttribute('data-app'), x.getAttribute('href')]));

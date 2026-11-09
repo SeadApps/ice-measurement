@@ -37,10 +37,17 @@ await R(() => openSettings()); await sleep(400);
 if (await p.isChecked('#tieChk')) await p.click('#tieChk');   // flood and shave only show when attention is set by hand
 await sleep(300);
 
+ok('Preferences is a tab beside the Measurement builder, at its own address, and the gear is gone', await R(() => !document.getElementById('gear') && !document.getElementById('gearHome') && document.querySelector('#iceTabs [data-page=prefs]').getAttribute('aria-current') === 'page' && /\/s\/s1\/prefs$/.test(location.hash) && document.getElementById('prefsPage').classList.contains('on')));
+ok('and it is a page, not a window over the rink: the workspace and the trend chart are put away', await R(() => document.getElementById('home').style.display === 'none' && !document.getElementById('app').classList.contains('live') && !document.querySelector('.scrim.on')));
+await R(() => showPage('trends')); await sleep(300);
+ok('another tab puts it away, and Trends comes back', await R(() => !document.getElementById('prefsPage').classList.contains('on') && document.getElementById('home').style.display === 'block' && /\/trends$/.test(location.hash)));
+await R(() => showPage('rink')); await sleep(300); await R(() => openSettings()); await sleep(300);
+await p.reload(); await p.waitForSelector('#prefsPage.on'); await sleep(1500);
+ok('a reload on its address opens it again', await p.isVisible('#prefsPage .modal') && /Conway/.test(await p.textContent('#prefFac')));
 ok('the window has no Display, Facilities or Sheets sections', await R(() => !document.getElementById('facManage') && !document.getElementById('sheetManage') && !document.getElementById('addSheetBtn') && !document.getElementById('thLight2') && !document.getElementById('unitPrefIn')));
 ok('and says which facility it is for', /Conway/.test(await p.textContent('#prefFac')));
 ok('every setting has a minus and a plus', await R(() => ['overdueIn', 'targetIn', 'floodIn', 'shaveIn'].every(id => document.getElementById(id).parentNode.classList.contains('stp')) && document.querySelectorAll('#edges .stp').length === 4));
-ok('and they are at least 44px', await R(() => [...document.querySelectorAll('#scrim .stp button')].every(b => { const r = b.getBoundingClientRect(); return r.width >= 44 && r.height >= 44; })));
+ok('and they are at least 44px', await R(() => [...document.querySelectorAll('#prefsPage .stp button')].every(b => { const r = b.getBoundingClientRect(); return r.width >= 44 && r.height >= 44; })));
 
 const stamps0 = JSON.stringify((await k.rows()).filter(r => !(r.kind === 'facility' && r.id === 'f1')).map(r => [r.kind, r.id, r.updated_at]).sort());
 const t0 = await val('targetIn');
@@ -84,14 +91,14 @@ await D.ctx.close();
 /* Staff see it, read only */
 const S = await open('dana', 'dana-code-1'), q = S.p;
 await q.evaluate(() => openSettings()); await sleep(500);
-ok('Staff can open the window', await q.isVisible('#scrim .modal') && await q.isVisible('#prefRo'));
+ok('Staff can open the window', await q.isVisible('#prefsPage .modal') && await q.isVisible('#prefRo'));
 ok('it says only Management can change it', /only Management/.test(await q.textContent('#prefRo')));
-ok('every input and stepper is disabled', await q.evaluate(() => [...document.querySelectorAll('#scrim .modal input:not([type=file]), #scrim .stp button, #resetBands')].every(e => e.disabled)));
+ok('every input and stepper is disabled', await q.evaluate(() => [...document.querySelectorAll('#prefsPage .modal input:not([type=file]), #prefsPage .stp button, #resetBands')].every(e => e.disabled)));
 const before = await q.inputValue('#targetIn');
 await q.click('#targetIn', { force: true, timeout: 1500 }).catch(() => {}); await q.keyboard.type('9');
 ok('and the target cannot be typed over', await q.inputValue('#targetIn') === before);
-await q.click('#settingsDone'); await sleep(300);
-ok('Done closes it', !(await q.isVisible('#scrim .modal')));
+await q.click('#iceTabs [data-page=rink]'); await sleep(300);
+ok('leaving the Preferences tab puts it away', !(await q.isVisible('#prefsPage')));
 ok('no errors', errs.length === 0, errs.slice(0, 3).join(' | '));
 await k.done(b);
 })();

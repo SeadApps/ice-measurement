@@ -75,7 +75,7 @@
       if (p[2] === "s" && p[3] && p[4] === "settings" && p.length === 5) return { page: "settings", fid: p[1], sid: p[3] };
       /* Ice's own pages. The shell's pages never draw these; they are read by Ice (and by
          whereFromAddress), and the sheet they sit under is the sheet you are on. */
-      if (p[2] === "s" && p[3] && (p[4] === "rink" || p[4] === "trends" || p[4] === "build" || p[4] === "inventory") && p.length === 5) return { page: "sheets", fid: p[1], sid: p[3], view: p[4] };
+      if (p[2] === "s" && p[3] && (p[4] === "rink" || p[4] === "trends" || p[4] === "build" || p[4] === "prefs" || p[4] === "inventory") && p.length === 5) return { page: "sheets", fid: p[1], sid: p[3], view: p[4] };
     }
     return { page: "unknown" };
   }
@@ -309,7 +309,7 @@
 
   function buildNav(f, s) {
     var nav = h("header", { cls: "nav sb" + (barApp ? " sb-app" : ""), "data-layout": layoutName });
-    nav.appendChild(h("a", { cls: "logo", href: barApp ? "index.html" : "#/", title: "Facilities", text: "LOGO", id: "logo" }));
+    nav.appendChild(h("a", { cls: "logo", href: barApp ? "index.html" : "#/", title: "Facilities", id: "logo" }, [h("img", { src: "logo-bar.png", alt: "Arena Management System", width: "36", height: "36" })]));
 
     // the facility menu
     var fb = h("button", { cls: "menu", type: "button", id: "facMenu" }, [h("span", { text: f ? f.name : "Facility" })]);

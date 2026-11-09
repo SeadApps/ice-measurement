@@ -46,8 +46,8 @@ async function walk(label, who, code, width) {
   await step('Ice: Trends', '#iceTabs [data-page=trends]', '#home', 900);
   await step('Ice: Measurement builder', '#iceTabs [data-page=build]', '#chips', 900);
   await step('Ice: back to the Rink view', '#iceTabs [data-page=rink]', '#rink', 900);
-  await step('Ice: Preferences from the gear', '#gear', '#scrim.on', 600);
-  await p.click('#settingsDone'); await sleep(300);
+  await step('Ice: Preferences tab', '#iceTabs [data-page=prefs]', '#prefsPage.on', 600);
+  await p.click('#iceTabs [data-page=rink]'); await sleep(300);
   /* across to Glass: the same sheet */
   await p.click('#shellbar #appSw a[data-app="glass"]'); await sleep(3500);
   ok(label + ': the Ice | Glass switch lands on Glass\'s Rink view for the same sheet', await vis('#plan') && /\/s\/s1/.test(await p.evaluate(() => location.hash)), await p.evaluate(() => location.hash));

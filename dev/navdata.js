@@ -14,7 +14,7 @@ module.exports = {
     { id: 'Ice: Rink view', url: '/ice.html' + F + '/rink', probe: '#rink', ph: 1, tp: 1, tl: 1, lp: 1, mgmt: 1, staff: 1 },
     { id: 'Ice: Trends', url: '/ice.html' + F + '/trends', probe: '#home', ph: 1, tp: 1, tl: 1, lp: 1, mgmt: 1, staff: 1 },
     { id: 'Ice: Measurement builder', url: '/ice.html' + F + '/build', probe: '#chips', msg: '#laptopMsg', ph: 1, tp: 1, tl: 1, lp: 'message', mgmt: 1, staff: 1 },
-    { id: 'Ice Preferences', url: '/ice.html' + F + '/rink', open: '#gear', probe: '#scrim.on', ph: 1, tp: 1, tl: 1, lp: 1, mgmt: 1, staff: 'view' },
+    { id: 'Ice Preferences', url: '/ice.html' + F + '/prefs', probe: '#prefsPage.on', ph: 1, tp: 1, tl: 1, lp: 1, mgmt: 1, staff: 'view' },
     { id: 'Glass: Rink view', url: '/glass.html' + F, probe: '#plan', ph: 1, tp: 1, tl: 1, lp: 1, mgmt: 1, staff: 1 },
     { id: 'Glass: Builder', url: '/glass.html' + G3 + '/build', probe: '#builder', msg: '#bldLaptop', ph: 1, tp: 1, tl: 1, lp: 'message', mgmt: 1, staff: 1 },
     { id: 'Glass: Inventory', url: '/glass.html' + F + '/inventory', probe: '#spares', ph: 1, tp: 1, tl: 1, lp: 1, mgmt: 1, staff: 1 },

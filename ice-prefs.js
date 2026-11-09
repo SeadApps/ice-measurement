@@ -1,12 +1,10 @@
 "use strict";
-/* ice-prefs.js: the Preferences window: steppers, bands, rounds list, backup and restore.
+/* ice-prefs.js: the Preferences page: steppers, bands, rounds list, backup and restore.
    Moved out of ice.html unchanged, in the order it had there. A classic script: the names it declares are the
    page's globals, shared with ice-core.js and the other modules. */
 /* ---------- preferences ---------- */
-function openSettings(){buildSettings();$("scrim").classList.add("on");}
-const closeSettings=()=>$("scrim").classList.remove("on");
-$("gear").addEventListener("click",openSettings);$("gearHome").addEventListener("click",openSettings);
-$("settingsDone").addEventListener("click",closeSettings);$("scrim").addEventListener("click",e=>{if(e.target===$("scrim"))closeSettings();});
+/* Preferences is the fourth page of Ice (the tab beside the Measurement builder); this opens it. */
+function openSettings(){showPage("prefs");}
 /* A stepper around a number box: the buttons move it one step and fire the same input event typing does. */
 function stepper(inp,step,min,max){if(inp.parentNode.classList.contains("stp"))return;
   const w=document.createElement("span");w.className="stp";inp.parentNode.insertBefore(w,inp);
@@ -15,7 +13,7 @@ function stepper(inp,step,min,max){if(inp.parentNode.classList.contains("stp"))r
   w.appendChild(mk("−",-1,"Less"));w.appendChild(inp);w.appendChild(mk("+",1,"More"));}
 /* Staff see the window, but only Management changes what is in it. */
 function applyPrefsRole(){const ro=typeof Shell!=="undefined"&&!Shell.canManage();$("prefRo").hidden=!ro;
-  document.querySelectorAll("#scrim .modal input:not([type=file]),#scrim .modal .stp button,#resetBands,#roundManage .del").forEach(e=>{if(ro)e.disabled=true;else if(e.dataset.roLocked!=="1")e.disabled=false;});}
+  document.querySelectorAll("#prefsPage .modal input:not([type=file]),#prefsPage .modal .stp button,#resetBands,#roundManage .del").forEach(e=>{if(ro)e.disabled=true;else if(e.dataset.roLocked!=="1")e.disabled=false;});}
 function buildSettings(){applyTheme();applyUnitButtons();
   $("prefFac").textContent=facility().name;$("prefSheet").textContent=sheet().name;
   const ef=EF();
@@ -54,7 +52,7 @@ $("backupFile").addEventListener("change",e=>{const f=e.target.files[0];if(!f)re
     if(!sheet())state.activeSheet=facility().sheets[0].id;
     if(!session())state.activeSession=sheet().sessions[0].id;
     compareId=null;clearUndo();
-    applyGeometry(Records.sizeOf(sheet()),session().mode);buildBands();buildChips();persist();closeSettings();showPage(page);
+    applyGeometry(Records.sizeOf(sheet()),session().mode);buildBands();buildChips();persist();showPage(page);
     flashNote(res.taken?("merged "+res.taken+" change"+(res.taken===1?"":"s")):"already up to date");
     });
   }catch(err){ask({title:"Not a backup file",text:"That doesn't look like a valid Ice Sheet backup file.",cancel:null});}

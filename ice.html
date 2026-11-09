@@ -13,18 +13,18 @@
 
 <div id="shellbar"></div>
 
-<!-- The three pages of Ice. The address names the page; these are links to it. -->
+<!-- The four pages of Ice. The address names the page; these are links to it. -->
 <nav class="icetabs" id="iceTabs" aria-label="Ice pages">
   <button type="button" data-page="rink">Rink view</button>
   <button type="button" data-page="trends">Trends</button>
   <button type="button" data-page="build">Measurement builder</button>
+  <button type="button" data-page="prefs">Preferences</button>
 </nav>
 
 <!-- ===================== HOME ===================== -->
 <div id="home">
   <div class="home-bar">
     <div class="brand"><h1><span class="mark">[ ◊ ]</span> Trends</h1><span class="sub" id="trendsFac"></span></div>
-    <button class="iconbtn" id="gearHome" title="Preferences" aria-label="Preferences">⚙</button>
   </div>
 
   <div class="backup-warn" id="backupWarn">
@@ -51,7 +51,6 @@
   <header class="bar">
     <div class="brand-mini"><b id="wsName">Sheet</b><span class="sub" id="wsFac"></span></div>
     <div class="count-pill" id="countPill"><b id="countNum">0</b> / <span id="countTot">33</span> logged</div>
-    <button class="iconbtn" id="gear" title="Preferences" aria-label="Preferences">⚙</button>
   </header>
 
   <div class="subbar">
@@ -152,8 +151,8 @@
 </div>
 
 <!-- ===================== PREFERENCES ===================== -->
-<div class="scrim" id="scrim">
-  <div class="modal" role="dialog" aria-label="Preferences">
+<section id="prefsPage" aria-label="Preferences">
+  <div class="modal">
     <h2>Preferences</h2>
     <div class="lead ro-note" id="prefRo" hidden>You can see these settings but only Management can change them.</div>
     <div class="lead">These apply to <b id="prefFac"></b>, on every device. Theme and units are in the account menu; facilities and sheets are on their own pages.</div>
@@ -186,9 +185,8 @@
       <div class="row"><button class="btn" id="backupExport">⬇ Export all data</button><button class="btn ghost" id="backupImport">⬆ Restore from backup</button></div>
       <input type="file" id="backupFile" accept=".json,application/json">
     </div>
-    <div class="modal-foot"><button class="btn" id="settingsDone">Done</button></div>
   </div>
-</div>
+</section>
 
 <!-- ===================== NEW ROUND ===================== -->
 <div class="scrim" id="roundScrim">
@@ -271,7 +269,7 @@ function applyUnitButtons(){const mm=isMM();
   const pi=$("unitPrefIn"),pm=$("unitPrefMM");if(pi)pi.setAttribute("aria-pressed",String(!mm));if(pm)pm.setAttribute("aria-pressed",String(mm));}
 function setUnit(u){if(state.unit===u)return;state.unit=u;applyUnitButtons();buildBands();buildChips();persist();
   if(state.screen==="work"){drawLive();buildLegend();renderStats();updateContourReadout();}else buildHome();
-  if($("scrim").classList.contains("on"))buildSettings();}
+  if(page==="prefs")buildSettings();}
 
 
 /* ---------- backup staleness ---------- */
@@ -288,21 +286,24 @@ $("backupWarnBtn").addEventListener("click",doBackupExport);
 
 /* ---------- screens ---------- */
 const appEl=$("app");
-function enterWork(view){state.screen="work";if(page==="trends")page="rink";appEl.dataset.page=page;markTabs();compareId=null;clearUndo();hideSel=false;applyGeometry(Records.sizeOf(sheet()),session().mode);buildBands();buildChips();computeField();computeDelta();
+function enterWork(view){$("prefsPage").classList.remove("on");state.screen="work";if(page==="trends")page="rink";appEl.dataset.page=page;markTabs();compareId=null;clearUndo();hideSel=false;applyGeometry(Records.sizeOf(sheet()),session().mode);buildBands();buildChips();computeField();computeDelta();
   $("home").style.display="none";appEl.classList.add("live");buildSessSel();sizeLive();setView(view||"map");refresh();persist();applyLaptop();}
-function goHome(){state.screen="home";page="trends";appEl.dataset.page=page;markTabs();appEl.classList.remove("live");$("home").style.display="block";buildHome();persist();}
+function goHome(){$("prefsPage").classList.remove("on");state.screen="home";page="trends";appEl.dataset.page=page;markTabs();appEl.classList.remove("live");$("home").style.display="block";buildHome();persist();}
 /* ---------- the three pages ----------
    The address names the page (#/f/FID/s/SID/rink|trends|build). Trends is the old home screen
    cut down to the chart and the rounds; Rink view and the Measurement builder are the workspace
    with the other page's controls put away (see the [data-page] rules in the stylesheet). */
-const PAGES=["rink","trends","build"];let page="rink";
+const PAGES=["rink","trends","build","prefs"];let page="rink";
 function markTabs(){document.querySelectorAll("#iceTabs [data-page]").forEach(b=>b.setAttribute("aria-current",b.dataset.page===page?"page":"false"));}
 /* Entry is for a phone or tablet. When the shell says the layout is a laptop, the builder shows why and
    nothing on it can be used (inert: no clicks, no keys, no focus), so import and clear are out too. */
 function applyLaptop(){const on=typeof Shell!=="undefined"&&Shell.layout()==="laptop"&&page==="build";
   document.querySelectorAll("#app main,#app .subbar,#app footer.actions").forEach(e=>{e.inert=on;});$("laptopMsg").hidden=!on;}
-function showPage(p){if(!PAGES.includes(p))p="rink";page=p;state.lastPage=p;
-  if(p==="trends")goHome();else{$("home").style.display="none";enterWork(p==="build"?"map":state.lastView);}
+/* Preferences is a page of its own for the sheet in the address: neither the trend chart nor the workspace is showing. */
+function showPrefs(){state.screen="home";appEl.dataset.page=page;markTabs();appEl.classList.remove("live");$("home").style.display="none";buildSettings();persist();}
+function showPage(p){if(!PAGES.includes(p))p="rink";page=p;if(p!=="prefs")state.lastPage=p;
+  $("prefsPage").classList.toggle("on",p==="prefs");
+  if(p==="prefs")showPrefs();else if(p==="trends")goHome();else{$("home").style.display="none";enterWork(p==="build"?"map":state.lastView);}
   applyLaptop();if(typeof Shell!=="undefined")Shell.setAddress(facility().id,sheet().id,p);}
 if(typeof Shell!=="undefined")Shell.onLayout(applyLaptop);
 $("laptopToRink").addEventListener("click",()=>showPage("rink"));
