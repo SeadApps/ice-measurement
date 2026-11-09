@@ -246,7 +246,7 @@
 
   /* Stamp only what changed, and leave a tombstone for anything removed, so a
      delete on one device isn't undone by a merge from another. */
-  function stampChanges(next,prev){
+  function stampChanges(next,prev,tagOf){
     const out={},t=nowISO();
     for(const id in next){
       const p=prev[id];
@@ -257,7 +257,16 @@
         ? Object.assign(base,{updatedAt:p.updatedAt||t},p.changedBy?{changedBy:p.changedBy}:{},p.seed?{seed:true}:{})
         : Object.assign(base,{updatedAt:t});
     }
-    for(const id in prev){ if(!(id in next)) out[id]=prev[id].deleted?prev[id]:{id,deleted:true,updatedAt:t}; }
+    /* A removal keeps the facility tag (and where the record sat). A bare {id, deleted} was refused by the server for anybody but
+       an Admin ("untagged records are Admin only"), and for an Admin was stored untagged, so nobody who is scoped to a facility
+       ever learned of the removal. */
+    for(const id in prev){ if(!(id in next)){
+      const p=prev[id];
+      if(p.deleted){ out[id]=p; continue; }
+      const keep={}; ["fac","sheetId","facilityId"].forEach(k=>{ if(p[k]!=null) keep[k]=p[k]; });
+      if(keep.fac==null&&tagOf){ const f=tagOf(p); if(f) keep.fac=f; }
+      out[id]=Object.assign({id,deleted:true,updatedAt:t},keep);
+    } }
     return out;
   }
   function reassemble(fac,sh,se){
@@ -422,7 +431,8 @@
         const z=SNAP.se[id], sh=z&&!z.deleted&&SNAP.sh[z.sheetId];
         if(sh&&sh.deleted&&sh.name&&!(id in d.se)) d.se[id]=z;
       }
-      SNAP={fac:stampChanges(d.fac,SNAP.fac),sh:stampChanges(d.sh,SNAP.sh),se:stampChanges(d.se,SNAP.se)};
+      const tt=treeOf(SNAP.sh,SNAP.se);             // read before SNAP is replaced: where each record sat
+      SNAP={fac:stampChanges(d.fac,SNAP.fac,p=>tt.facOfRec("fac",p)),sh:stampChanges(d.sh,SNAP.sh,p=>tt.facOfRec("sh",p)),se:stampChanges(d.se,SNAP.se,p=>tt.facOfRec("se",p))};
       if(opts&&opts.seed) [SNAP.fac,SNAP.sh,SNAP.se].forEach(m=>{for(const id in m) if(m[id]&&!m[id].deleted) m[id].seed=true;});
       const prefs={};PREF_KEYS.forEach(k=>prefs[k]=st[k]);
       await Promise.all([Store.set(K.fac,JSON.stringify(SNAP.fac)),Store.set(K.sh,JSON.stringify(SNAP.sh)),

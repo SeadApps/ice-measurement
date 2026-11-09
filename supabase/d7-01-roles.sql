@@ -85,6 +85,15 @@ begin
 
   new.body            := coalesce(new.body, '{}'::jsonb) - 'changedBy' - 'changed_by';
   fac                 := nullif(new.body ->> 'fac', '');
+  -- A removal sent with no tag (an older app wrote them bare) takes the tag of the row it removes, so it is judged against
+  -- the right facility and the right people see it. Looked up by kind and id: an upsert over an existing row fires the
+  -- INSERT trigger first, where OLD does not exist.
+  if fac is null and new.deleted then
+    select r.facility_id into fac from public.records r where r.kind = new.kind and r.id = new.id;
+    if fac is not null then
+      new.body := jsonb_set(new.body, '{fac}', to_jsonb(fac));
+    end if;
+  end if;
   new.facility_id     := fac;
   new.changed_by      := person.user_id;        -- null for the shared account
   new.changed_by_name := person.name;

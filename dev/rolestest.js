@@ -77,6 +77,19 @@ ok('and reopens it', (await send(tok.gwen, [rec('flag', 'fl1', 'f1', { status: '
 ok('Staff cannot resolve one', (await send(tok.dee, [rec('flag', 'fl1', 'f1', { status: 'resolved', sheetId: 's1' })])).status === 403);
 ok('a Manager cannot resolve another facility\'s flag', (await send(tok.flo, [rec('flag', 'fl2', 'f2', { status: 'open', sheetId: 's2' })])).ok && (await send(tok.gwen, [rec('flag', 'fl2', 'f2', { status: 'resolved', sheetId: 's2' })])).status === 403);
 
+/* ---- a removal keeps its tag ---------------------------------------------------------------------------------------- */
+/* The app used to send a deleted round as {id} and nothing else, which the server refused for a Manager ("untagged records") and
+   stored with no facility for an Admin. The server now gives a bare removal the tag of the row it removes. */
+ok('Staff make two rounds', (await send(tok.dee, [rec('session', 'zdel', 'f1', { sheetId: 's1', date: '2026-11-01', data: {} }), rec('session', 'zdel2', 'f1', { sheetId: 's1', date: '2026-11-02', data: {} })])).ok);
+const bare = id => ({ kind: 'session', id, deleted: true, body: { id } });
+ok('a Manager removes one with a bare removal, and the server takes it', (await send(tok.gwen, [bare('zdel')])).ok);
+const zrow = (await k.rows()).find(r => r.id === 'zdel');
+ok('which is stored with the facility it was removed from, in the column and in the record', zrow.deleted === true && zrow.facility_id === 'f1' && zrow.body.fac === 'f1', JSON.stringify(zrow));
+ok('so Staff of that facility are told of it', (await ids(tok.dee)).includes('session zdel'));
+const foreignGone = await send(tok.flo, [bare('z2')]);
+ok('and a bare removal of a round in another facility is still refused', foreignGone.status === 403 && /not your facility/.test(await msg(foreignGone)));
+ok('a bare removal by an Admin gets the tag too', (await send(tok.pete, [bare('zdel2')])).ok && (await k.rows()).find(r => r.id === 'zdel2').facility_id === 'f1');
+
 /* ---- the change log -------------------------------------------------------------------------------------------- */
 const seenBy = async t => (await (await log(t)).json());
 const gl = await log(tok.gwen), gRows = gl.ok ? await gl.json() : [];
@@ -187,6 +200,9 @@ ok('Changes opens for a Manager, with their facility\'s changes', /Changes/.test
 await gp.goto(B + '/ice.html#/f/f1/s/s1/prefs'); await gp.waitForSelector('#prefsPage.on'); await sleep(1500);
 ok('Preferences are not read only for a Manager of that facility', !(await gp.isDisabled('#targetIn')) && !(await gp.isVisible('#prefRo')));
 ok('and there is no backup section', !(await gp.isVisible('#backupSec')));
+await gp.click('#roundManage .del >> nth=0'); await sleep(400); await gp.click('#sureScrim.on #sureYes'); await sleep(800);
+ok('a Manager deletes a round from Preferences, and the server takes it with its tag', await eventually(async () => (await k.rows()).some(r => r.kind === 'session' && r.deleted && r.body.fac === 'f1' && r.changed_by_name === 'Gwen')));
+ok('and the pill does not go red', !(await gp.$('.sync-pill.refused')));
 await G.ctx.close();
 
 /* Staff: unchanged */

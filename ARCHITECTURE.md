@@ -659,7 +659,7 @@ node dev/reg.js            # 15 checks: rounds persist, prefs stay separate, the
 node dev/restoretest.js    # 12 checks: restoring a backup is the Admin's, for an Ice backup and for a Glass file through the account menu; Staff are told and nothing merges
 node dev/resume.js         # 8 checks: coming back lands where you left off
 node dev/rinktest.js       # 19 checks: the Rink view: Compare to and its delta legend, no 3D, the old Map | Trend buttons gone
-node dev/rolestest.js      # 93 checks: Admin, Manager and Staff: what each reads and writes, the change log, the manage-staff function (a Manager's Staff only), the pages for each role, and the refused-changes view on the pill
+node dev/rolestest.js      # 101 checks: Admin, Manager and Staff: what each reads and writes, the change log, the manage-staff function (a Manager's Staff only), the pages for each role, and the refused-changes view on the pill
 node dev/routetest.js      # 40 checks: the shell's addresses, back/forward, a Staff person and a shared iPad, the apps follow where you are
 node dev/scheduletest.js   # 31 checks: the schedule opens on what needs attention, and print still carries all 127
 node dev/scopetest.js      # 53 checks: a Staff person sees and writes only their facilities; the tag; the per-person cursor
@@ -679,7 +679,7 @@ node dev/whotest.js        # 18 checks: nobody types their name; the bar names t
 node dev/widthstest.js     # 25 checks: a facility's one-tap widths (default 43/48, no record until changed); only a Manager or Admin resolves or reopens a flag
 ```
 
-2050 checks in all, over 63 suites. Tests point `window.__SYNC_CONFIG__` at the fake via
+2058 checks in all, over 63 suites. Tests point `window.__SYNC_CONFIG__` at the fake via
 `addInitScript`; the real pages never read it.
 
 **Lessons from the access work, each of which cost a debugging session:**
@@ -1146,6 +1146,13 @@ way, so it can still be loaded once from the account menu (`glassbackuptest`).
   belt and braces.
 
 ## Lessons that cost an afternoon
+
+- **A removal must keep its facility tag.** `stampChanges` used to write a deleted round as `{id, deleted, updatedAt}`. With no `fac` the
+  server refused it for a Manager or Staff ("untagged records are Admin only"), found on the real server by deleting a round on
+  an iPad, and stored it with no facility for an Admin, so nobody scoped to a facility ever learned of the removal. The app now keeps
+  `fac`, `sheetId` and `facilityId` on a removal, and the guard gives a bare one the tag of the row it removes (`d7-04-tombstone-tag.sql`).
+  The fake only caught it once `rolestest` deleted a round as a Manager.
+- **The real database runs the INSERT trigger first on an upsert**, and refuses a DELETE with no WHERE. Neither shows in the fake.
 
 - **Two devices on the old app ping-pong records** (its jsonb key order differs from the new store's), which
   wiped the backfill's `fac` tag and the sheets' `shape`. Before any server data step make sure no device is

@@ -384,6 +384,11 @@ const server = http.createServer(async (req,res)=>{
       opts.writes++;
       if (opts.flaky && opts.writes % opts.flaky === 0)      // every Nth write fails
         return json(res,500,{message:'simulated failure'});
+      /* What the trigger does first: a removal sent with no tag (an older app wrote them bare) takes the tag of the row it removes. */
+      for (const r of b){
+        const was = rows.get(r.kind+' '+r.id);
+        if (r.deleted && was && was.facility_id && !(r.body && r.body.fac)) r.body = Object.assign({}, r.body || {}, {fac:was.facility_id});
+      }
       for (const r of b){ const e = check(w, r); if (e) return json(res,403,{message:e}); }
       b.forEach(r=>{
         const key = r.kind+' '+r.id, old = rows.get(key);
