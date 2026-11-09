@@ -198,6 +198,17 @@ const sMenu = await menu(sp);
 ok('their menu has no Staff and no backup', !sMenu.includes('Staff') && !sMenu.some(t => /Back up|Restore/.test(t)), sMenu.join('|'));
 await sp.goto(B + '/index.html#/staff'); await sleep(1200);
 ok('the Staff page is not available to them, even by address', !(await sp.$('#pageStaff')));
+/* a refusal can be looked at: what the server said, and which records it was about */
+await sp.goto(B + '/index.html'); await sp.waitForSelector('#page'); await sleep(800);
+await sp.evaluate(c => Sync.unlockEditing(c), EDIT); await sleep(1200);
+await sp.evaluate(() => Records.Repo.addSheet({ facilityId: 'f1', name: 'Smuggled', size: null }).then(() => Sync.nudge()));
+const pill = await eventually(() => sp.evaluate(() => { const e = document.querySelector('.sync-pill'); return !!e && /refused/.test(e.textContent) && e.classList.contains('refused'); }));
+ok('a change the server refuses says so in the pill, which can then be tapped', !!pill);
+await sp.click('.sync-pill'); await sleep(300);
+const rtxt = await text(sp, '#syncRefuse');
+ok('it shows what the server said, in words, and which record it was', /Managers and Admins/.test(rtxt) && /The server said/.test(rtxt) && /sheet · Smuggled/.test(rtxt), rtxt);
+await sp.click('#syncRefuseClose'); await sleep(200);
+ok('and Close puts it away', !(await sp.$('#syncRefuse')));
 await S.ctx.close();
 
 /* An Admin: everything, and the form has the three roles */

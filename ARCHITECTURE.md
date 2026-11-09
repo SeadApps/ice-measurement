@@ -659,7 +659,7 @@ node dev/reg.js            # 15 checks: rounds persist, prefs stay separate, the
 node dev/restoretest.js    # 12 checks: restoring a backup is the Admin's, for an Ice backup and for a Glass file through the account menu; Staff are told and nothing merges
 node dev/resume.js         # 8 checks: coming back lands where you left off
 node dev/rinktest.js       # 19 checks: the Rink view: Compare to and its delta legend, no 3D, the old Map | Trend buttons gone
-node dev/rolestest.js      # 90 checks: Admin, Manager and Staff: what each reads and writes, the change log, the manage-staff function (a Manager's Staff only), and the pages for each role
+node dev/rolestest.js      # 93 checks: Admin, Manager and Staff: what each reads and writes, the change log, the manage-staff function (a Manager's Staff only), the pages for each role, and the refused-changes view on the pill
 node dev/routetest.js      # 40 checks: the shell's addresses, back/forward, a Staff person and a shared iPad, the apps follow where you are
 node dev/scheduletest.js   # 31 checks: the schedule opens on what needs attention, and print still carries all 127
 node dev/scopetest.js      # 53 checks: a Staff person sees and writes only their facilities; the tag; the per-person cursor
@@ -679,7 +679,7 @@ node dev/whotest.js        # 18 checks: nobody types their name; the bar names t
 node dev/widthstest.js     # 25 checks: a facility's one-tap widths (default 43/48, no record until changed); only a Manager or Admin resolves or reopens a flag
 ```
 
-2047 checks in all, over 63 suites. Tests point `window.__SYNC_CONFIG__` at the fake via
+2050 checks in all, over 63 suites. Tests point `window.__SYNC_CONFIG__` at the fake via
 `addInitScript`; the real pages never read it.
 
 **Lessons from the access work, each of which cost a debugging session:**

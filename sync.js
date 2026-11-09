@@ -61,6 +61,7 @@
   var lockSel = "";                           // the controls a page says change records; see lockControls
   var editUntil = 0, editCbs = [];            // the editing window, as far as this device knows
   var refusal = "";                           // why the last push was turned away: "locked" or "refused"
+  var lastRefusal = null;                     // what the server said, and which records it was about, for the pill to show
   var gateNotice = "";                        // what to say on the next gate: why it came back
 
   var MSG_CODE_CHANGED = "The access code has changed. Ask Pete for the new one.";
@@ -411,6 +412,10 @@
              window is the person's to fix, a refused facility is not. */
           return r.json().catch(function () { return {}; }).then(function (m) {
             refusal = /locked/i.test((m && m.message) || "") ? "locked" : "refused";
+            if (refusal === "refused") lastRefusal = { message: (m && m.message) || "", items: batch.map(function (x) {
+              var b = x.body || {};
+              return { kind: x.kind, label: b.name || b.label || (b.sheetId ? "on sheet " + b.sheetId : "") || String(x.id) };
+            }) };
             if (refusal === "locked" && !entry) setEditing(0);   // a departed person's window is not this person's
             return false;
           });
@@ -494,7 +499,7 @@
   }
 
   function push() {
-    refusal = "";
+    refusal = ""; lastRefusal = null;
     return changed().then(function (c) {
       var groups = [], idx = {};
       c.rows.forEach(function (row) {
@@ -700,11 +705,49 @@
     + '.sync-pill i{width:7px;height:7px;border-radius:50%;background:var(--ink-faint,#5d7384);flex:none}'
     + '.sync-pill.synced i{background:#7fcf9a}.sync-pill.syncing i{background:var(--frost,#6fd6ec)}'
     + '.sync-pill.offline i{background:#e8b54a}.sync-pill.local i{background:var(--ink-faint,#5d7384)}'
+    + '.sync-pill.refused{cursor:pointer;border-color:#e5645d}.sync-pill.refused i{background:#e5645d}'
+    + '.sync-refuse{position:fixed;inset:0;z-index:300;background:rgba(6,9,13,.78);display:flex;align-items:flex-start;justify-content:center;padding:24px 14px;overflow:auto}'
+    + '.sync-refuse-box{background:var(--panel,#152433);color:var(--ink,#eaf3f8);border:1px solid var(--line,#273d4f);border-radius:4px;width:min(520px,100%);padding:20px}'
+    + '.sync-refuse-box h2{margin:0 0 10px;font-size:17px}.sync-refuse-box p{margin:0 0 10px;font-size:14px;line-height:1.5}'
+    + '.sync-refuse-box .raw{font-family:var(--mono,monospace);font-size:12px;color:var(--ink-dim,#90a8b8)}'
+    + '.sync-refuse-box .note{font-size:12.5px;color:var(--ink-dim,#90a8b8)}.sync-refuse-box ul{margin:0 0 14px;padding-left:20px;font-size:13px}'
+    + '.sync-refuse-box button{appearance:none;font:inherit;min-height:44px;padding:0 18px;border-radius:3px;border:1px solid var(--line,#273d4f);background:var(--panel-2,#1c3142);color:var(--ink,#eaf3f8);cursor:pointer}'
     + '.sync-signout{appearance:none;font:inherit;font-family:var(--mono,monospace);font-size:11px;'
     + 'color:var(--ink-dim,#90a8b8);background:var(--panel,#152433);border:1px solid var(--line,#273d4f);'
     + 'border-radius:999px;padding:5px 11px;cursor:pointer;white-space:nowrap}'
     + '.sync-signout:hover{color:var(--ink,#eaf3f8);border-color:var(--ink-faint,#5d7384)}'
     + '.sync-signout:focus-visible{outline:2px solid var(--frost,#6fd6ec);outline-offset:2px}';
+
+  /* What a refusal means, in words a person can act on. Anything not listed is shown as the server said it. */
+  function refusalWords(msg) {
+    if (/not your facility/i.test(msg)) return "One of these changes is for a facility you were not given. It stays on this device and is tried again each time.";
+    if (/settings are for Managers and Admins/i.test(msg)) return "Only a Manager or an Admin can change a facility's or a sheet's settings.";
+    if (/only an Admin adds, removes or restores a facility/i.test(msg)) return "Only an Admin can add, hide or bring back a facility.";
+    if (/Admin only/i.test(msg)) return "This change is not tied to a facility, so only an Admin can make it.";
+    if (/resolves or reopens a flag/i.test(msg)) return "Only a Manager or an Admin can resolve or reopen a flag.";
+    if (/shared account/i.test(msg)) return "Nobody is signed in as a person on this device.";
+    return "";
+  }
+  function showRefusal() {
+    var r = lastRefusal; if (!r) return;
+    var old = document.getElementById("syncRefuse"); if (old) old.remove();
+    var wrap = document.createElement("div"); wrap.id = "syncRefuse"; wrap.className = "sync-refuse";
+    var box = document.createElement("div"); box.className = "sync-refuse-box"; box.setAttribute("role", "dialog"); box.setAttribute("aria-modal", "true"); box.setAttribute("aria-label", "Refused by the server");
+    function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+    box.appendChild(el("h2", "", "Refused by the server"));
+    var words = refusalWords(r.message);
+    if (words) box.appendChild(el("p", "why", words));
+    box.appendChild(el("p", "raw", "The server said: " + (r.message || "no reason given")));
+    var ul = el("ul", "");
+    r.items.slice(0, 12).forEach(function (x) { ul.appendChild(el("li", "", String(x.kind).replace(/_/g, " ") + (x.label ? " \u00b7 " + x.label : ""))); });
+    if (r.items.length > 12) ul.appendChild(el("li", "", "and " + (r.items.length - 12) + " more"));
+    box.appendChild(el("p", "note", "The server turns away the whole batch when one change in it is refused, so these were sent together:"));
+    box.appendChild(ul);
+    var close = el("button", "", "Close"); close.type = "button"; close.id = "syncRefuseClose";
+    close.addEventListener("click", function () { wrap.remove(); });
+    wrap.addEventListener("click", function (e) { if (e.target === wrap) wrap.remove(); });
+    box.appendChild(close); wrap.appendChild(box); document.body.appendChild(wrap); close.focus();
+  }
 
   function injectCSS() {
     if (document.getElementById("sync-css")) return;
@@ -1007,12 +1050,18 @@
       var el = document.createElement("span");
       el.className = "sync-pill";
       el.innerHTML = '<i></i><span></span>';
+      /* A pill that says "refused by the server" can be tapped to see what was refused and why. */
+      el.addEventListener("click", function () { if (refusal === "refused" && lastRefusal) showRefusal(); });
+      el.addEventListener("keydown", function (e) { if ((e.key === "Enter" || e.key === " ") && refusal === "refused" && lastRefusal) { e.preventDefault(); showRefusal(); } });
       Sync.onStatus(function (s, d) {
-        el.className = "sync-pill " + s;
+        var bad = s === "offline" && refusal === "refused" && !!lastRefusal;
+        el.className = "sync-pill " + s + (bad ? " refused" : "");
+        if (bad) { el.setAttribute("role", "button"); el.setAttribute("tabindex", "0"); el.title = "Tap to see what was refused"; }
+        else { el.removeAttribute("role"); el.removeAttribute("tabindex"); el.removeAttribute("title"); }
         el.querySelector("span").textContent =
           s === "synced"  ? (d && d !== "up to date" ? d : "everyone has this")
         : s === "syncing" ? "syncing…"
-        : s === "offline" ? (d || "saved on this device")
+        : s === "offline" ? (d || "saved on this device") + (bad ? " · tap for details" : "")
         : (d || "on this device only");
       });
       return el;

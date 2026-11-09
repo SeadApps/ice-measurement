@@ -430,7 +430,7 @@ begin
   end if;
   insert into app.codes (name, hash) values ('editing', extensions.crypt(p_code, extensions.gen_salt('bf')))
     on conflict (name) do update set hash = excluded.hash, changed_at = now();
-  delete from app.unlocks;                          -- the old code's windows end with it
+  delete from app.unlocks where true;               -- the old code's windows end with it (Supabase refuses a DELETE with no WHERE)
 end $$;
 
 -- The access code is the shared account's password, so the auth system holds
