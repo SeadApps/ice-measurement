@@ -564,15 +564,19 @@
       if (asking) {
         line.appendChild(h("span", { style: "font-size:13px", text: kind === "access"
           ? "Everyone is signed out until they enter the new code. Nothing saved on their devices is lost." : "Everyone\u2019s open editing window ends." }));
-        var ownIn = h("input", { type: "text", id: kind + "Own", autocomplete: "off", maxlength: "72", placeholder: "or type your own (8 or more characters)", "aria-label": "Your own " + title.toLowerCase() });
+        var ownIn = h("input", { type: "text", id: kind + "Own", autocomplete: "off", maxlength: "72", placeholder: ask.own ? "Type the new code (8 or more characters)" : "or type your own (8 or more characters)", "aria-label": "Your own " + title.toLowerCase() });
         line.appendChild(ownIn);
-        line.appendChild(h("button", { cls: "btn danger sm", type: "button", id: kind + "Yes", text: "Yes, change it", onclick: function () {
-          if (ownIn.value && ownIn.value.length < 8) { staffMsg = "A code needs at least 8 characters."; Shell.repaint(); return; }
+        if (ask.own) setTimeout(function () { ownIn.focus(); }, 0);
+        line.appendChild(h("button", { cls: "btn danger sm", type: "button", id: kind + "Yes", text: ask.own ? "Set it" : "Yes, change it", onclick: function () {
+          if ((ask.own && !ownIn.value) || (ownIn.value && ownIn.value.length < 8)) { staffMsg = "A code needs at least 8 characters."; Shell.repaint(); return; }
           var code = ownIn.value || newCode(); ask = null;
           act(kind === "access" ? "set_access_code" : "set_editing_code", { code: code }, function () {
             showCode("New " + title.toLowerCase() + ":", code, kind === "access" ? "Share it with the team. Everyone is signed out until they enter it. It will not be shown again." : "Share it with the people who edit. It will not be shown again."); }); } }));
         line.appendChild(h("button", { cls: "btn ghost sm", type: "button", id: kind + "No", text: "Keep", onclick: function () { ask = null; Shell.repaint(); } }));
-      } else line.appendChild(h("button", { cls: "btn ghost sm", type: "button", id: btnId, text: label, onclick: function () { ask = { kind: kind }; Shell.repaint(); } }));
+      } else {
+        line.appendChild(h("button", { cls: "btn ghost sm", type: "button", id: btnId, text: label, onclick: function () { ask = { kind: kind }; Shell.repaint(); } }));
+        line.appendChild(h("button", { cls: "btn ghost sm", type: "button", id: kind === "access" ? "setAccess" : "setEdit", text: "Set code…", onclick: function () { ask = { kind: kind, own: true }; staffMsg = ""; Shell.repaint(); } }));
+      }
       return [h("div", { cls: "eyebrow" }, [h("span", { text: title })]), h("p", { style: "margin:0 0 10px;font-size:14px", text: blurb }), line];
     }
     var card = h("div", { cls: "card", id: "sharedCodes" });
